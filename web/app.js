@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+import { initBuilder, showBuilder } from "./builder.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -130,8 +131,19 @@ const MAT = {
   other: new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.5 }),
 };
 const geomCache = new Map();
-const meshesP = fetch("/api/meshes").then((r) => r.json());
-let MESHES = null;
+const meshStore = {}; // robot id -> promise of its mesh buffers (fetched once per robot)
+const meshesFor = (rid) => (meshStore[rid] ||= fetch(`/api/meshes?robot=${encodeURIComponent(rid)}`).then((r) => r.json()));
+const robotMats = new Map();
+function robotMaterial(rid, rgba) {
+  const lum = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2];
+  if (rid === "so101") return lum > 0.5 ? MAT.printed : lum < 0.2 ? MAT.motor : MAT.other;
+  // other embodiments keep the colours their source models ship with
+  const k = rgba.map((x) => x.toFixed(2)).join(",");
+  if (!robotMats.has(k)) {
+    robotMats.set(k, new THREE.MeshPhysicalMaterial({ color: srgb(rgba), roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.4 }));
+  }
+  return robotMats.get(k);
+}
 function meshGeometry(id, data) {
   if (geomCache.has(id)) return geomCache.get(id);
   const v = new Float32Array(Uint8Array.from(atob(data.v), (c) => c.charCodeAt(0)).buffer);
@@ -164,7 +176,9 @@ function bowlGeometry(r, h) {
 }
 
 let world = null; // { root, bodies: Object3D[] }
-function buildWorld(sc) {
+async function buildWorld(sc) {
+  const rid = sc.robot_id || "so101";
+  const meshes = await meshesFor(rid);
   if (world) scene3.remove(world.root);
   const root = new THREE.Group();
   const bodies = sc.bodies.map(() => {
@@ -173,10 +187,8 @@ function buildWorld(sc) {
     return o;
   });
   for (const g of sc.robot) {
-    const geo = meshGeometry(g.mesh, MESHES[String(g.mesh)]);
-    const lum = 0.299 * g.rgba[0] + 0.587 * g.rgba[1] + 0.114 * g.rgba[2];
-    const mat = lum > 0.5 ? MAT.printed : lum < 0.2 ? MAT.motor : MAT.other;
-    const m = new THREE.Mesh(geo, mat);
+    const geo = meshGeometry(`${rid}|${g.mesh}`, meshes[String(g.mesh)]);
+    const m = new THREE.Mesh(geo, robotMaterial(rid, g.rgba));
     m.position.fromArray(g.pos);
     m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
     m.castShadow = true;
@@ -225,8 +237,8 @@ function applyFrame(frame) {
 
 // playback of the policy's own recorded rollout (body poses at 30 Hz)
 let play = null; // { frames, fps, t0 }
-function startPlayback(payload) {
-  buildWorld(payload.scene);
+async function startPlayback(payload) {
+  await buildWorld(payload.scene);
   play = { frames: payload.frames, fps: payload.fps, t0: performance.now(), phases: payload.phase_frames || null, instructions: payload.instructions || [], step: -1 };
   $("#step-badge").classList.add("hidden");
   applyFrame(payload.frames[0]);
@@ -274,8 +286,10 @@ function tick() {
       }
     }
   }
-  controls.update();
-  renderer.render(scene3, camera);
+  if (!$("#view-sim").classList.contains("hidden")) {
+    controls.update();
+    renderer.render(scene3, camera);
+  }
   requestAnimationFrame(tick);
 }
 tick();
@@ -479,7 +493,7 @@ async function loadRollout(run, ri, i) {
   if (!res.ok) return;
   const p = await res.json();
   if (shown.index !== i || shown.run !== run) return;
-  startPlayback(p);
+  await startPlayback(p);
   const badge = $("#vp-badge");
   badge.classList.remove("hidden", "ok", "bad");
   badge.classList.add(p.success ? "ok" : "bad");
@@ -519,7 +533,7 @@ async function showPreview(rid) {
   if (!res.ok) return;
   const sc = await res.json();
   play = null;
-  buildWorld(sc);
+  await buildWorld(sc);
   applyFrame(sc.frame);
   $("#pb-fill").style.width = "0";
   $("#vp-badge").classList.add("hidden");
@@ -532,7 +546,8 @@ document.querySelectorAll(".seg button").forEach((b) =>
 );
 function setView(v) {
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
-  for (const k of ["sim", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  for (const k of ["sim", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();
   if (v === "skills") refreshSkills();
@@ -613,6 +628,7 @@ function renderSkills(skills, fresh) {
     const meta = el("div", "meta");
     const parent = s.steps?.length ? "chained" : s.parent ? (byId[s.parent] ? `from "${byId[s.parent].instruction.slice(0, 24)}..."` : "from a skill") : "from base";
     meta.append(el("span", "pct", `${Math.round(100 * s.success_rate)}% of ${s.n_eval}`), el("span", "", `${Math.round(s.seconds)}s`), el("span", "", parent));
+    if (s.robot && s.robot !== "so101") meta.append(el("span", "robot-tag mono", s.robot));
     const b = el("button", "", "Call agent");
     const reply = el("div", "reply");
     b.onclick = async () => {
@@ -648,9 +664,20 @@ function setReady(on) {
 }
 
 // ---------------------------------------------------------------- page load: show the last finished run
+let robotNow = "so101";
+window.addEventListener("robot-change", (e) => {
+  const changed = e.detail.id !== robotNow;
+  robotNow = e.detail.id;
+  $("#robot-chip").textContent = `${e.detail.label} · sim`;
+  if (changed && !current) {
+    $("#vp-caption").textContent = `${e.detail.label} · MuJoCo`;
+    fetch("/api/preview").then((r) => r.json()).then(async (sc) => { await buildWorld(sc); applyFrame(sc.frame); });
+  }
+});
 async function idleScene() {
-  MESHES = await meshesP;
   const st = await (await fetch("/api/state")).json();
+  robotNow = st.robot || "so101";
+  initBuilder(robotNow);
   renderSkills(st.skills);
   setReady(st.ready);
   const tops = st.runs.filter((r) => !r.parent);
@@ -659,7 +686,7 @@ async function idleScene() {
     adoptRun(last, st.runs);
   } else {
     const sc = await (await fetch("/api/preview")).json();
-    buildWorld(sc);
+    await buildWorld(sc);
     applyFrame(sc.frame);
   }
 }

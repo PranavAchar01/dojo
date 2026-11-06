@@ -152,6 +152,45 @@ hold hardware (CERN-OHL-S) and an MIT MCP server but no interface code, so nothi
 rebuilt with this project's own HTML, CSS and JavaScript, with no HeyPCB name or logo in the page. Not
 affiliated. Details and other credits in `NOTICE`.
 
+## Custom robots (the Robot tab)
+
+The Robot tab builds the embodiment before a skill is trained, in the spirit of Etch's part picker: pick an arm,
+a wrist option and an end effector, see each part as a 3D preview and the assembled robot live, read the checks,
+then press "Train the next skill on this robot". Every part is a published open-source MuJoCo model; sources,
+licences and the pinned Menagerie commit are in `SOURCES.md`. Code: `src/vla_forge/sim/robots.py`.
+
+- **Robot id.** `<arm>.<wrist>.<effector>`, for example `vx300s.native.native` or `wx250s.native.robotiq_2f85`.
+  The stock arm is plain `so101`. Each published skill stores its robot in `Skill.robot` (default `"so101"`), and
+  nearest-skill lookup only fine-tunes from skills trained on the same robot.
+- **Assembly.** `robot_spec(id)` composes the source MJCF with `MjSpec.attach_body`: the arm's own jaw is removed
+  when another effector replaces it, the effector is mounted on the last wrist link, a locked wrist drops its roll
+  joint and actuator, and a `tcp` site marks the tool centre. `calibrate(id)` then measures in sim: finger opening
+  at the fingertips (mm), gripper command range, a top-down home pose.
+- **Checks** (`report(id)`, shown in the tab): the model compiles; every arm joint has sane limits with home
+  inside; the action size; fingers open wider than a 3 cm block and close below it; top-down reach over the table
+  workspace (7 x 9 grid, r 0.125-0.285 m, +/-38 deg) at grasp, push and hover height; gravity torque with a 30 g
+  block at full reach against the source model's actuator limits; no self-collision at home.
+- **Training on it.** Demos come from the same scripted expert, solving IK on the new arm. If the action size
+  matches the base policy (6), every layer is kept and fine-tuned. If it differs (7 for the Trossen arms, 5 with
+  a locked wrist on a 5-joint arm), `VLA.for_embodiment` keeps the frozen encoders and every head weight whose
+  shape still fits, re-initialises the state input and action output layers, and resets the action
+  normalisation from the new robot's demos; the run's `init_from.reason` says which. SO-101 replay data is not
+  mixed into a custom robot's training.
+
+### Router hook: `robot_feasibility`
+
+```python
+from vla_forge.sim.robots import robot_feasibility
+ok, reason = robot_feasibility("koch.native.native", "pick_place")
+# (False, "it reaches only 57% of the table workspace at grasp height pointing down (needs 90%); ...")
+```
+
+`task` may be a skill name (`"reach"`, `"push"`, `"lift"`, `"pick_place"`, `"stack"`), a `TaskSpec`, or a dict
+with a `"skill"` key. It returns `(ok, reason)` with a plain sentence either way. In order it checks: the parts
+compose; for grasping skills, the fingers open at least 38 mm and close below 28 mm; at least 90% of the workspace
+is reachable pointing down at the height the skill works at, and at hover height; holding torque is within the
+actuator limits. Results are cached per robot (the first call on a new robot takes about 4-8 s).
+
 ## What is real and what is scaffolded
 
 Real:
@@ -193,6 +232,7 @@ src/vla_forge/
   llm.py         task parser and critic (OpenAI, optional Llama)
   registry.py    skill library, nearest-skill lookup
   viz.py         scene export for three.js
-web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library
+  sim/robots.py  robot builder: part catalog, MJCF assembly, calibration, checks, robot_feasibility
+web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js)
 scripts/         pretrain_base.py, experiment.py, ladder.py, record_demo.mjs, narrate.py, edit_demo.py, heavy.sh
 ```
