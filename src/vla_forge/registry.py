@@ -42,6 +42,7 @@ class Skill:
         default_factory=list
     )  # composed skills: [{instruction, skill_id}, ...]; no checkpoint
     prompt: str = ""
+    robot: str = "so101"  # the robot id it was trained on (sim/robots.py); a policy only runs on that robot
 
     @property
     def composite(self) -> bool:
@@ -80,18 +81,23 @@ class Registry:
     def ordered(self) -> list[Skill]:
         return sorted(self.skills.values(), key=lambda s: -s.created)
 
-    def exact(self, instruction: str) -> Skill | None:
-        """The best published single skill for exactly this instruction (what a composed task reuses)."""
+    def exact(self, instruction: str, robot: str = "so101") -> Skill | None:
+        """The best published single skill for exactly this instruction on this robot (what a composed task reuses)."""
         hits = [
             s
             for s in self.skills.values()
-            if not s.composite and s.instruction == instruction
+            if not s.composite and s.instruction == instruction and s.robot == robot
         ]
         return max(hits, key=lambda s: (s.success_rate, s.created)) if hits else None
 
-    def nearest(self, spec: TaskSpec) -> tuple[str | None, Path, float, str]:
-        """(skill id or None for the base, checkpoint, similarity, human-readable reason)."""
-        singles = [s for s in self.skills.values() if not s.composite]
+    def nearest(
+        self, spec: TaskSpec, robot: str = "so101"
+    ) -> tuple[str | None, Path, float, str]:
+        """(skill id or None for the base, checkpoint, similarity, human-readable reason). Only skills trained on
+        the same robot count: another robot's policy speaks a different joint space."""
+        singles = [
+            s for s in self.skills.values() if not s.composite and s.robot == robot
+        ]
         if not singles:
             return (
                 None,

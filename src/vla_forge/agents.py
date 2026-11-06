@@ -770,12 +770,19 @@ def run_once(skill: Skill) -> dict:
         models = [VLA.load(ROOT / s.model, device())[0] for s in subs]
         with FORGE.compute:
             r = evaluate_composed(
-                models, [st.in_scene() for st in steps], [lay], seed0=seed, record=False
+                models,
+                [st.in_scene() for st in steps],
+                [lay],
+                seed0=seed,
+                record=False,
+                robot=skill.robot,
             )[0]
         return {"success": r.success, "failure": r.failure, "steps": r.ticks}
     model, _ = VLA.load(ROOT / skill.model, device())
     with FORGE.compute:
-        r = evaluate(model, skill.task(), 1, seed0=seed, record=False)[0]
+        r = evaluate(
+            model, skill.task(), 1, seed0=seed, record=False, robot=skill.robot
+        )[0]
     return {"success": r.success, "failure": r.failure, "steps": r.steps}
 
 
