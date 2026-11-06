@@ -202,6 +202,39 @@ The library router calls it for the active robot on every skill a prompt needs (
 carries its reason, for example a pick on the WidowX 250: "the fingers open only 25 mm; a 3 cm block needs at
 least 38 mm". Reuse and remix only match tiles trained on the same robot, and each tile shows its robot.
 
+## Factory lines (the Line tab)
+
+A company describes its line in words; the planner splits it into stations along one conveyor; the router checks
+each station; the agents train every station that needs a skill; then the whole line runs, part by part.
+
+- **Stations.** One arm beside the belt with one tote. A station is either a trained VLA (its own skill, fine-tuned
+  from the nearest library skill on that station's own conveyor cell) or a scripted cell (the expert with
+  privileged state). The page labels which. A line can mix them, e.g. VLA, VLA, then a scripted end-of-line cell.
+- **Planner.** `factory.plan_line`: one OpenAI call with a strict JSON schema (keyword planner offline). Only
+  conveyor sort / kitting lines are supported: each station takes one part colour (or, last, every part).
+- **Router.** `factory.route_station`: the robot's own feasibility check, an IK reach check over the photo-eye
+  stop and the tote in sampled cells, then reuse (exact skill in the library), train (with an estimate from past
+  runs), scripted, or refused with the reason.
+- **Cells.** `sim/line.py`: the conveyor (MuJoCo maintainers' constant-speed belt construction) and the totes
+  (robosuite's bin, scaled), both sourced, see SOURCES.md. The belt stops when a part reaches the station's
+  photo-eye; the station moves it into its tote; parts for later stations ride through.
+- **Line run.** `factory.run_line`: every zone runs in its own MuJoCo cell; VLA stations are the policy's own
+  closed-loop rollouts, batched; after a VLA pick the arm is driven home by a scripted move. The zone schedule
+  (one part per zone, parts released every 3 s) gives the line time and throughput. Times are simulated time.
+
+Measured (2026-11-06, simulation, line "Red and Blue Sorting Line": SO-101 VLA red, SO-101 VLA blue, scripted
+ViperX 300 end of line):
+
+| Station | Controller | Trained in | Held-out success | On the line (30 parts, seed 11) | Mean cycle |
+|---|---|---|---|---|---|
+| 1 red to red tote | VLA, fine-tuned from "put the red block in the white bowl" | 91 s | 17/20 (85%) | 9/9 | 8.0 s |
+| 2 blue to blue tote | VLA, fine-tuned from station 1's skill | 163 s | 17/20 (85%) | 11/12 | 8.0 s |
+| 3 everything else to gray | scripted (ViperX 300) | none | n/a | 9/9 | 10.3 s |
+
+End to end: 29/30 parts in the right tote (97%), 252 s of line time, 6.9 parts per simulated minute. A first run
+of 12 parts (seed 7) put 12/12 in the right tote, 6.6 parts per minute. The one miss was a blue part dropped on
+the way by station 2.
+
 ## What is real and what is scaffolded
 
 Real:
@@ -216,6 +249,8 @@ Real:
 Scaffolded or limited:
 - Simulation only. No real robot was driven.
 - The demos come from a scripted expert with privileged state, not from human teleoperation.
+- Factory lines: each station is its own MuJoCo cell and the zones are chained by a schedule, not one shared
+  simulation of the whole belt; parts are the same 3 cm cubes; the arm's return home after a VLA pick is scripted.
 - The per-prompt 3 minute run is a fine-tune of a base policy pretrained ahead of time on the same five
   motion primitives; it does not learn a new motion family from nothing in 3 minutes.
 - Agentverse: registration code is in `agents.register_on_agentverse`. It runs only when
@@ -242,8 +277,10 @@ src/vla_forge/
   rollout.py     closed-loop evaluation, failure classification
   llm.py         task parser and critic (OpenAI, optional Llama)
   registry.py    skill library, nearest-skill lookup
+  factory.py     factory lines: planner, station router, building (training stations), line runs and schedule
+  sim/line.py    conveyor and totes for a station cell (sourced: see SOURCES.md)
   viz.py         scene export for three.js
   sim/robots.py  robot builder: part catalog, MJCF assembly, calibration, checks, robot_feasibility
-web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js)
+web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js), factory line (line.js)
 scripts/         pretrain_base.py, experiment.py, ladder.py, record_demo.mjs, narrate.py, edit_demo.py, heavy.sh
 ```

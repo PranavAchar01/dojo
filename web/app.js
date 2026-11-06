@@ -270,6 +270,49 @@ function bowlGeometry(r, h) {
 }
 
 let world = null; // { root, bodies: Object3D[] }
+// factory-line cell parts (sim/line.py): the totes are robosuite's bin boxes as the MJCF has them; the belt is drawn
+// fixed in place and its tread texture scrolls with the slide joint (the MuJoCo belt body itself translates)
+function beltTexture() {
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#1c1d21"; g.fillRect(0, 0, 64, 256);
+  g.fillStyle = "#2a2c31";
+  for (let y = 0; y < 256; y += 32) g.fillRect(0, y, 64, 14);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const BELT_RAIL = new THREE.MeshStandardMaterial({ color: 0x9ea3ab, roughness: 0.35, metalness: 0.7 });
+function addLineParts(sc, root, bodies, maxHalfLen = Infinity) {
+  for (const b of sc.bins || []) {
+    const mat = new THREE.MeshStandardMaterial({ color: srgb(b.rgb), roughness: 0.6, envMapIntensity: 0.5 });
+    for (const g of b.boxes) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(g.size[0] * 2, g.size[1] * 2, g.size[2] * 2), mat);
+      m.position.set(...g.pos);
+      m.castShadow = m.receiveShadow = true;
+      bodies[b.body].add(m);
+    }
+  }
+  if (!sc.belt) return null;
+  const [w, l0, t] = sc.belt.half;
+  const l = Math.min(l0, maxHalfLen);
+  const tex = beltTexture();
+  tex.repeat.set(1, (l * 2) / 0.06);
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(w * 2, l * 2, t * 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+  const x = sc.frame ? sc.frame[sc.belt.body * 7] : 0.245;
+  belt.position.set(x, 0, sc.belt.top - t);
+  belt.receiveShadow = true;
+  root.add(belt);
+  for (const s of [-1, 1]) { // side rails
+    const r = new THREE.Mesh(new THREE.BoxGeometry(0.008, l * 2, 0.014), BELT_RAIL);
+    r.position.set(x + s * (w + 0.004), 0, 0.004);
+    r.castShadow = r.receiveShadow = true;
+    root.add(r);
+  }
+  return { tex, body: sc.belt.body, y0: sc.frame ? sc.frame[sc.belt.body * 7 + 1] : 0 };
+}
 async function buildWorld(sc) {
   const rid = sc.robot_id || "so101";
   const meshes = await meshesFor(rid);
@@ -320,12 +363,13 @@ async function buildWorld(sc) {
       bodies[p.body].add(m);
     }
   }
+  const belt = addLineParts(sc, root, bodies, TOP.d / 2 - 0.02);
   const base = contactShadow(0.2, 0.6); // under the arm's base plate
   base.position.set(0, 0, 0.0004);
   root.add(base);
   for (const b of blobs) root.add(b.mesh);
   scene3.add(root);
-  world = { root, bodies, blobs, n: sc.bodies.length, rid };
+  world = { root, bodies, blobs, n: sc.bodies.length, rid, belt };
 }
 function applyFrame(frame) {
   if (!world || !frame) return;
@@ -335,6 +379,7 @@ function applyFrame(frame) {
     world.bodies[i].position.set(frame[k], frame[k + 1], frame[k + 2]);
     world.bodies[i].quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
   }
+  if (world.belt) world.belt.tex.offset.y = -(frame[world.belt.body * 7 + 1] - world.belt.y0) / 0.06;
   for (const b of world.blobs) { // contact shadows stay on the table and fade as the object lifts
     const p = world.bodies[b.body].position;
     b.mesh.position.set(p.x, p.y, 0.0004);
@@ -872,6 +917,7 @@ const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   window.forgeLib?.onEvent(e, e.run === current || family.has(e.run));
+  window.dispatchEvent(new CustomEvent("forge:event", { detail: e })); // the Line tab listens here (one stream per page)
   if (e.kind === "ready") { setReady(true); return; }
   if (e.kind === "agents") return;
   if (e.run !== current && !family.has(e.run)) {
@@ -1094,6 +1140,7 @@ window.forge = {
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
   THREE, scene3, camera, controls, renderer,
+  meshesFor, meshGeometry, robotMaterial, srgb, contactShadow, addLineParts, RoundedBoxGeometry,
 };
 
 idleScene();

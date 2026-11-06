@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
-from . import tiles
+from . import factory, tiles
 from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
@@ -308,6 +308,184 @@ async def capture(req: Request):
     out.parent.mkdir(exist_ok=True)
     out.write_bytes(await req.body())
     return {"path": str(out), "bytes": out.stat().st_size}
+
+
+# ---------------------------------------------------------------- factory lines
+
+LINES: dict[str, factory.Line] = factory.load_all()
+LINE_SCENES: dict[str, list] = {}
+
+
+class LinePrompt(BaseModel):
+    prompt: str
+
+
+class LineRun(BaseModel):
+    n_parts: int = 12
+    seed: int = 7
+
+
+class StationEdit(BaseModel):
+    controller: str | None = None  # vla | scripted
+    robot: str | None = None
+
+
+def _line(lid: str) -> factory.Line:
+    return LINES.get(lid) or _404()
+
+
+def _line_json(ln: factory.Line, full: bool = False) -> dict:
+    """The line plus each station's skill record (held-out success and how it was trained)."""
+    d = ln.to_json(full)
+    for st in d["stations"]:
+        sk = FORGE.registry.skills.get(st["skill_id"]) if st["skill_id"] else None
+        st["skill"] = sk and {
+            "success_rate": sk.success_rate,
+            "n_eval": sk.n_eval,
+            "seconds": sk.seconds,
+        }
+    return d
+
+
+def _line_emit(ln: factory.Line, kind: str, **data) -> None:
+    FORGE.emit(f"line-{ln.id}", f"line_{kind}", "line", line=ln.id, **data)
+
+
+@app.get("/api/lines")
+def lines():
+    return [_line_json(ln) for ln in sorted(LINES.values(), key=lambda x: -x.created)]
+
+
+@app.post("/api/line/plan")
+async def line_plan(p: LinePrompt):
+    """Words to stations: the planner splits the line, the router checks every station."""
+    text = " ".join(p.prompt.split())[:600]
+    if not text:
+        raise HTTPException(400, "empty description")
+    ln = await asyncio.to_thread(factory.plan_line, text)
+    await asyncio.to_thread(factory.route_line, ln, FORGE.registry)
+    if not ln.stations:
+        ln.status = "refused"
+    LINES[ln.id] = ln
+    factory.save(ln)
+    return _line_json(ln)
+
+
+@app.patch("/api/line/{lid}/stations/{index}")
+async def line_station(lid: str, index: int, e: StationEdit):
+    ln = _line(lid)
+    if ln.status in ("building", "running") or not 0 <= index < len(ln.stations):
+        raise HTTPException(409, "line is busy or no such station")
+    st = ln.stations[index]
+    if e.controller in ("vla", "scripted"):
+        st.controller = e.controller
+    if e.robot in factory.ROBOTS:
+        st.robot = e.robot
+    st.skill_id = ""
+    r = await asyncio.to_thread(factory.route_station, st, FORGE.registry)
+    st.route = r.to_json()
+    st.status = {"reuse": "ready", "train": "train", "scripted": "scripted"}.get(
+        r.decision, "refused"
+    )
+    st.skill_id = r.skill_id if r.decision == "reuse" else ""
+    LINE_SCENES.pop(lid, None)
+    factory.save(ln)
+    return _line_json(ln)
+
+
+async def _run_line(ln: factory.Line, n_parts: int, seed: int) -> None:
+    ln.status = "running"
+    _line_emit(ln, "status", status=ln.status)
+
+    def progress(p: dict) -> None:
+        _line_emit(ln, "station_done", **p)
+
+    try:
+        ln.result = await asyncio.to_thread(
+            factory.run_line, ln, FORGE.registry, FORGE.compute, n_parts, seed, progress
+        )
+        ln.status = "done"
+    except Exception as exc:  # noqa: BLE001  (surfaced to the page; the line stays inspectable)
+        ln.status, ln.result = "failed", {"error": str(exc)}
+    factory.save(ln)
+    _line_emit(
+        ln,
+        "status",
+        status=ln.status,
+        result={k: v for k, v in ln.result.items() if k != "playback"},
+    )
+
+
+def _with_skill(kind: str, d: dict) -> dict:
+    if kind == "station" and d["station"].get("skill_id"):
+        sk = FORGE.registry.skills.get(d["station"]["skill_id"])
+        d["station"]["skill"] = sk and {
+            "success_rate": sk.success_rate,
+            "n_eval": sk.n_eval,
+            "seconds": sk.seconds,
+        }
+    return d
+
+
+@app.post("/api/line/{lid}/build")
+async def line_build(lid: str, r: LineRun):
+    """Train every station that needs a skill (one agent run each), then run the whole line."""
+    assert AGENTS is not None
+    ln = _line(lid)
+    if ln.status in ("building", "running"):
+        raise HTTPException(409, "line is busy")
+    if any(s.status == "refused" for s in ln.stations) or not ln.stations:
+        raise HTTPException(409, "a station is not feasible; change it first")
+    n = min(max(r.n_parts, 2), 30)
+
+    async def go() -> None:
+        _line_emit(ln, "status", status="building")
+        await factory.build_line(
+            ln,
+            AGENTS,
+            FORGE,
+            lambda kind, **d: _line_emit(ln, kind, **_with_skill(kind, d)),
+        )
+        factory.save(ln)
+        if any(s.status != "ready" and s.controller == "vla" for s in ln.stations):
+            ln.status = "failed"
+            factory.save(ln)
+            _line_emit(ln, "status", status=ln.status)
+            return
+        await _run_line(ln, n, r.seed)
+
+    asyncio.get_running_loop().create_task(go())
+    return {"line": ln.id}
+
+
+@app.post("/api/line/{lid}/run")
+async def line_run(lid: str, r: LineRun):
+    ln = _line(lid)
+    if ln.status in ("building", "running"):
+        raise HTTPException(409, "line is busy")
+    if any(s.controller == "vla" and not s.skill_id for s in ln.stations):
+        raise HTTPException(409, "train the stations first")
+    asyncio.get_running_loop().create_task(
+        _run_line(ln, min(max(r.n_parts, 2), 30), r.seed)
+    )
+    return {"line": ln.id}
+
+
+@app.get("/api/line/{lid}")
+def line_get(lid: str):
+    return _line_json(_line(lid), full=True)
+
+
+@app.get("/api/line/{lid}/scene")
+async def line_scene(lid: str):
+    ln = _line(lid)
+    if lid not in LINE_SCENES:
+        LINE_SCENES[lid] = await asyncio.to_thread(factory.cell_scenes, ln)
+    return {
+        "cells": LINE_SCENES[lid],
+        "pitch": factory.L.EXIT_Y - factory.L.ENTRY_Y,
+        "block_colors": factory.block_colors(),
+    }
 
 
 @app.get("/api/events")

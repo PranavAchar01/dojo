@@ -257,7 +257,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .badge.bad { color: var(--bad); }
 .step-badge { position: absolute; top: 44px; left: 14px; font-size: 12.5px; padding: 5px 10px; border-radius: 9px; background: rgb(255 255 255 / 0.92); border: 1px solid var(--border); box-shadow: var(--shadow-float); animation: tt-in 300ms var(--ease-out) both; }
 .step-badge b { font-weight: 500; color: var(--accent-700); }
-.speed { position: absolute; top: 44px; right: 96px; font: 600 15px/1 var(--mono); padding: 7px 10px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); letter-spacing: 0.5px; box-shadow: var(--keycap); }
+.speed { position: fixed; z-index: 60; top: 64px; right: 28px; font: 600 15px/1 var(--mono); padding: 7px 10px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); letter-spacing: 0.5px; box-shadow: var(--keycap); }
 
 .tools { position: absolute; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-float); animation: lib-rise 520ms var(--ease-out) 120ms both; }
 .tools.left { left: 12px; top: 50%; transform: translateY(-50%); animation-name: mk-in-l; }

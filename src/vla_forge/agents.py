@@ -797,9 +797,13 @@ class Forge:
         await self.bureau.run_async()
 
     async def submit(
-        self, prompt: str, mode: str = "auto", from_skill: str = ""
+        self,
+        prompt: str,
+        mode: str = "auto",
+        from_skill: str = "",
+        station: dict | None = None,
     ) -> Run:
-        run = FORGE.new_run(prompt, mode, from_skill)
+        run = FORGE.new_run(prompt, mode, from_skill, station)
         self.pending[run.id] = self.loop.create_future()
         gw = self.agents["gateway"]
         await gw._build_context().send(
