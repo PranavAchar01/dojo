@@ -17,12 +17,14 @@ FAST = 4.0
 # narration line -> where it starts, as (anchor in marks, offset in output seconds after that anchor)
 CUES = [
     ("hook", "zero", 0.5),
-    ("t1_train", "speed0", 0.3),
-    ("t1_done", "published0", 0.4),
-    ("t3_plan", "start1", -3.5),
-    ("t3_train", "speed1", 2.1),
-    ("t3_child", "speed1_end", 14.0),
-    ("t3_done", "published1", 9.5),
+    ("t1_train", "speed0", 0.5),
+    ("t1_done", "simple_done", -0.2),
+    ("chain", "chain", 2.5),
+    ("far", "far", 2.5),
+    ("library", "library", 0.5),
+    ("robot", "robot", 3.0),
+    ("widowx", "widowx", 2.0),
+    ("custom", "custom", 0.5),
     ("close", "ladder", 0.4),
 ]
 
@@ -43,7 +45,8 @@ def main() -> None:
 
     anchors = {
         "zero": 0.0,
-        "ladder": marks["ladder"],
+        **({"ladder": marks["ladder"]} if "ladder" in marks else {}),
+        **marks.get("at", {}),
         **{f"speed{i}": a for i, (a, _b) in enumerate(spans)},
         **{f"speed{i}_end": b for i, (_a, b) in enumerate(spans)},
         **{f"start{i}": p["start"] for i, p in enumerate(marks["prompts"])},
