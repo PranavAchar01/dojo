@@ -45,7 +45,9 @@ class Rollout:
 def _named(spec) -> tuple[str, str | None]:
     """(moved block, goal body) of a spec's core predicate."""
     p = spec.success[0]
-    return p.get("block", "target"), p.get("bowl") or p.get("pad") or p.get("base")
+    return p.get("block", "target"), p.get("bowl") or p.get("pad") or p.get(
+        "bin"
+    ) or p.get("base")
 
 
 def _new_stats(sc, spec) -> dict:
@@ -187,7 +189,7 @@ def _worker(conn):
                             st["distractor_lift"],
                             float(sc.body_pos(name)[2] - CUBE_HALF),
                         )
-                if "goal" in {**sc.layout.bowls, **sc.layout.pads, **sc.layout.blocks}:
+                if "goal" in {**sc.layout.fixtures(), **sc.layout.blocks}:
                     st["final_goal_dist"] = float(
                         np.linalg.norm(cpos[:2] - sc.body_pos("goal")[:2])
                     )
@@ -419,7 +421,7 @@ def summarize(rolls: list[Rollout]) -> dict:
 
 
 def _goal_xy(lay: dict):
-    for kind in ("bowls", "pads", "blocks"):
+    for kind in ("bowls", "pads", "bins", "blocks"):
         if "goal" in lay.get(kind, {}):
             v = lay[kind]["goal"]
             return [round(v[1], 3), round(v[2], 3)]

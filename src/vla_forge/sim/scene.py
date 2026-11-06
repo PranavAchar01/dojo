@@ -100,6 +100,9 @@ class Layout:
     blocks: dict[str, tuple[str, float, float, float]] = field(default_factory=dict)
     bowls: dict[str, tuple[str, float, float]] = field(default_factory=dict)
     pads: dict[str, tuple[str, float, float]] = field(default_factory=dict)
+    # factory-line cells (sim/line.py): totes name -> (color, x, y), and whether a conveyor runs past the arm
+    bins: dict[str, tuple[str, float, float]] = field(default_factory=dict)
+    belt: bool = False
 
     def key(self) -> tuple:
         """Structure only (names and colours): layouts with the same key share a compiled model."""
@@ -107,10 +110,19 @@ class Layout:
             tuple((n, v[0]) for n, v in sorted(self.blocks.items())),
             tuple((n, v[0]) for n, v in sorted(self.bowls.items())),
             tuple((n, v[0]) for n, v in sorted(self.pads.items())),
+            tuple((n, v[0]) for n, v in sorted(self.bins.items())),
+            self.belt,
         )
 
+    def fixtures(self) -> dict[str, tuple[str, float, float]]:
+        """Every mocap fixture (bowls, squares, totes)."""
+        return {**self.bowls, **self.pads, **self.bins}
+
     def to_json(self) -> dict:
-        return {"blocks": self.blocks, "bowls": self.bowls, "pads": self.pads}
+        d = {"blocks": self.blocks, "bowls": self.bowls, "pads": self.pads}
+        if self.bins or self.belt:
+            d.update(bins=self.bins, belt=self.belt)
+        return d
 
     @staticmethod
     def from_json(d: dict) -> Layout:
@@ -118,6 +130,8 @@ class Layout:
             {k: tuple(v) for k, v in d.get("blocks", {}).items()},
             {k: tuple(v) for k, v in d.get("bowls", {}).items()},
             {k: tuple(v) for k, v in d.get("pads", {}).items()},
+            {k: tuple(v) for k, v in d.get("bins", {}).items()},
+            bool(d.get("belt", False)),
         )
 
 
@@ -300,6 +314,14 @@ def build_spec(
                 material=f"{name}_mat",
             )
 
+    if layout.belt or layout.bins:
+        from . import line
+
+        if layout.belt:
+            line.add_belt(spec)
+        for name, (color, *_xy) in layout.bins.items():
+            line.add_bin(spec, name, color)
+
     if not stock_jaw:
         _robot_contacts(spec, calibrate(robot).finger_bodies)
     # jaw meshes stop touching blocks; the pads do the grasping; everything else touches blocks
@@ -378,6 +400,12 @@ def _robot_contacts(spec: mujoco.MjSpec, fingers: list[str]) -> None:
             g.solimp = GRASP_SOLIMP
 
 
+def _belt_top(x: float) -> float:
+    from .line import BELT_TOP, on_belt
+
+    return BELT_TOP if on_belt(x) else 0.0
+
+
 class Scene:
     """A compiled layout plus helpers. Reuse one Scene for every episode with the same layout structure."""
 
@@ -448,9 +476,10 @@ class Scene:
             d.ctrl[:] = self.to_ctrl(np.append(arm_q, r.g_closed))
         for name, (_c, x, y, yaw) in layout.blocks.items():
             adr = m.joint(f"{name}_free").qposadr[0]
-            d.qpos[adr : adr + 3] = [x, y, CUBE_HALF]
+            z = CUBE_HALF + (_belt_top(x) if layout.belt else 0.0)
+            d.qpos[adr : adr + 3] = [x, y, z]
             d.qpos[adr + 3 : adr + 7] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
-        for name, (_c, x, y) in {**layout.bowls, **layout.pads}.items():
+        for name, (_c, x, y) in layout.fixtures().items():
             d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
         self.layout = layout
         self.apply_look(look or Look())

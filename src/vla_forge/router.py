@@ -201,7 +201,7 @@ def check_reach(parsed: TaskSpec | list[Step], seed: int = 0) -> Check:
     q0 = sc.joint_pos()[:5]
     for lay in lays:
         pts = [(x, y, HOVER_Z) for _c, x, y, _yaw in lay.blocks.values()]
-        pts += [(x, y, RELEASE_Z) for _c, x, y in lay.bowls.values()]
+        pts += [(x, y, RELEASE_Z) for _c, x, y in {**lay.bowls, **lay.bins}.values()]
         pts += [(x, y, PUSH_Z) for _c, x, y in lay.pads.values()]
         for x, y, z in pts:
             _q, err = ik.solve(np.array([x, y, z]), q0, iters=150)

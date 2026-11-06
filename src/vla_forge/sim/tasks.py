@@ -30,6 +30,7 @@ TIER = {"reach": 1, "push": 1, "lift": 1, "pick_place": 2, "stack": 2}
 # predicates the success DSL understands
 PREDICATES = {
     "in_bowl": "block centre inside the bowl's inner radius and resting low",
+    "in_bin": "block centre inside the tote's opening and below its rim",
     "on_pad": "block centre inside the taped square, on the table",
     "lifted": "block held above min_z metres",
     "touching": "closed gripper hovering just above the block (within 2.5 cm sideways)",
@@ -141,6 +142,10 @@ def _pred(p: dict, scene: Scene, start: Layout | None) -> bool:
         return bool(
             np.linalg.norm(c[:2] - b[:2]) < BOWL_R and c[2] < BOWL_WALL_H + CUBE_HALF
         )
+    if op == "in_bin":
+        from .line import in_bin
+
+        return in_bin(c, scene.body_pos(p.get("bin", "goal")))
     if op == "on_pad":
         b = scene.body_pos(p.get("pad", "goal"))
         return bool(
