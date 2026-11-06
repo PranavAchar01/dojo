@@ -95,6 +95,8 @@ class Run:
     from_skill: str = ""
     route: dict = field(default_factory=dict)
     robot: str = "so101"  # robot id from the Robot tab (sim/robots.py), fixed when the run starts
+    # factory line: the station this run trains (factory.py); its scenes are that station's conveyor cell
+    station: dict = field(default_factory=dict)
 
     @property
     def composite(self) -> bool:
@@ -145,6 +147,7 @@ class Run:
             "from_skill": self.from_skill,
             "route": self.route,
             "robot": self.robot,
+            "station": self.station,
         }
 
 
@@ -198,13 +201,27 @@ class Forge:
             "", "ready", seconds=round(time.time() - t0, 1), replay=self.replay.episodes
         )
 
-    def new_run(self, prompt: str, mode: str = "auto", from_skill: str = "") -> Run:
+    def new_run(
+        self,
+        prompt: str,
+        mode: str = "auto",
+        from_skill: str = "",
+        station: dict | None = None,
+    ) -> Run:
         rid = (
             time.strftime("%H%M%S")
             + "-"
             + hashlib.sha1(f"{prompt}{time.time()}".encode()).hexdigest()[:4]
         )
-        run = Run(rid, prompt, mode=mode, from_skill=from_skill, robot=self.robot)
+        robot = station["robot"] if station else self.robot
+        run = Run(
+            rid,
+            prompt,
+            mode=mode,
+            from_skill=from_skill,
+            robot=robot,
+            station=station or {},
+        )
         self.runs[rid] = run
         self.order.append(rid)
         return run
@@ -213,6 +230,16 @@ class Forge:
     def parse(self, run: Run) -> TaskSpec | list[Step] | None:
         run.t0 = time.time()
         run.status = "running"
+        if (
+            run.station
+        ):  # the line planner already wrote this station's task and success check
+            run.spec = TaskSpec.from_json(run.station["spec"])
+            run.parse_info = {
+                "model": "line planner",
+                "seconds": 0.0,
+                "note": f"station {run.station['index'] + 1} of line '{run.station['line_name']}'",
+            }
+            return run.spec
         out, info = llm.parse_task(run.prompt)
         run.parse_info = info
         if isinstance(out, list):
@@ -224,6 +251,12 @@ class Forge:
     def route(self, run: Run) -> router_mod.Route:
         """What the prompt needs (reuse / train / chain) or why it is refused; see router.py."""
         parsed = run.steps if run.composite else run.spec
+        if run.station:
+            from . import factory
+
+            r = factory.route_station(run.station, self.registry)
+            run.route = r.to_json()
+            return r
         r = router_mod.route(
             run.prompt,
             parsed,
@@ -364,6 +397,10 @@ class Forge:
         assert run.spec is not None
         if run.parent:
             return step_layout(self.runs[run.parent].steps, run.step_index, rng)
+        if run.station:
+            from .sim.line import station_layout
+
+            return station_layout(run.spec.obj, run.spec.target or "gray", rng)
         return sample_layout(run.spec, rng)
 
     def scene(self, run: Run) -> dict:
@@ -393,7 +430,7 @@ class Forge:
                 "noise": DART_NOISE,
                 "robot": run.robot,
             }
-            if run.parent:
+            if run.parent or run.station:
                 j["layout"] = self._layout(
                     run, np.random.default_rng(base_seed + i)
                 ).to_json()
@@ -590,7 +627,9 @@ class Forge:
             tier=TIER[run.spec.skill],
             prompt=run.prompt,
             robot=run.robot,
-            origin="step"
+            origin="station"
+            if run.station
+            else "step"
             if run.parent
             else run.mode
             if run.mode in ("scratch", "remix")
