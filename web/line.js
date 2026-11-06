@@ -122,6 +122,7 @@ async function setLine(l) {
   const same = line && line.id === l.id;
   line = l;
   if (!same) stationRuns = {};
+  if (line.result?.n_parts) $(".ln-n input").value = line.result.n_parts;
   render();
   await buildLine3D();
   if (line.result?.playback) startClock();
@@ -385,10 +386,13 @@ function size() {
   three.renderer.setSize(r.width, r.height, false);
   three.camera.aspect = r.width / r.height;
   three.camera.updateProjectionMatrix();
-  // narrow screens: back the camera off so the whole line still fits across
-  const k = Math.max(1, 1.5 / three.camera.aspect);
+  // portrait screens: look down the line from its entry end, so the stations recede into depth instead of
+  // shrinking to fit across; wide screens look at it from the front
+  const a = three.camera.aspect, N = three.cells.length;
+  const eye = a < 1.3 ? new three.THREE.Vector3(0.75 + 0.1 * N, -(0.75 + 0.42 * N), 0.55 + 0.16 * N) : three.eye;
+  const k = Math.max(1, (a < 1.3 ? 0.9 : 1.5) / a);
   const t = three.controls.target;
-  three.camera.position.set(t.x + three.eye.x * k, t.y + three.eye.y * k, t.z + three.eye.z * k);
+  three.camera.position.set(t.x + eye.x * k, t.y + eye.y * k, t.z + eye.z * k);
   three.controls.update();
 }
 window.addEventListener("forge:view", (e) => { if (e.detail === "line") { setTimeout(size, 340); if (!lines.length) refreshList(); } });
@@ -422,7 +426,7 @@ function tick(now) {
   if (!three) return;
   three.controls.update();
   if (clock.playing && line?.result?.playback) {
-    const dt = Math.min(0.1, (now - clock.last) / 1000);
+    const dt = Math.max(0, Math.min(0.1, (now - clock.last) / 1000));
     clock.last = now;
     clock.t += dt * clock.speed;
     const pb = line.result.playback;
