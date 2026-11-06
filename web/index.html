@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/library.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
@@ -25,7 +26,7 @@
     <div class="seg" role="tablist">
       <button class="on" data-view="sim">Sim</button>
       <button data-view="ladder">Ladder</button>
-      <button data-view="skills">Skills</button>
+      <button data-view="skills">Library</button>
     </div>
     <div class="top-right">
       <div class="clock mono" title="wall clock for this prompt"><span id="elapsed">0:00</span><span class="dim"> / 3:00</span></div>
@@ -110,10 +111,21 @@
       <div class="view hidden" id="view-skills">
         <div class="doc">
           <div class="doc-h">
-            <h2>Skill agents</h2>
-            <p>Each published skill is its own agent with a chat endpoint. Calling one runs its policy in a fresh random scene.</p>
+            <h2>Skill library</h2>
+            <p>Every finished skill is saved as a tile: a frame from its own rollout, its success on held-out scenes, and how long it took to train. Replay it, test it on scenes it has never seen, remix it with a new prompt, or start a new skill from the base policy. Each tile is also its own agent with a chat endpoint.</p>
           </div>
-          <div id="skills" class="skills"></div>
+          <div class="lib-bar">
+            <input id="lib-q" type="search" placeholder="Search skills" aria-label="Search skills">
+            <div class="lib-filter" id="lib-filter" role="group" aria-label="Filter">
+              <button data-f="all" class="on">All</button><button data-f="1">Tier 1</button><button data-f="2">Tier 2</button><button data-f="3">Chains</button><button data-f="mine">Remixed</button>
+            </div>
+            <select id="lib-sort" aria-label="Sort">
+              <option value="new">Newest</option><option value="rate">Best success</option><option value="fast">Fastest</option>
+            </select>
+            <button class="primary" id="lib-new" type="button"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>New skill from scratch</button>
+          </div>
+          <div id="lib-count" class="lib-count"></div>
+          <div id="skills" class="tiles"></div>
         </div>
       </div>
 
@@ -146,5 +158,6 @@
 </div>
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/mascot.js"></script>
+<script type="module" src="/static/library.js"></script>
 </body>
 </html>
