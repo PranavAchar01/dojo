@@ -13,25 +13,25 @@ Third-party material and design credits.
    https://threejs.org, MIT License.
 
 4. Interface design
-   The editor layout and visual language of the page (top bar with segmented tabs, chat panel with tool
-   status pills, floating tool groups on the canvas, bottom tab bar and the Geist / Geist Mono
-   type set, two of the families heypcb.ai loads) are modelled on the public website of HeyPCB, https://heypcb.ai.
-   HeyPCB's open-source repositories (github.com/heypcb) contain hardware designs under CERN-OHL-S and an
-   MIT-licensed MCP server, but no interface code, so nothing was copied: the look was recreated from the
-   public site with this project's own HTML, CSS and JavaScript. No HeyPCB logo, name or asset appears in
-   the interface. HeyPCB is not affiliated with this project.
+   The whole interface (shell, top bar, toolbar with segmented view tabs, side panels, prompt cards, composer,
+   stage cards and dock, workplane grid, CSS tokens and motion) is ported from Etch, the author's own earlier
+   project (deploy/etch-app at a0bb241d: editor.css, explore.css, new-board.css), with Etch's blue accent
+   swapped for this page's safety orange (#ff5a1f).
+   HeyPCB (https://heypcb.ai) was checked as a possible source and not used: its public repositories
+   (github.com/HeyPCB) hold hardware designs under CERN-OHL-S-2.0, an MIT-licensed MCP server and KiCad
+   boards, and no web interface code, so no HeyPCB code, name, logo or asset is in this project. HeyPCB is
+   not affiliated with this project.
 
-4a. Motion and mascot
-   The animations (entrance rises, keycap buttons with a halo ring, blink, float, cheer, ripple, thought
-   cloud, shimmer loaders) are ported from Etch, the author's own earlier project, and recoloured to this
-   page's factory safety-orange accent (#ff5a1f). The robot mascot is an original character, built from square
-   tiles and drawn in code (web/mascot.js): hazard-stripe hard hat, dark visor, two tall pixel eyes, no mouth,
-   antenna lamp. It is original art made for this project: its silhouette, face, proportions and colours are
-   our own, and it does not reproduce or adapt any existing character or company mark. Only the general genre
-   (a friendly robot built from pixel tiles) is shared with other work.
+4a. Mascot
+   The robot mascot (web/mascot.js) is original art made for this project and drawn in code as one SVG:
+   a solid chamfered head, a forked gripper antenna and two cut-out eyes, in a single ink colour. Its four
+   moods (idle, think, ok, fail) change only the eyes and antenna. The general direction (monochrome,
+   minimal, geometric, bold) was the only reference; it does not trace, reproduce or adapt any existing
+   logo, character or company mark.
 
 5. Fonts
-   Geist and Geist Mono (Vercel, SIL Open Font License 1.1), loaded from Google Fonts. No other typeface.
+   Figtree and Averia Serif Libre (SIL Open Font License 1.1), loaded from Google Fonts, the same pair
+   Etch uses. No other typeface.
 
 6. Encoders
    facebook/dinov2-small (Apache-2.0) and google/siglip2-base-patch16-224 (Apache-2.0), loaded from the
