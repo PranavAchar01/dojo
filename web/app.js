@@ -61,9 +61,9 @@ scene3.environmentIntensity = 0.75;
 
 const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 20);
 camera.up.set(0, 0, 1);
-camera.position.set(0.78, -0.62, 0.52);
+camera.position.set(0.98, -0.66, 0.58);
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(0.17, 0.0, 0.06);
+controls.target.set(0.12, 0.0, 0.1);
 controls.enableDamping = true;
 controls.minDistance = 0.35;
 controls.maxDistance = 2.2;
@@ -92,11 +92,10 @@ scene3.add(rim);
 const texLoader = new THREE.TextureLoader();
 const woodMap = texLoader.load("/static/assets/wood_diff.jpg");
 woodMap.colorSpace = THREE.SRGBColorSpace;
-const woodRough = texLoader.load("/static/assets/wood_rough.jpg");
-for (const t of [woodMap, woodRough]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.2, 1.6); t.anisotropy = 8; }
+for (const t of [woodMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.2, 1.6); t.anisotropy = 8; }
 const tableTop = new THREE.Mesh(
   new RoundedBoxGeometry(0.9, 1.2, 0.04, 4, 0.006),
-  new THREE.MeshPhysicalMaterial({ map: woodMap, roughnessMap: woodRough, roughness: 0.75, clearcoat: 0.15, clearcoatRoughness: 0.5 }),
+  new THREE.MeshStandardMaterial({ map: woodMap, color: 0xf3e2cf, roughness: 0.82, envMapIntensity: 0.25 }),
 );
 tableTop.position.set(0.2, 0, -0.02);
 tableTop.receiveShadow = true;
@@ -120,6 +119,8 @@ const MAT = {
   other: new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.5 }),
 };
 const geomCache = new Map();
+const meshesP = fetch("/api/meshes").then((r) => r.json());
+let MESHES = null;
 function meshGeometry(id, data) {
   if (geomCache.has(id)) return geomCache.get(id);
   const v = new Float32Array(Uint8Array.from(atob(data.v), (c) => c.charCodeAt(0)).buffer);
@@ -161,7 +162,7 @@ function buildWorld(sc) {
     return o;
   });
   for (const g of sc.robot) {
-    const geo = meshGeometry(g.mesh, sc.meshes[String(g.mesh)]);
+    const geo = meshGeometry(g.mesh, MESHES[String(g.mesh)]);
     const lum = 0.299 * g.rgba[0] + 0.587 * g.rgba[1] + 0.114 * g.rgba[2];
     const mat = lum > 0.5 ? MAT.printed : lum < 0.2 ? MAT.motor : MAT.other;
     const m = new THREE.Mesh(geo, mat);
@@ -205,9 +206,9 @@ function applyFrame(frame) {
   if (!world || !frame) return;
   const n = world.n;
   for (let i = 0; i < n; i++) {
-    world.bodies[i].position.set(frame[i * 3], frame[i * 3 + 1], frame[i * 3 + 2]);
-    const q = 3 * n + i * 4;
-    world.bodies[i].quaternion.set(frame[q + 1], frame[q + 2], frame[q + 3], frame[q]);
+    const k = i * 7; // per body: x y z, then quaternion w x y z (MuJoCo order)
+    world.bodies[i].position.set(frame[k], frame[k + 1], frame[k + 2]);
+    world.bodies[i].quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
   }
 }
 
@@ -355,17 +356,23 @@ async function showPreview(rid) {
   const sc = await res.json();
   play = null;
   buildWorld(sc);
+  applyFrame(sc.frame);
   $("#vp-progress").classList.add("hidden");
   $("#vp-badge").classList.add("hidden");
 }
 // home pose for the idle scene
 async function idleScene() {
+  MESHES = await meshesP;
   const st = await (await fetch("/api/state")).json();
   renderSkills(st.skills);
   setReady(st.ready);
   const last = st.runs[st.runs.length - 1];
   if (last && last.status === "published") {
     adoptRun(last);
+  } else {
+    const sc = await (await fetch("/api/preview")).json();
+    buildWorld(sc);
+    applyFrame(sc.frame);
   }
 }
 
@@ -375,6 +382,20 @@ function adoptRun(summary) {
   runStart = 1; runDone = 1 + summary.elapsed;
   $("#elapsed").textContent = fmt(summary.elapsed);
   rounds = summary.rounds.map((r) => ({ ...r }));
+  losses.length = 0;
+  for (const r of summary.rounds) losses.push(r.loss.map(([t, l]) => [t, l]));
+  drawLoss();
+  const last = summary.rounds[summary.rounds.length - 1];
+  if (last && last.train && last.train.steps) $("#loss-steps").textContent = `${last.train.steps} steps`;
+  if (last && last.loss.length) $("#loss-now").textContent = last.loss[last.loss.length - 1][1].toFixed(3);
+  if (summary.init_from && summary.init_from.reason) $("#loss-init").textContent = `init: ${summary.init_from.reason}`;
+  $("#critic").innerHTML = "";
+  for (const r of summary.rounds) {
+    if (!r.plan || !r.plan.action) continue;
+    const p = el("div");
+    p.append(el("b", "", `Round ${r.index + 1}: ${r.plan.action}. `), document.createTextNode(r.plan.rationale));
+    $("#critic").append(p);
+  }
   for (const [k] of STAGES) stage(k, "done");
   drawRounds();
   if (summary.best_round >= 0) showRound(summary.best_round);
@@ -539,3 +560,29 @@ $("#prompt-form").addEventListener("submit", async (ev) => {
 document.querySelectorAll(".ex").forEach((b) => b.addEventListener("click", () => { $("#prompt").value = b.textContent; $("#prompt").focus(); }));
 
 idleScene();
+
+// ---------------------------------------------------------------- live tab capture (?capture=1, demo recording)
+if (new URLSearchParams(location.search).has("capture")) {
+  let rec = null;
+  const chunks = [];
+  window.startCapture = async () => {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30, width: 1920, height: 1200 },
+      audio: false,
+      preferCurrentTab: true,
+    });
+    rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 12_000_000 });
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.start(1000);
+    return true;
+  };
+  window.stopCapture = () =>
+    new Promise((resolve) => {
+      rec.onstop = async () => {
+        rec.stream.getTracks().forEach((t) => t.stop());
+        const r = await fetch("/api/capture", { method: "POST", body: new Blob(chunks, { type: "video/webm" }) });
+        resolve(await r.json());
+      };
+      rec.stop();
+    });
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -105,7 +106,13 @@ def encode_shape() -> tuple[int, int]:
 
 def _batch(p: dict, n: int, b: int, dev: torch.device):
     idx = torch.randint(0, n, (b,), device=dev)
-    return p["vis"][idx], p["lang"][p["lang_i"][idx]], p["state"][idx], p["chunk"][idx], p["aux"][idx]
+    return (
+        p["vis"][idx],
+        p["lang"][p["lang_i"][idx]],
+        p["state"][idx],
+        p["chunk"][idx],
+        p["aux"][idx],
+    )
 
 
 def train(
@@ -140,10 +147,17 @@ def train(
             g["lr"] = lr * (
                 0.1 + 0.9 * 0.5 * (1 + np.cos(np.pi * min(el / seconds, 1.0)))
             )
-        vis, lang, state, chunk, aux = _batch(p, n, batch if r is None else batch - nr, dev)
-        if r is not None:  # replay of earlier skills keeps the library from being forgotten
+        vis, lang, state, chunk, aux = _batch(
+            p, n, batch if r is None else batch - nr, dev
+        )
+        if (
+            r is not None
+        ):  # replay of earlier skills keeps the library from being forgotten
             rb = _batch(r, r["vis"].shape[0], nr, dev)
-            vis, lang, state, chunk, aux = (torch.cat(x) for x in zip((vis, lang, state, chunk, aux), rb, strict=True))
+            vis, lang, state, chunk, aux = (
+                torch.cat(x)
+                for x in zip((vis, lang, state, chunk, aux), rb, strict=True)
+            )
         state = model.norm_q(state)
         state = state + torch.randn_like(state) * state_noise / model.sd
         target = model.norm_q(chunk)
@@ -178,3 +192,29 @@ def train(
         "loss": ema,
         "frames": n,
     }
+
+
+def save_shard(d: Demos, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "vis": d.vis,
+            "states": d.states,
+            "actions": d.actions,
+            "aux": d.aux,
+            "instr": [d.instructions[i] for i in d.lang_idx],
+        },
+        path.with_suffix(".tmp"),
+    )
+    path.with_suffix(".tmp").replace(path)
+
+
+def load_shards(paths: list[Path]) -> Demos:
+    d = Demos()
+    for p in paths:
+        z = torch.load(p, weights_only=False)
+        for v, s, a, x, ins in zip(
+            z["vis"], z["states"], z["actions"], z["aux"], z["instr"], strict=True
+        ):
+            d.add_encoded(v, s, a, x, ins)
+    return d

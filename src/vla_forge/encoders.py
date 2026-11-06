@@ -30,7 +30,9 @@ def device() -> torch.device:
 
 
 def _dtype(dev: str) -> torch.dtype:
-    return torch.float16 if dev == "mps" else torch.float32  # fp16 is 3.5x faster on MPS
+    return (
+        torch.float16 if dev == "mps" else torch.float32
+    )  # fp16 is 3.5x faster on MPS
 
 
 @lru_cache(maxsize=2)

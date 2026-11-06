@@ -157,9 +157,9 @@ def _pred(p: dict, scene: Scene, start: Layout | None) -> bool:
 # ---------------------------------------------------------------- layouts
 
 BLOCK_R = (0.14, 0.27)
-BLOCK_ANG = math.radians(48)
+BLOCK_ANG = math.radians(36)
 GOAL_R = (0.18, 0.26)
-GOAL_ANG = math.radians(35)
+GOAL_ANG = math.radians(30)
 
 
 def _polar(rng, rr, ang):

@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from functools import lru_cache
 
 import openai
@@ -205,6 +206,7 @@ def _clean_success(skill: str, raw: list[dict]) -> list[dict]:
 
 def parse_task(prompt: str) -> tuple[TaskSpec | None, dict]:
     """Sentence -> (TaskSpec or None if infeasible, info dict for the log)."""
+    t0 = time.time()
     try:
         raw, model = _chat_json(TASK_SYSTEM, prompt, TASK_SCHEMA)
     except RuntimeError as e:
@@ -229,6 +231,7 @@ def parse_task(prompt: str) -> tuple[TaskSpec | None, dict]:
     )
     return spec, {
         "model": model,
+        "seconds": round(time.time() - t0, 2),
         "note": raw.get("note", ""),
         "llm_instruction": raw.get("instruction", ""),
     }
