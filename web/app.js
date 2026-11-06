@@ -21,6 +21,7 @@ const svgIcon = (d) => {
 // ---------------------------------------------------------------- stage rail (one entry per agent)
 const STAGES = [
   ["task", "Task", '<path d="M5 5h10M5 10h10M5 15h6"/>'],
+  ["router", "Route", '<path d="M4 10h5l3-5h4M9 10l3 5h4"/><circle cx="4" cy="10" r="1.6"/>'],
   ["planner", "Plan", '<circle cx="5" cy="5" r="1.8"/><circle cx="5" cy="15" r="1.8"/><circle cx="15" cy="10" r="1.8"/><path d="M6.6 5.8 13.4 9.2M6.6 14.2l6.8-3.4"/>'],
   ["scene", "Scene", '<path d="M3 13.5 10 17l7-3.5M3 9.5 10 13l7-3.5L10 6z"/>'],
   ["data", "Demos", '<path d="M4 16V9M8 16V5M12 16v-5M16 16V7"/>'],
@@ -31,7 +32,7 @@ const STAGES = [
   ["registry", "Publish", '<path d="M10 3.5v9M6 8.5l4 4 4-4M4 16.5h12"/>'],
 ];
 const NAMES = Object.fromEntries(STAGES.map(([k, n]) => [k, n]));
-NAMES.trainer = "Trainer"; NAMES.data = "Data"; NAMES.planner = "Planner"; NAMES.executor = "Executor"; NAMES.registry = "Registry";
+NAMES.router = "Router"; NAMES.trainer = "Trainer"; NAMES.data = "Data"; NAMES.planner = "Planner"; NAMES.executor = "Executor"; NAMES.registry = "Registry";
 const rail = {};
 for (const [key, name, icon] of STAGES) {
   if (key === "executor") $("#rail").append(el("li", "sep"));
@@ -52,6 +53,7 @@ function stage(key, state, metric) {
 }
 function resetStages(composite) {
   for (const [k] of STAGES) stage(k, "idle", "");
+  for (const k of ["scene", "data", "trainer", "eval", "critic"]) rail[k].classList.remove("off");
   rail.planner.classList.toggle("off", !composite);
   rail.executor.classList.toggle("off", !composite);
 }
@@ -703,36 +705,10 @@ async function renderLadder() {
 
 function renderSkills(skills, fresh) {
   skillsCache = skills;
-  const box = $("#skills");
-  box.innerHTML = "";
-  const byId = Object.fromEntries(skills.map((s) => [s.id, s]));
-  for (const s of skills) {
-    const card = el("div", `skill${s.id === fresh ? " new" : ""}`);
-    card.append(el("div", "lbl", `Tier ${s.tier} · skill-${s.id.slice(-4)}`), el("div", "ins", s.instruction));
-    if (s.steps && s.steps.length) {
-      const ol = el("ol", "chain");
-      for (const st of s.steps) ol.append(el("li", "", `${st.instruction}  (skill-${st.skill_id.slice(-4)})`));
-      card.append(ol);
-    }
-    const meta = el("div", "meta");
-    const parent = s.steps?.length ? "chained" : s.parent ? (byId[s.parent] ? `from "${byId[s.parent].instruction.slice(0, 24)}..."` : "from a skill") : "from base";
-    meta.append(el("span", "pct", `${Math.round(100 * s.success_rate)}% of ${s.n_eval}`), el("span", "", `${Math.round(s.seconds)}s`), el("span", "", parent));
-    const b = el("button", "", "Call agent");
-    const reply = el("div", "reply");
-    b.onclick = async () => {
-      b.disabled = true;
-      reply.textContent = "running in a fresh scene...";
-      const r = await fetch(`/api/skills/${s.id}/run`, { method: "POST" });
-      reply.textContent = r.ok ? (await r.json()).reply : "no answer";
-      b.disabled = false;
-    };
-    meta.append(b);
-    card.append(meta, reply);
-    box.append(card);
-  }
-  if (!skills.length) box.append(el("div", "empty-note", "No skill agents yet."));
+  window.forgeLib?.render(skills, fresh); // the library (library.js) draws the tiles
 }
 async function refreshSkills(fresh) {
+  if (window.forgeLib) return window.forgeLib.refresh(fresh);
   const st = await (await fetch("/api/state")).json();
   renderSkills(st.skills, fresh);
 }
@@ -817,6 +793,7 @@ function setTier(t) {
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
+  window.forgeLib?.onEvent(e, e.run === current || family.has(e.run));
   if (e.kind === "ready") { setReady(true); return; }
   if (e.kind === "agents") return;
   if (e.run !== current && !family.has(e.run)) {
@@ -876,11 +853,26 @@ function handle(e) {
       settle(e.run, "task");
       stage("task", "done");
       break;
+    case "route":
+      settle(e.run, "router", e.refused ? "fail" : "done");
+      stage("router", e.refused ? "fail" : "done", e.decision.replace("_", " "));
+      break;
     case "rejected":
-      tool(e.run, "task", e.reason, "fail");
-      stage("task", "fail");
+      tool(e.run, e.agent || "task", e.reason, "fail");
+      stage(e.agent || "task", "fail");
       runDone = Date.now() / 1000;
       $("#go").disabled = false;
+      break;
+    case "reused":
+      lastSkill = e.skill;
+      $("#call-last").disabled = false;
+      runDone = Date.now() / 1000;
+      for (const k of ["scene", "data", "trainer", "eval", "critic"]) rail[k].classList.add("off");
+      stage("registry", "done", `${Math.round(100 * e.tile.success_rate)}%`);
+      $("#go").disabled = false;
+      break;
+    case "saving":
+      stage("registry", "live", "saving");
       break;
     case "error":
       tool(e.run, e.agent || "task", e.error, "fail");
@@ -996,7 +988,9 @@ async function submit(text) {
   $("#go").disabled = true;
   $("#prompt").value = "";
   $("#crumb-run").textContent = text;
-  await fetch("/api/prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text }) });
+  const how = window.forgeLib?.takeMode() || { mode: "auto", from_skill: "" };
+  const res = await fetch("/api/prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text, ...how }) });
+  if (!res.ok) $("#go").disabled = false;
 }
 $("#prompt-form").addEventListener("submit", (ev) => { ev.preventDefault(); submit($("#prompt").value.trim()); });
 $("#prompt").addEventListener("keydown", (ev) => {
@@ -1007,6 +1001,21 @@ document.querySelectorAll(".ex").forEach((b) => b.addEventListener("click", () =
   $("#prompt").focus();
 }));
 window.submitPrompt = submit;
+// what the library (library.js) needs from the sim view and the chat thread
+window.forge = {
+  el, fmt, stage, setView, submit, startPlayback, scrollThread,
+  toolList: (run) => toolLists[run],
+  current: () => current,
+  setBadge(text, ok) {
+    const b = $("#vp-badge");
+    b.classList.remove("hidden", "ok", "bad");
+    b.classList.add(ok ? "ok" : "bad");
+    b.textContent = text;
+  },
+  showScene(sc) { play = null; buildWorld(sc); applyFrame(sc.frame); $("#pb-fill").style.width = "0"; $("#vp-badge").classList.add("hidden"); $("#step-badge").classList.add("hidden"); },
+  setCaption(text) { $("#vp-caption").textContent = text; },
+  setShown(v) { shown = v; },
+};
 
 idleScene();
 

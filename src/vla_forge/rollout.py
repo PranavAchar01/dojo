@@ -34,6 +34,9 @@ class Rollout:
     failure: str = ""
     frames: list = field(default_factory=list)
     stats: dict = field(default_factory=dict)
+    final_q: list = field(
+        default_factory=list
+    )  # joint positions at the last frame (thumbnail render)
 
 
 # ------------------------------------------------------------------ worker side (no torch)
@@ -381,6 +384,7 @@ def evaluate(
     for r in rolls:
         f = fin[r.index]
         r.frames, r.stats = f["frames"], f["stats"]
+        r.final_q = [float(v) for v in obs[r.index][1]]
         if not r.success:
             r.failure = f["failure"]
     return rolls
@@ -442,6 +446,7 @@ class ComposedRollout:
     )  # first recorded frame of each step
     ticks: int = 0
     frames: list = field(default_factory=list)
+    final_q: list = field(default_factory=list)
 
     @property
     def failure(self) -> str:
@@ -563,6 +568,7 @@ def evaluate_composed(
     for r in rolls:
         f = fin[r.index]
         r.frames = f["frames"]
+        r.final_q = [float(v) for v in obs[r.index][1]]
         r.steps_ok = f["final"]
         r.held = [bool(v) for v in held[r.index]]
         r.failures = f["failures"]
