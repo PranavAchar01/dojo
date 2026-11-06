@@ -25,7 +25,7 @@ from .compose import sample_layout as compose_layout
 from .datagen import demo_job, pool
 from .encoders import device, encode_images, encode_text
 from .learn import Demos, train
-from .policy import VLA
+from .policy import VLA, HeadConfig
 from .registry import BASE_PATH, ROOT, Registry, Skill
 from .rollout import (
     env_pool,
@@ -34,6 +34,7 @@ from .rollout import (
     summarize,
     summarize_composed,
 )
+from .sim.robots import calibrate, is_default
 from .sim.scene import Layout, Scene
 from .sim.tasks import TIER, TaskSpec, sample_layout
 from .viz import export_scene
@@ -88,6 +89,7 @@ class Run:
     )  # per step: instruction, skill_id, source, child, ...
     parent: str = ""
     step_index: int = -1
+    robot: str = "so101"  # robot id from the Build tab (sim/robots.py), fixed when the run starts
 
     @property
     def composite(self) -> bool:
@@ -134,6 +136,7 @@ class Run:
             "plan": self.plan,
             "parent": self.parent,
             "step_index": self.step_index,
+            "robot": self.robot,
         }
 
 
@@ -147,6 +150,7 @@ class Forge:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.subscribers: set[asyncio.Queue] = set()
         self.replay: Demos | None = None
+        self.robot = "so101"  # the robot new runs train on; set from the Build tab
         self.compute = threading.Lock()  # one run's heavy stages at a time
         self.ready = False
 
@@ -191,7 +195,7 @@ class Forge:
             + "-"
             + hashlib.sha1(f"{prompt}{time.time()}".encode()).hexdigest()[:4]
         )
-        run = Run(rid, prompt)
+        run = Run(rid, prompt, robot=self.robot)
         self.runs[rid] = run
         self.order.append(rid)
         return run
@@ -215,7 +219,7 @@ class Forge:
         run.layouts = [compose_layout(run.steps, np.random.default_rng(seed)).to_json()]
         run.plan = []
         for k, st in enumerate(run.steps):
-            sk = self.registry.exact(st.instruction)
+            sk = self.registry.exact(st.instruction, run.robot)
             run.plan.append(
                 {
                     "step": k,
@@ -238,6 +242,7 @@ class Forge:
         child = self.new_run(st.instruction)
         child.spec = st.single()
         child.parent, child.step_index = parent.id, k
+        child.robot = parent.robot
         child.status, child.t0 = "running", time.time()
         child.parse_info = {"model": "planner", "kind": "single"}
         parent.plan[k]["child"] = child.id
@@ -261,7 +266,12 @@ class Forge:
         t0 = time.time()
         with self.compute:
             rolls = evaluate_composed(
-                models, specs, run.layouts, record=True, on_progress=prog
+                models,
+                specs,
+                run.layouts,
+                record=True,
+                on_progress=prog,
+                robot=run.robot,
             )
         s = summarize_composed(rolls, len(specs))
         s["seconds"] = round(time.time() - t0, 1)
@@ -291,6 +301,7 @@ class Forge:
                 for p in run.plan
             ],
             prompt=run.prompt,
+            robot=run.robot,
         )
         self.registry.add(skill)
         run.skill_id = sid
@@ -311,7 +322,7 @@ class Forge:
         rng = np.random.default_rng(seed)
         run.layouts = [self._layout(run, rng).to_json() for _ in range(EVAL_N)]
         lay = Layout.from_json(run.layouts[0])
-        sc = Scene(lay)
+        sc = Scene(lay, run.robot)
         sc.reset(lay)
         frame = sc.pose_frame()
         sc.close()
@@ -330,6 +341,7 @@ class Forge:
                 "seed": base_seed + i,
                 "out": str(out / f"ep{i:03d}.npz"),
                 "noise": DART_NOISE,
+                "robot": run.robot,
             }
             if run.parent:
                 j["layout"] = self._layout(
@@ -372,16 +384,26 @@ class Forge:
 
     def train(self, run: Run, seconds: float, lr: float, agent: str) -> dict:
         assert run.spec is not None
+        custom = not is_default(run.robot)
         if run.model is None:
-            sid, path, sim, reason = self.registry.nearest(run.spec)
+            sid, path, sim, reason = self.registry.nearest(run.spec, run.robot)
             if not path.exists():
                 path = BASE_PATH
                 sid, reason = None, "starting from the multi-task base policy"
             if path.exists():
                 run.model, _meta = VLA.load(path, device())
+                if custom and sid is None:
+                    # the base policy was trained on the SO-101: carry it over to this robot's joints
+                    act_dim = calibrate(run.robot).act_dim
+                    run.model, how = run.model.for_embodiment(act_dim, run.data.norm())
+                    run.model = run.model.to(device())
+                    reason = f"base policy carried over to {run.robot} ({how})"
             else:  # no base trained yet on this machine: learn from scratch
                 sid, reason = None, "no base policy yet, training from scratch"
-                run.model = VLA(norm=run.data.norm()).to(device())
+                act_dim = calibrate(run.robot).act_dim
+                run.model = VLA(
+                    HeadConfig(act_dim=act_dim, state_dim=act_dim), norm=run.data.norm()
+                ).to(device())
             run.init_from = {
                 "skill": sid,
                 "similarity": round(sim, 3),
@@ -401,7 +423,8 @@ class Forge:
                 seconds,
                 lr=lr,
                 on_log=log,
-                replay=self.replay,
+                # replay holds SO-101 demos; another robot's joint space would only be confused by them
+                replay=None if custom else self.replay,
                 log_every=0.4,
             )
         return st
@@ -422,6 +445,7 @@ class Forge:
                 layouts=run.layouts,
                 record=True,
                 on_progress=prog,
+                robot=run.robot,
             )
         s = summarize(rolls)
         s["seconds"] = round(time.time() - t0, 1)
@@ -495,6 +519,7 @@ class Forge:
             thumb=ok_roll.frames[-1] if ok_roll.frames else [],
             tier=TIER[run.spec.skill],
             prompt=run.prompt,
+            robot=run.robot,
         )
         self.registry.add(skill)
         run.skill_id = sid
@@ -515,7 +540,7 @@ class Forge:
                 "phase_frames": r.phase_frames,
                 "instructions": [st.instruction for st in run.steps],
                 "fps": 30,
-                "scene": export_scene(Layout.from_json(r.layout)),
+                "scene": export_scene(Layout.from_json(r.layout), run.robot),
                 "frames": r.frames,
             }
         return {
@@ -525,7 +550,7 @@ class Forge:
             "failure": r.failure,
             "steps": r.steps,
             "fps": 30,
-            "scene": export_scene(Layout.from_json(r.layout)),
+            "scene": export_scene(Layout.from_json(r.layout), run.robot),
             "frames": r.frames,
         }
 
