@@ -50,7 +50,7 @@ def render_thumb(
         adr = m.joint(f"{name}_free").qposadr[0]
         d.qpos[adr : adr + 3] = f[bid - 1, :3]
         d.qpos[adr + 3 : adr + 7] = f[bid - 1, 3:]
-    for name, (_c, x, y) in {**lay.bowls, **lay.pads}.items():
+    for name, (_c, x, y) in lay.fixtures().items():
         d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
     mujoco.mj_forward(m, d)
     cam = mujoco.MjvCamera()

@@ -116,7 +116,35 @@ def export_scene(layout: Layout, robot: str = "so101") -> dict:
             }
             for n, (c, *_r) in layout.pads.items()
         ],
+        **_line_parts(layout, idx),
     }
+
+
+def _line_parts(layout: Layout, idx: dict) -> dict:
+    """Totes (their scaled robosuite boxes) and the conveyor, when the layout is a factory-line cell."""
+    if not (layout.bins or layout.belt):
+        return {}
+    from .sim import line
+
+    out: dict = {
+        "bins": [
+            {
+                "body": idx[n],
+                "name": n,
+                "color": c,
+                "rgb": list(line.BIN_COLORS[c]),
+                "boxes": line.bin_geoms(),
+            }
+            for n, (c, *_r) in layout.bins.items()
+        ]
+    }
+    if layout.belt:
+        out["belt"] = {
+            "body": idx["belt"],
+            "half": [line.BELT_HALF_W, line.BELT_HALF_L, line.BELT_HALF_T],
+            "top": line.BELT_TOP,
+        }
+    return out
 
 
 def preview(layout: Layout, robot: str = "so101") -> dict:

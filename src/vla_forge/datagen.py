@@ -33,7 +33,7 @@ def demo_job(args: dict) -> dict:
     sc = Scene(layout, args.get("robot", "so101"))
     sc.reset(layout, look)
     imgs, states, ctrls, aux = [], [], [], []
-    has_goal = "goal" in {**layout.bowls, **layout.pads, **layout.blocks}
+    has_goal = "goal" in {**layout.fixtures(), **layout.blocks}
 
     def on_tick(s: Scene):
         f, w = s.render_obs()

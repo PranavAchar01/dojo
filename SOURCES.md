@@ -34,6 +34,17 @@ https://github.com/google-deepmind/mujoco_menagerie into `vendor/menagerie/<mode
 | `robotiq_2f85` | Robotiq 2F-85 | Robotiq; ROS-Industrial description; MJCF by MuJoCo Menagerie | BSD-2-Clause | https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/robotiq_2f85 | `vendor/menagerie/robotiq_2f85/2f85.xml` |
 | `franka_hand` | Franka Hand | Franka Robotics; MJCF by MuJoCo Menagerie | Apache-2.0 | https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/franka_emika_panda | `vendor/menagerie/franka_hand/hand.xml` |
 
+## Factory line equipment
+
+The Line tab's cells add a conveyor and totes to the table. Both come from published sources; nothing was modelled
+from scratch.
+
+| Part | Source | Licence | How it is used |
+|---|---|---|---|
+| Tote | robosuite `bins_arena.xml`, body `bin1` (floor box + four wall boxes), https://github.com/ARISE-Initiative/robosuite/blob/5ce6643f3092639d08f7b0f90ed1c6a84f50552c/robosuite/models/assets/arenas/bins_arena.xml | MIT (`vendor/robosuite/LICENSE`) | `vendor/robosuite/bins_arena.xml` is read at run time; `sim/line.py` takes bin1's collision boxes and scales them so the opening is 9 cm square and the rim about 3.4 cm high (an SO-101 reaches over it), floor on the table. Colour per station. The visual legs, textures and second bin are not used. |
+| Conveyor | MuJoCo issue #547, "Conveyor belt", answer by maintainer Yuval Tassa: a box on a slide joint with large damping driven by a constant force settles at force / damping and carries what rests on it by friction, https://github.com/google-deepmind/mujoco/issues/547 | recipe (MuJoCo itself is Apache-2.0) | `sim/line.py add_belt`: same construction (slide joint, damping 1000 N s/m), force applied through `qfrc_applied` so the policy's action vector keeps its size; a contact exclude keeps the belt off the table. 0.12 m/s while running; it stops when a part reaches the station's photo-eye. |
+| Arms | `so101` and `vx300s` above | as above | Stations use the same arm models as the rest of the app. |
+
 ## Looked at and left out
 
 - **Suction cup.** No open-source MuJoCo model of a suction gripper was found in these sources, and MuJoCo has no

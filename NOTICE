@@ -41,3 +41,10 @@ Third-party material and design credits.
    trs_so_arm100 (Apache-2.0), low_cost_robot_arm (Apache-2.0), trossen_wx250s and trossen_vx300s
    (BSD-3-Clause, Trossen Robotics), robotiq_2f85 (BSD-2-Clause, ROS-Industrial), franka_emika_panda hand.xml
    (Apache-2.0). Full table in SOURCES.md.
+
+8. Factory line tote (vendor/robosuite)
+   bins_arena.xml from robosuite, https://github.com/ARISE-Initiative/robosuite, commit
+   5ce6643f3092639d08f7b0f90ed1c6a84f50552c, MIT License (Copyright (c) 2022 Stanford Vision and Learning Lab
+   and UT Robot Perception and Learning Lab), kept unmodified with its LICENSE; bin1's collision boxes are
+   scaled at run time (src/vla_forge/sim/line.py). The conveyor follows the construction given by MuJoCo's
+   maintainers in google-deepmind/mujoco issue #547. Details in SOURCES.md.
