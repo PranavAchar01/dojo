@@ -237,13 +237,8 @@ async def robot_report(robot: str):
     rid = _robot_id(robot)
 
     def run() -> dict:
-        rep = R.report(rid)
-        skills = ("reach", "push", "lift", "pick_place", "stack")
-        feas = {
-            k: dict(zip(("ok", "reason"), R.robot_feasibility(rid, k), strict=True))
-            for k in skills
-        }
-        return {**rep, "skills": feas}
+        ok, why, feas = R.usable(rid)
+        return {**R.report(rid), "skills": feas, "usable": ok, "usable_reason": why}
 
     return await asyncio.to_thread(run)
 
@@ -263,10 +258,11 @@ async def part_preview(slot: str, part: str):
 
 @app.post("/api/robot/use")
 async def use_robot(u: UseRobot):
-    """Make this robot the embodiment the next skill trains on (only one that passes every check)."""
-    rep = await asyncio.to_thread(R.report, _robot_id(u.robot))
-    if not rep["ok"]:
-        raise HTTPException(409, rep["failure"] or "robot failed its checks")
+    """Make this robot the embodiment the next skill trains on. It must compose and pass every check that is not
+    task-specific, and fit at least one skill; the router refuses the skills it cannot do, with the reason."""
+    ok, why, _ = await asyncio.to_thread(R.usable, _robot_id(u.robot))
+    if not ok:
+        raise HTTPException(409, why)
     FORGE.robot = u.robot
     return {"robot": FORGE.robot}
 

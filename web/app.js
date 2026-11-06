@@ -78,9 +78,9 @@ scene3.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 30);
 camera.up.set(0, 0, 1);
-camera.position.set(1.5, -1.12, 0.68);
+camera.position.set(1.72, -1.3, 0.56);
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(0.14, 0.0, 0.1);
+controls.target.set(0.14, 0.0, 0.13);
 controls.enableDamping = true;
 controls.minDistance = 0.35;
 controls.maxDistance = 2.6;
@@ -361,7 +361,7 @@ function resize() {
 new ResizeObserver(resize).observe(canvas.parentElement);
 resize();
 const CAMS = {
-  orbit: { pos: [1.5, -1.12, 0.68], target: [0.14, 0.0, 0.1], rotate: true },
+  orbit: { pos: [1.72, -1.3, 0.56], target: [0.14, 0.0, 0.13], rotate: true },
   front: { pos: [1.3, -0.02, 0.56], target: [0.16, 0.0, 0.06], rotate: false },
   top: { pos: [0.2, -0.06, 1.15], target: [0.2, 0.0, 0.0], rotate: false },
 };
@@ -898,7 +898,7 @@ function handle(e) {
       break;
     case "route":
       settle(e.run, "router", e.refused ? "fail" : "done");
-      stage("router", e.refused ? "fail" : "done", e.decision.replace("_", " "));
+      stage("router", e.refused ? "fail" : "done", e.refused ? "refused" : e.decision.replace("_", " "));
       break;
     case "rejected":
       tool(e.run, e.agent || "task", e.reason, "fail");

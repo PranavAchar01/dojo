@@ -187,6 +187,7 @@ scripted expert itself lifts on this arm in 6 of 6 seeds, so the gap is training
 
 ```python
 from vla_forge.sim.robots import robot_feasibility
+
 ok, reason = robot_feasibility("koch.native.native", "pick_place")
 # (False, "it reaches only 57% of the table workspace at grasp height pointing down (needs 90%); ...")
 ```

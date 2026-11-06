@@ -28,7 +28,8 @@ import numpy as np
 from .compose import MAX_STEPS, Step
 from .compose import sample_layout as compose_layout
 from .registry import BASE_PATH, ROBOT, Registry
-from .sim.robots import robot_feasibility
+from .sim.robots import is_default, robot_feasibility
+from .sim.robots import label as robot_label
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS, Layout, Scene
 from .sim.tasks import BLOCK_ANG, BLOCK_R, SKILLS, TaskSpec, sample_layout
 
@@ -340,6 +341,15 @@ def _suggest(parsed, registry: Registry) -> str:
     return best.instruction if best else "touch the red block"
 
 
+SKILL_VERB = {
+    "reach": "reach a block",
+    "push": "push a block",
+    "lift": "pick up a block",
+    "pick_place": "pick and place a block",
+    "stack": "stack blocks",
+}
+
+
 def check_robot(parsed: TaskSpec | list[Step], robot: str) -> Check:
     """Can the active robot do every skill the prompt needs? (sim/robots.py: fingers, reach, torque)"""
     skills = (
@@ -347,13 +357,12 @@ def check_robot(parsed: TaskSpec | list[Step], robot: str) -> Check:
         if isinstance(parsed, list)
         else [parsed.skill]
     )
+    name = robot_label(robot)
     for sk in skills:
         ok, why = robot_feasibility(robot, sk)
         if not ok:
-            return Check(
-                "robot", False, f"{robot} cannot {sk.replace('_', ' ')}: {why}"
-            )
-    return Check("robot", True, f"{robot}: {why}")
+            return Check("robot", False, f"the {name} cannot {SKILL_VERB[sk]}: {why}")
+    return Check("robot", True, f"{name}: {why}")
 
 
 # ------------------------------------------------------------------ the decision
@@ -403,12 +412,18 @@ def route(
                 checks,
                 suggestion=_suggest(parsed, registry),
             )
-    reach = check_reach(parsed)
-    checks.append(reach)
-    if not reach.ok:
-        return Route(
-            "not_feasible", reach.detail, checks, suggestion=_suggest(None, registry)
-        )
+    if is_default(
+        robot
+    ):  # the SO-101's IK; another robot's reach is part of its robot check below
+        reach = check_reach(parsed)
+        checks.append(reach)
+        if not reach.ok:
+            return Route(
+                "not_feasible",
+                reach.detail,
+                checks,
+                suggestion=_suggest(None, registry),
+            )
 
     fit = check_robot(parsed, robot)
     checks.append(fit)

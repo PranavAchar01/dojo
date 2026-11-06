@@ -39,3 +39,11 @@ def test_failures_explain_themselves():
     assert not ok and "reaches only" in reason
     # pushing needs no grip, so a jaw too small for a block is fine for it
     assert R.robot_feasibility("wx250s.native.native", "push")[0]
+
+
+def test_usable_keeps_the_skills_a_robot_can_do():
+    ok, why, feas = R.usable("wx250s.native.native")
+    assert ok and feas["push"]["ok"] and not feas["pick_place"]["ok"]
+    assert "refuses" in why
+    ok, why, _ = R.usable("koch.native.native")
+    assert not ok and "workspace" in why
