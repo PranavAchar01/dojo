@@ -98,7 +98,7 @@ class Route:
         return self.decision in ("not_feasible", "too_complex")
 
     def to_json(self) -> dict:
-        return asdict(self)
+        return {**asdict(self), "refused": self.refused}
 
 
 # ------------------------------------------------------------------ the arm's workspace
