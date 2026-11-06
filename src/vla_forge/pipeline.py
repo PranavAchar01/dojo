@@ -19,14 +19,15 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from . import llm
+from . import llm, tiles
+from . import router as router_mod
 from .compose import Step, step_layout
 from .compose import sample_layout as compose_layout
 from .datagen import demo_job, pool
 from .encoders import device, encode_images, encode_text
 from .learn import Demos, train
 from .policy import VLA
-from .registry import BASE_PATH, ROOT, Registry, Skill
+from .registry import BASE_PATH, ROBOT, ROOT, Registry, Skill
 from .rollout import (
     env_pool,
     evaluate,
@@ -36,7 +37,7 @@ from .rollout import (
 )
 from .sim.scene import Layout, Scene
 from .sim.tasks import TIER, TaskSpec, sample_layout
-from .viz import export_scene
+from .viz import export_scene, preview
 
 DEADLINE = 172.0  # seconds from prompt to published skill (the brief's budget is 180)
 TARGET = 0.8
@@ -88,6 +89,10 @@ class Run:
     )  # per step: instruction, skill_id, source, child, ...
     parent: str = ""
     step_index: int = -1
+    # library: how this prompt was asked for, and what the router decided
+    mode: str = "auto"  # auto | train (never reuse) | scratch (from the base) | remix (from from_skill)
+    from_skill: str = ""
+    route: dict = field(default_factory=dict)
 
     @property
     def composite(self) -> bool:
@@ -134,6 +139,9 @@ class Run:
             "plan": self.plan,
             "parent": self.parent,
             "step_index": self.step_index,
+            "mode": self.mode,
+            "from_skill": self.from_skill,
+            "route": self.route,
         }
 
 
@@ -149,6 +157,7 @@ class Forge:
         self.replay: Demos | None = None
         self.compute = threading.Lock()  # one run's heavy stages at a time
         self.ready = False
+        self.tests: dict[str, dict] = {}  # test id -> {skill, rolls, instructions}
 
     # events
     def emit(self, run_id: str, kind: str, agent: str = "", **data) -> None:
@@ -185,13 +194,13 @@ class Forge:
             "", "ready", seconds=round(time.time() - t0, 1), replay=self.replay.episodes
         )
 
-    def new_run(self, prompt: str) -> Run:
+    def new_run(self, prompt: str, mode: str = "auto", from_skill: str = "") -> Run:
         rid = (
             time.strftime("%H%M%S")
             + "-"
             + hashlib.sha1(f"{prompt}{time.time()}".encode()).hexdigest()[:4]
         )
-        run = Run(rid, prompt)
+        run = Run(rid, prompt, mode=mode, from_skill=from_skill)
         self.runs[rid] = run
         self.order.append(rid)
         return run
@@ -207,6 +216,15 @@ class Forge:
         else:
             run.spec = out
         return out
+
+    def route(self, run: Run) -> router_mod.Route:
+        """What the prompt needs (reuse / train / chain) or why it is refused; see router.py."""
+        parsed = run.steps if run.composite else run.spec
+        r = router_mod.route(
+            run.prompt, parsed, run.parse_info, self.registry, run.mode, run.from_skill
+        )
+        run.route = r.to_json()
+        return r
 
     # tier 3
     def plan(self, run: Run) -> list[dict]:
@@ -291,12 +309,32 @@ class Forge:
                 for p in run.plan
             ],
             prompt=run.prompt,
+            robot=ROBOT,
+            origin="chain",
+            train_seconds=round(
+                sum(
+                    self.registry.skills[p["skill_id"]].train_seconds
+                    for p in run.plan
+                    if p["source"] == "train"
+                ),
+                1,
+            ),
         )
         self.registry.add(skill)
+        self._save_tile(skill, run.rollouts[0], [st.instruction for st in run.steps])
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)
         run.status = "published"
         return skill
+
+    def _save_tile(
+        self, skill: Skill, rolls: list, instructions=None, source="held-out eval"
+    ) -> None:
+        """The tile's thumbnail and replay, written next to the registry, then the 'saved' moment."""
+        self.emit("", "saving", "registry", skill=skill.id)
+        fields = tiles.save_assets(skill, rolls, source, instructions)
+        sk = self.registry.update(skill.id, **fields)
+        self.emit("", "saved", "registry", tile=tiles.tile(sk))
 
     def _layout(self, run: Run, rng: np.random.Generator) -> Layout:
         """A training or held-out scene. A step trained for a composed task sees that task's tables."""
@@ -374,6 +412,13 @@ class Forge:
         assert run.spec is not None
         if run.model is None:
             sid, path, sim, reason = self.registry.nearest(run.spec)
+            src = self.registry.skills.get(run.from_skill)
+            if run.mode == "remix" and src is not None and src.model:
+                sid, path, sim = src.id, ROOT / src.model, 1.0
+                reason = f"remix: fine-tuning from '{src.name or src.instruction}'"
+            elif run.mode == "scratch":
+                sid, path, sim = None, BASE_PATH, 0.0
+                reason = "from scratch: starting from the multi-task base policy, not the nearest tile"
             if not path.exists():
                 path = BASE_PATH
                 sid, reason = None, "starting from the multi-task base policy"
@@ -393,6 +438,14 @@ class Forge:
         def log(e):
             run.rounds[-1].loss.append([e["t"], round(e["ema"], 5)])
             self.emit(run.id, "loss", agent, round=len(run.rounds) - 1, **e)
+
+        self.emit(
+            run.id,
+            "train_start",
+            agent,
+            round=len(run.rounds) - 1,
+            seconds=round(seconds, 1),
+        )
 
         with self.compute:
             st = train(
@@ -495,12 +548,98 @@ class Forge:
             thumb=ok_roll.frames[-1] if ok_roll.frames else [],
             tier=TIER[run.spec.skill],
             prompt=run.prompt,
+            robot=ROBOT,
+            origin="step"
+            if run.parent
+            else run.mode
+            if run.mode in ("scratch", "remix")
+            else "prompt",
+            train_seconds=round(
+                sum(r.train.get("seconds", 0.0) for r in run.rounds), 1
+            ),
         )
         self.registry.add(skill)
+        self._save_tile(skill, run.rollouts[run.best_round])
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)
         run.status = "published"
         return skill
+
+    # library: Test a tile on scenes nobody has seen
+    def test_skill(self, sid: str, tid: str, n: int) -> dict:
+        sk = self.registry.skills[sid]
+        seed0 = int(np.random.default_rng().integers(2_000_000, 3_000_000))
+        rng = np.random.default_rng(seed0)
+
+        def prog(p):
+            self.emit(f"test-{tid}", "test_progress", "eval", skill=sid, **p)
+
+        t0 = time.time()
+        if sk.composite:
+            subs = [self.registry.skills[st["skill_id"]] for st in sk.steps]
+            steps = [Step(s.task().skill, s.task().obj, s.task().target) for s in subs]
+            lays = [compose_layout(steps, rng).to_json() for _ in range(n)]
+            self.emit(
+                f"test-{tid}",
+                "test_start",
+                "eval",
+                skill=sid,
+                n=n,
+                scene=preview(Layout.from_json(lays[0])),
+            )
+            models = [VLA.load(ROOT / s.model, device())[0] for s in subs]
+            with self.compute:
+                rolls = evaluate_composed(
+                    models,
+                    [st.in_scene() for st in steps],
+                    lays,
+                    seed0=seed0,
+                    on_progress=prog,
+                )
+            instructions = [st.instruction for st in steps]
+        else:
+            spec = sk.task()
+            lays = [sample_layout(spec, rng).to_json() for _ in range(n)]
+            self.emit(
+                f"test-{tid}",
+                "test_start",
+                "eval",
+                skill=sid,
+                n=n,
+                scene=preview(Layout.from_json(lays[0])),
+            )
+            model, _ = VLA.load(ROOT / sk.model, device())
+            with self.compute:
+                rolls = evaluate(
+                    model, spec, n, seed0=seed0, layouts=lays, on_progress=prog
+                )
+            instructions = None
+        res = {
+            "t": round(time.time(), 1),
+            "n": n,
+            "succeeded": int(sum(r.success for r in rolls)),
+            "seconds": round(time.time() - t0, 1),
+            "seed0": seed0,
+        }
+        self.tests[tid] = {"skill": sid, "rolls": rolls, "instructions": instructions}
+        sk = self.registry.add_test(sid, res)
+        if not sk.replay:  # tiles from before the library: their first test gives them a picture and a replay
+            self._save_tile(sk, rolls, instructions, source="test")
+            sk = self.registry.skills[sid]
+        self.emit(
+            f"test-{tid}",
+            "test_done",
+            "eval",
+            skill=sid,
+            **res,
+            successes=[r.success for r in rolls],
+            tile=tiles.tile(sk),
+        )
+        return res
+
+    def test_payload(self, tid: str, index: int) -> dict:
+        t = self.tests[tid]
+        return {"round": 0, **tiles.payload(t["rolls"][index], t["instructions"])}
 
     def rollout_payload(self, run: Run, rnd: int, index: int) -> dict:
         r = run.rollouts[rnd][index]

@@ -11,3 +11,6 @@ demo/*.webm
 *.log
 archive/
 demo/narration/
+skills/tiles/
+.pytest_cache/
+/models
