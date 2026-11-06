@@ -147,7 +147,7 @@ without 25/30, so the grounding token is off by default.
 
 The page is modelled on the public website of HeyPCB (heypcb.ai): top bar with breadcrumb and segmented tabs,
 chat on the left with tool status pills, floating tool groups on the canvas, a stage rail, a bottom tab bar for
-rollouts, an inspector on the right, zinc palette, Geist and Instrument Serif. HeyPCB's GitHub repositories
+rollouts, an inspector on the right, zinc palette with one safety-orange accent, Geist and Geist Mono only. HeyPCB's GitHub repositories
 hold hardware (CERN-OHL-S) and an MIT MCP server but no interface code, so nothing was copied; the look was
 rebuilt with this project's own HTML, CSS and JavaScript, with no HeyPCB name or logo in the page. Not
 affiliated. Details and other credits in `NOTICE`.

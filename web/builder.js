@@ -194,7 +194,7 @@ let visible = false;
 function initAssembly() {
   const canvas = $("#asm");
   asm = stage(canvas);
-  asm.s.background = new THREE.Color(0xf7f6fb);
+  asm.s.background = new THREE.Color(0xfafafa);
   asm.controls = new OrbitControls(asm.cam, canvas);
   asm.controls.enableDamping = true;
   asm.controls.autoRotate = true;

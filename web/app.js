@@ -78,15 +78,13 @@ scene3.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 30);
 camera.up.set(0, 0, 1);
-camera.position.set(1.72, -1.3, 0.56);
+camera.position.set(1.37, -0.38, 0.52);
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0.14, 0.0, 0.13);
 controls.enableDamping = true;
 controls.minDistance = 0.35;
 controls.maxDistance = 2.6;
 controls.maxPolarAngle = Math.PI * 0.47;
-controls.autoRotate = true;
-controls.autoRotateSpeed = 0.35;
 controls.update();
 
 // three-point studio lighting: a warm soft key that casts the shadows, a cool fill from the sky, a rim from behind
@@ -354,6 +352,7 @@ async function startPlayback(payload) {
 }
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
+  if (!r.width || !r.height) return; // the sim view is hidden on the other tabs
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / r.height;
   camera.updateProjectionMatrix();
@@ -361,10 +360,21 @@ function resize() {
 new ResizeObserver(resize).observe(canvas.parentElement);
 resize();
 const CAMS = {
-  orbit: { pos: [1.72, -1.3, 0.56], target: [0.14, 0.0, 0.13], rotate: true },
+  orbit: { target: [0.2, 0.0, 0.10], rotate: true },
   front: { pos: [1.3, -0.02, 0.56], target: [0.16, 0.0, 0.06], rotate: false },
   top: { pos: [0.2, -0.06, 1.15], target: [0.2, 0.0, 0.0], rotate: false },
 };
+// Orbit starts in front of the arm (+x, the side the gripper works toward), a little to the right, and only sways
+// about 25 degrees either way, so the camera never swings round behind it.
+const SWAY = { az: (-12 * Math.PI) / 180, amp: (25 * Math.PI) / 180, period: 28, r: 0.88, h: 0.30, resume: 4000 };
+let userUntil = 0; // sway pauses while the user drags and for a few seconds after
+function swayPose(now) {
+  const k = camScale;
+  const t = CAMS.orbit.target;
+  const tz = t[2] + (k - 1) * 0.16;
+  const az = SWAY.az + SWAY.amp * Math.sin((2 * Math.PI * now) / (SWAY.period * 1000));
+  return [t[0] + Math.cos(az) * SWAY.r * k, t[1] + Math.sin(az) * SWAY.r * k, tz + SWAY.h * k, tz];
+}
 // bigger arms stand taller and swing wider: back the camera off and lift its aim so the whole arm and the blocks fit
 const ARM_SCALE = { so101: 1, so100: 1, koch: 1, wx250s: 1.22, vx300s: 1.42 };
 let camName = "orbit";
@@ -378,9 +388,15 @@ function setCam(name) {
   camName = name;
   const k = camScale;
   const t = [c.target[0], c.target[1], c.target[2] + (k - 1) * 0.16];
-  camera.position.fromArray(c.pos.map((p, i) => t[i] + (p - c.target[i]) * k));
   controls.target.fromArray(t);
-  controls.autoRotate = c.rotate;
+  if (name === "orbit") {
+    const p = swayPose(performance.now());
+    camera.position.set(p[0], p[1], p[2]);
+    userUntil = 0;
+  } else {
+    camera.position.fromArray(c.pos.map((p, i) => t[i] + (p - c.target[i]) * k));
+  }
+  controls.autoRotate = false;
   controls.update();
   document.querySelectorAll("[data-cam]").forEach((b) => b.classList.toggle("on", b.dataset.cam === name));
 }
@@ -407,13 +423,21 @@ function tick() {
     }
   }
   if (!$("#view-sim").classList.contains("hidden")) {
+    if (camName === "orbit" && performance.now() > userUntil) {
+      const p = swayPose(performance.now());
+      camera.position.x += (p[0] - camera.position.x) * 0.06;
+      camera.position.y += (p[1] - camera.position.y) * 0.06;
+      camera.position.z += (p[2] - camera.position.z) * 0.06;
+      controls.target.z += (p[3] - controls.target.z) * 0.06;
+    }
     controls.update();
     renderer.render(scene3, camera);
   }
   requestAnimationFrame(tick);
 }
 tick();
-canvas.addEventListener("pointerdown", () => { controls.autoRotate = false; });
+controls.addEventListener("start", () => { userUntil = Infinity; });
+controls.addEventListener("end", () => { userUntil = performance.now() + SWAY.resume; });
 
 // ---------------------------------------------------------------- run state
 let current = null; // the prompt's run id
@@ -666,16 +690,27 @@ document.querySelectorAll(".seg button").forEach((b) =>
 );
 function setView(v) {
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
-  for (const k of ["sim", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  const app = $("#app");
+  const prev = app.dataset.view;
+  app.dataset.view = v;
+  app.classList.toggle("immersive", v !== "sim");
+  for (const k of ["sim", "line", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();
   if (v === "skills") refreshSkills();
-  if (v === "sim") resize();
+  // the panels slide away over ~300ms; resize the 3D canvases once the layout has settled
+  resize();
+  if (prev !== v) {
+    const again = () => { resize(); window.dispatchEvent(new Event("resize")); };
+    setTimeout(again, 340);
+  }
+  window.dispatchEvent(new CustomEvent("forge:view", { detail: v }));
 }
 window.setView = setView;
-$("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); resize(); };
-$("#toggle-right").onclick = () => { $("#app").classList.toggle("no-right"); resize(); };
+$("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); setTimeout(resize, 340); };
+$("#toggle-right").onclick = () => { $("#app").classList.toggle("no-right"); setTimeout(resize, 340); };
+$("#app").dataset.view = "sim";
 
 const TIER_NAMES = {
   1: ["Tier 1", "one motion: reach, push, lift"],
@@ -1058,6 +1093,7 @@ window.forge = {
   showScene(sc) { play = null; buildWorld(sc); applyFrame(sc.frame); $("#pb-fill").style.width = "0"; $("#vp-badge").classList.add("hidden"); $("#step-badge").classList.add("hidden"); },
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
+  THREE, scene3, camera, controls, renderer,
 };
 
 idleScene();
