@@ -14,3 +14,6 @@ demo/narration/
 skills/tiles/
 .pytest_cache/
 /models
+.cache/
+MUJOCO_LOG.TXT
+skills/registry.json.*

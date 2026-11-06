@@ -20,7 +20,7 @@ from .sim.tasks import TaskSpec, check, sample_layout
 
 
 def demo_job(args: dict) -> dict:
-    """One expert episode. args: spec, seed, out, look_strength, near (optional), layout (optional)."""
+    """One expert episode. args: spec, seed, out, look_strength, near, layout, robot (a robot id, default so101)."""
     t0 = time.time()
     spec = TaskSpec.from_json(args["spec"])
     rng = np.random.default_rng(args["seed"])
@@ -30,7 +30,7 @@ def demo_job(args: dict) -> dict:
         else sample_layout(spec, rng, near=args.get("near"))
     )
     look = Look.sample(rng, args.get("look_strength", 1.0))
-    sc = Scene(layout)
+    sc = Scene(layout, args.get("robot", "so101"))
     sc.reset(layout, look)
     imgs, states, ctrls, aux = [], [], [], []
     has_goal = "goal" in {**layout.bowls, **layout.pads, **layout.blocks}

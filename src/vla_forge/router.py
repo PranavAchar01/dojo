@@ -28,6 +28,7 @@ import numpy as np
 from .compose import MAX_STEPS, Step
 from .compose import sample_layout as compose_layout
 from .registry import BASE_PATH, ROBOT, Registry
+from .sim.robots import robot_feasibility
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS, Layout, Scene
 from .sim.tasks import BLOCK_ANG, BLOCK_R, SKILLS, TaskSpec, sample_layout
 
@@ -339,6 +340,22 @@ def _suggest(parsed, registry: Registry) -> str:
     return best.instruction if best else "touch the red block"
 
 
+def check_robot(parsed: TaskSpec | list[Step], robot: str) -> Check:
+    """Can the active robot do every skill the prompt needs? (sim/robots.py: fingers, reach, torque)"""
+    skills = (
+        list(dict.fromkeys(s.skill for s in parsed))
+        if isinstance(parsed, list)
+        else [parsed.skill]
+    )
+    for sk in skills:
+        ok, why = robot_feasibility(robot, sk)
+        if not ok:
+            return Check(
+                "robot", False, f"{robot} cannot {sk.replace('_', ' ')}: {why}"
+            )
+    return Check("robot", True, f"{robot}: {why}")
+
+
 # ------------------------------------------------------------------ the decision
 
 
@@ -393,6 +410,13 @@ def route(
             "not_feasible", reach.detail, checks, suggestion=_suggest(None, registry)
         )
 
+    fit = check_robot(parsed, robot)
+    checks.append(fit)
+    if not fit.ok:
+        return Route(
+            "not_feasible", fit.detail, checks, suggestion=_suggest(None, registry)
+        )
+
     if isinstance(parsed, list):
         return _route_chain(parsed, info, registry, checks, mode, robot)
 
@@ -404,6 +428,13 @@ def route(
         if src is None or src.composite:
             return Route(
                 "not_feasible", "the tile to remix has no checkpoint of its own", checks
+            )
+        if src.robot != robot:
+            return Route(
+                "not_feasible",
+                f"that tile was trained on {src.robot}; the active robot is {robot}, "
+                "and a policy only runs on the joints it learned",
+                checks,
             )
         note = (
             ""
@@ -426,7 +457,7 @@ def route(
             estimate_s=est,
             expected=expected_rate(registry, spec.skill),
         )
-    have = registry.exact(spec.instruction)
+    have = registry.exact(spec.instruction, robot)
     if (
         mode == "auto"
         and have
@@ -496,7 +527,7 @@ def _route_chain(
         )
     plan, total, missing = [], CHAIN_EXEC_S, []
     for s in steps:
-        have = registry.exact(s.instruction)
+        have = registry.exact(s.instruction, robot)
         if have and have.robot == robot:
             plan.append(
                 {"instruction": s.instruction, "source": "reuse", "skill_id": have.id}

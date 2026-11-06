@@ -142,7 +142,7 @@ def _worker(conn):
             out = {}
             for i, lay_j, look_seed, strength in arg["envs"]:
                 lay = Layout.from_json(lay_j)
-                sc = Scene(lay)
+                sc = Scene(lay, arg.get("robot", "so101"))
                 sc.reset(lay, Look.sample(np.random.default_rng(look_seed), strength))
                 envs[i] = {
                     "sc": sc,
@@ -165,6 +165,7 @@ def _worker(conn):
                 sc = e["sc"]
                 m, d = sc.model, sc.data
                 prev = d.ctrl.copy()
+                target = sc.to_ctrl(target)
                 for c in range(CONTROLS_PER_POLICY):
                     d.ctrl[:] = prev + (target - prev) * (c + 1) / CONTROLS_PER_POLICY
                     for s in range(STEPS_PER_CONTROL):
@@ -213,7 +214,7 @@ def _worker(conn):
             out = {}
             for i, lay_j, look_seed, strength in arg["envs"]:
                 lay = Layout.from_json(lay_j)
-                sc = Scene(lay)
+                sc = Scene(lay, arg.get("robot", "so101"))
                 sc.reset(lay, Look.sample(np.random.default_rng(look_seed), strength))
                 envs[i] = {
                     "sc": sc,
@@ -223,14 +224,13 @@ def _worker(conn):
                 out[i] = (np.stack(sc.render_obs()), sc.joint_pos(), False, 0.0)
             conn.send(out)
         elif cmd == "cstep":
-            from .sim.scene import HOME
-
             out = {}
             for i, (phase, target) in arg["targets"].items():
                 e = envs[i]
                 sc = e["sc"]
                 m, d = sc.model, sc.data
                 prev = d.ctrl.copy()
+                target = sc.to_ctrl(target)
                 for c in range(CONTROLS_PER_POLICY):
                     d.ctrl[:] = prev + (target - prev) * (c + 1) / CONTROLS_PER_POLICY
                     for s in range(STEPS_PER_CONTROL):
@@ -239,7 +239,8 @@ def _worker(conn):
                             e["frames"].append(sc.pose_frame())
                 _track(sc, e["stats"][phase], cspecs[phase])
                 ok = check(cspecs[phase], sc)
-                home = float(np.linalg.norm(sc.joint_pos()[:5] - HOME))
+                r = sc.robot
+                home = float(np.linalg.norm(sc.joint_pos()[: r.n_arm] - r.home))
                 out[i] = (np.stack(sc.render_obs()), sc.joint_pos(), ok, home)
             conn.send(out)
         elif cmd == "cfinish":
@@ -317,6 +318,7 @@ def evaluate(
     record: bool = True,
     on_progress: Callable[[dict], None] | None = None,
     look_strength: float = 1.0,
+    robot: str = "so101",
 ) -> list[Rollout]:
     import torch
 
@@ -329,7 +331,7 @@ def evaluate(
     pool = env_pool()
     w = len(pool.conns)
     rolls = []
-    init = [{"spec": spec.to_json(), "envs": []} for _ in range(w)]
+    init = [{"spec": spec.to_json(), "envs": [], "robot": robot} for _ in range(w)]
     for i in range(n):
         rng = np.random.default_rng(seed0 + i)
         lay = layouts[i] if layouts else sample_layout(spec, rng).to_json()
@@ -339,7 +341,7 @@ def evaluate(
     k = model.cfg.chunk
     max_steps = MAX_STEPS[spec.skill]
     hold = HOLD_STEPS[spec.skill]
-    preds = np.zeros((n, max_steps + k, k, 6), np.float32)
+    preds = np.zeros((n, max_steps + k, k, model.cfg.act_dim), np.float32)
     streak = np.zeros(n, int)
     active = np.ones(n, bool)
     t_start = time.time()
@@ -461,6 +463,7 @@ def evaluate_composed(
     seed0: int = EVAL_SEED0,
     record: bool = True,
     on_progress: Callable[[dict], None] | None = None,
+    robot: str = "so101",
 ) -> list[ComposedRollout]:
     """Run the steps' policies one after another in each scene, all scenes in parallel.
 
@@ -479,7 +482,10 @@ def evaluate_composed(
     w = len(pool.conns)
     n = len(layouts)
     rolls = [ComposedRollout(i, seed0 + i, layouts[i]) for i in range(n)]
-    init = [{"specs": [s.to_json() for s in specs], "envs": []} for _ in range(w)]
+    init = [
+        {"specs": [s.to_json() for s in specs], "envs": [], "robot": robot}
+        for _ in range(w)
+    ]
     for i in range(n):
         init[i % w]["envs"].append((i, layouts[i], seed0 + i + 7, 1.0))
     obs = pool._scatter("cinit", init)
@@ -488,7 +494,8 @@ def evaluate_composed(
     limit = [MAX_STEPS[s.skill] for s in specs]
     hold = [HOLD_STEPS[s.skill] for s in specs]
     longest = max(limit) + RETURN_STEPS
-    preds = np.zeros((n, longest + k, k, 6), np.float32)
+    adim = models[0].cfg.act_dim
+    preds = np.zeros((n, longest + k, k, adim), np.float32)
     phase = np.zeros(n, int)
     t_in = np.zeros(n, int)
     streak = np.zeros(n, int)
@@ -511,7 +518,7 @@ def evaluate_composed(
             .to(dev)
         )
         state = torch.from_numpy(np.stack([obs[i][1] for i in idx])).float().to(dev)
-        chunk = np.zeros((len(idx), k, 6), np.float32)
+        chunk = np.zeros((len(idx), k, adim), np.float32)
         for p in sorted({int(phase[i]) for i in idx}):
             sel = [bi for bi, i in enumerate(idx) if phase[i] == p]
             chunk[sel] = (

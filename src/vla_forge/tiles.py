@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from .registry import ROOT, TILES_DIR, Skill
+from .sim.robots import calibrate, fix_qpos0
 from .sim.scene import JOINTS, Layout, build_spec
 from .viz import export_scene
 
@@ -29,12 +30,19 @@ def tile_dir(skill_id: str) -> Path:
     return TILES_DIR / skill_id
 
 
-def render_thumb(layout_json: dict, frame: list, q: list, out: Path) -> Path:
-    """Render one recorded state of a rollout to a PNG."""
+def render_thumb(
+    layout_json: dict, frame: list, q: list, out: Path, robot: str = "so101"
+) -> Path:
+    """Render one recorded state of a rollout to a PNG, on the robot that ran it."""
     lay = Layout.from_json(layout_json)
-    m = build_spec(lay).compile()
+    m = build_spec(lay, robot=robot).compile()
+    fix_qpos0(m)
     d = mujoco.MjData(m)
-    for j, v in zip(JOINTS, q, strict=False):
+    rb = calibrate(robot)
+    joints = (
+        JOINTS if rb.default else rb.arm_joints
+    )  # a custom robot's q ends with its grip length
+    for j, v in zip(joints, q, strict=False):
         d.qpos[m.joint(j).qposadr[0]] = v
     f = np.asarray(frame, float).reshape(-1, 7)
     for name in lay.blocks:
@@ -66,13 +74,13 @@ def pick(rolls: list) -> list:
     return (ok + bad)[:REPLAY_KEEP] or rolls[:1]
 
 
-def payload(r, instructions: list[str] | None = None) -> dict:
+def payload(r, instructions: list[str] | None = None, robot: str = "so101") -> dict:
     p = {
         "index": r.index,
         "success": r.success,
         "failure": r.failure,
         "fps": 30,
-        "scene": export_scene(Layout.from_json(r.layout)),
+        "scene": export_scene(Layout.from_json(r.layout), robot),
         "frames": r.frames,
     }
     if instructions:  # a chained rollout
@@ -90,10 +98,16 @@ def save_assets(
     d = tile_dir(skill.id)
     d.mkdir(parents=True, exist_ok=True)
     shot = keep[0]
-    thumb = render_thumb(shot.layout, shot.frames[-1], shot.final_q, d / "thumb.png")
+    thumb = render_thumb(
+        shot.layout, shot.frames[-1], shot.final_q, d / "thumb.png", skill.robot
+    )
     replay = d / "replay.json.gz"
     with gzip.open(replay, "wt") as fh:
-        json.dump([payload(r, instructions) for r in keep], fh, separators=(",", ":"))
+        json.dump(
+            [payload(r, instructions, skill.robot) for r in keep],
+            fh,
+            separators=(",", ":"),
+        )
     return {
         "thumb_png": str(thumb.relative_to(ROOT)),
         "replay": str(replay.relative_to(ROOT)),

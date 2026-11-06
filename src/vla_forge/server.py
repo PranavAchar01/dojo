@@ -24,9 +24,10 @@ from . import tiles
 from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
+from .sim import robots as R
 from .sim.scene import Layout
 from .sim.tasks import TaskSpec, sample_layout
-from .viz import preview, robot_meshes
+from .viz import part_view, preview, robot_meshes, robot_view
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 AGENTS: Agents | None = None
@@ -79,6 +80,7 @@ def state():
     assert AGENTS is not None
     return {
         "ready": FORGE.ready,
+        "robot": FORGE.robot,
         "active": AGENTS.active,
         "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
         "skills": [s.__dict__ for s in FORGE.registry.ordered()],
@@ -190,19 +192,83 @@ def run_scene(rid: str):
     run = FORGE.runs.get(rid) or _404()
     if not run.layouts:
         raise HTTPException(409, "scene not built yet")
-    return preview(Layout.from_json(run.layouts[0]))
+    return preview(Layout.from_json(run.layouts[0]), run.robot)
+
+
+def _robot_id(robot: str) -> str:
+    try:
+        R.parse_id(robot)
+    except (KeyError, ValueError):
+        raise HTTPException(404, f"unknown robot {robot!r}") from None
+    return robot
 
 
 @app.get("/api/meshes")
-def meshes():
-    return robot_meshes()
+def meshes(robot: str = "so101"):
+    return robot_meshes(_robot_id(robot))
 
 
 @app.get("/api/preview")
-def idle_preview():
-    """A resting scene for the empty page: the arm at home behind a few blocks."""
+def idle_preview(robot: str | None = None):
+    """A resting scene for the empty page: the active arm at home behind a few blocks."""
     rng = np.random.default_rng(3)
-    return preview(sample_layout(TaskSpec("pick_place", "red", "white", 2), rng))
+    return preview(
+        sample_layout(TaskSpec("pick_place", "red", "white", 2), rng),
+        _robot_id(robot or FORGE.robot),
+    )
+
+
+# ---- Build tab: the robot customizer ----
+
+
+class UseRobot(BaseModel):
+    robot: str
+
+
+@app.get("/api/robots")
+def robots():
+    """The part catalog (arms, wrists, end effectors) with sources and licences, plus the active robot."""
+    return {**R.catalog(), "active": FORGE.robot}
+
+
+@app.get("/api/robots/{robot}/report")
+async def robot_report(robot: str):
+    """Assemble the robot and run every check: MJCF compiles, joint limits, stroke, reach of the table."""
+    rid = _robot_id(robot)
+
+    def run() -> dict:
+        rep = R.report(rid)
+        skills = ("reach", "push", "lift", "pick_place", "stack")
+        feas = {
+            k: dict(zip(("ok", "reason"), R.robot_feasibility(rid, k), strict=True))
+            for k in skills
+        }
+        return {**rep, "skills": feas}
+
+    return await asyncio.to_thread(run)
+
+
+@app.get("/api/robots/{robot}/view")
+async def robot_preview(robot: str):
+    return await asyncio.to_thread(robot_view, _robot_id(robot))
+
+
+@app.get("/api/parts/{slot}/{part}/view")
+async def part_preview(slot: str, part: str):
+    table = {"arm": R.ARMS, "wrist": R.WRISTS, "effector": R.EFFECTORS}.get(slot)
+    if table is None or part not in table:
+        _404()
+    return await asyncio.to_thread(part_view, slot, part)
+
+
+@app.post("/api/robot/use")
+async def use_robot(u: UseRobot):
+    """Make this robot the embodiment the next skill trains on (only one that passes every check)."""
+    rep = await asyncio.to_thread(R.report, _robot_id(u.robot))
+    if not rep["ok"]:
+        raise HTTPException(409, rep["failure"] or "robot failed its checks")
+    FORGE.robot = u.robot
+    return {"robot": FORGE.robot}
 
 
 @app.get("/api/runs/{rid}/rollout/{rnd}/{index}")

@@ -203,8 +203,15 @@ def _pad_frames():
     return out
 
 
-def build_spec(layout: Layout, offscreen: int = OBS_SIZE) -> mujoco.MjSpec:
-    spec = _arm_spec()
+def build_spec(
+    layout: Layout, offscreen: int = OBS_SIZE, robot: str = "so101"
+) -> mujoco.MjSpec:
+    """The table scene around a robot. `robot` is a robot id (sim/robots.py); "so101" is the stock arm."""
+    from .robots import calibrate, is_default, robot_spec, so101_jaw
+
+    default = is_default(robot)
+    stock_jaw = so101_jaw(robot)  # the SO-101 jaw grasps with the scene's own pads
+    spec = _arm_spec() if default else robot_spec(robot)
     spec.visual.global_.offwidth = max(offscreen, 640)
     spec.visual.global_.offheight = max(offscreen, 640)
     spec.visual.quality.shadowsize = 2048
@@ -293,15 +300,17 @@ def build_spec(layout: Layout, offscreen: int = OBS_SIZE) -> mujoco.MjSpec:
                 material=f"{name}_mat",
             )
 
+    if not stock_jaw:
+        _robot_contacts(spec, calibrate(robot).finger_bodies)
     # jaw meshes stop touching blocks; the pads do the grasping; everything else touches blocks
-    for g in spec.geoms:
+    for g in spec.geoms if stock_jaw else []:
         if not g.contype:
             continue
         if g.parent.name in ("gripper", "moving_jaw_so101_v1"):
             g.contype, g.conaffinity = MESH_BIT, MESH_BIT
         else:
             g.conaffinity = MESH_BIT | CUBE_BIT
-    for body, (pos, quat, size) in _pad_frames().items():
+    for body, (pos, quat, size) in _pad_frames().items() if stock_jaw else []:
         b = next(bb for bb in spec.bodies if bb.name == body)
         b.add_geom(
             name=f"pad_{'fixed' if body == 'gripper' else 'moving'}",
@@ -342,26 +351,57 @@ def build_spec(layout: Layout, offscreen: int = OBS_SIZE) -> mujoco.MjSpec:
         xyaxes=look_at(FRONT_POS, FRONT_TARGET).tolist(),
         fovy=52,
     )
-    grip = next(b for b in spec.bodies if b.name == "gripper")
-    grip.add_camera(
-        name="wrist", pos=[0.0, 0.045, -0.02], xyaxes=[1, 0, 0, 0, 1, 0], fovy=75
-    )
+    if stock_jaw:
+        grip = next(b for b in spec.bodies if b.name == "gripper")
+        grip.add_camera(
+            name="wrist", pos=[0.0, 0.045, -0.02], xyaxes=[1, 0, 0, 0, 1, 0], fovy=75
+        )
+    else:
+        r = calibrate(robot)
+        grip = next(b for b in spec.bodies if b.name == r.tcp_body)
+        grip.add_camera(name="wrist", fovy=75, **r.wrist_cam)
     return spec
+
+
+def _robot_contacts(spec: mujoco.MjSpec, fingers: list[str]) -> None:
+    """A composed robot: every collision geom touches blocks; the fingertips get the grasp contact settings."""
+    for g in spec.geoms:
+        if not g.contype:
+            continue
+        g.conaffinity = MESH_BIT | CUBE_BIT
+        g.contype = g.contype or MESH_BIT
+        if g.parent.name in fingers:
+            g.contype |= CUBE_BIT
+            g.friction = [PAD_FRICTION, 0.02, 0.002]
+            g.condim = 6
+            g.solref = GRASP_SOLREF
+            g.solimp = GRASP_SOLIMP
 
 
 class Scene:
     """A compiled layout plus helpers. Reuse one Scene for every episode with the same layout structure."""
 
-    def __init__(self, layout: Layout):
+    def __init__(self, layout: Layout, robot: str = "so101"):
+        from .robots import calibrate, fix_qpos0
+
         self.layout = layout
-        self.model = build_spec(layout).compile()
+        self.robot = calibrate(robot)
+        self.model = build_spec(layout, robot=robot).compile()
+        fix_qpos0(self.model)
         self.model.light_castshadow[:] = (
             0  # policy cameras: no shadow pass (render cost), same in train and eval
         )
         self.data = mujoco.MjData(self.model)
         m = self.model
-        self.qadr = np.array([m.joint(j).qposadr[0] for j in JOINTS])
-        self.dofadr = np.array([m.joint(j).dofadr[0] for j in JOINTS])
+        if self.robot.default:
+            self.qadr = np.array([m.joint(j).qposadr[0] for j in JOINTS])
+            self.dofadr = np.array([m.joint(j).dofadr[0] for j in JOINTS])
+        else:  # arm joints; the gripper state is its actuator length (joint or tendon)
+            arm = self.robot.arm_joints
+            self.qadr = np.array([m.joint(j).qposadr[0] for j in arm])
+            self.dofadr = np.array([m.joint(j).dofadr[0] for j in arm])
+        self._grip = m.actuator(self.robot.grip_actuator).id
+        self._site = m.site(self.robot.tcp_site).id
         self._renderer: mujoco.Renderer | None = None
         self._front_cam = m.camera("front").id
         self._front_pos0 = m.cam_pos[self._front_cam].copy()
@@ -370,7 +410,17 @@ class Scene:
 
     # state
     def joint_pos(self) -> np.ndarray:
-        return self.data.qpos[self.qadr].copy()
+        if self.robot.default:
+            return self.data.qpos[self.qadr].copy()
+        return np.r_[self.data.qpos[self.qadr], self.data.actuator_length[self._grip]]
+
+    def to_ctrl(self, action: np.ndarray) -> np.ndarray:
+        """Action (arm joint targets + gripper in actuator-length units) -> the model's ctrl vector."""
+        if self.robot.default:
+            return action
+        c = np.array(action, dtype=float)
+        c[-1] = c[-1] * self.robot.grip_scale
+        return c
 
     def body_pos(self, name: str) -> np.ndarray:
         return self.data.xpos[self.model.body(name).id].copy()
@@ -380,14 +430,22 @@ class Scene:
         return float(np.arctan2(mat[1, 0], mat[0, 0]))
 
     def ee_pos(self) -> np.ndarray:
-        return self.data.site_xpos[self.model.site("gripperframe").id].copy()
+        return self.data.site_xpos[self._site].copy()
 
-    def reset(self, layout: Layout, look: Look | None = None, arm_q=HOME) -> None:
+    def reset(
+        self, layout: Layout, look: Look | None = None, arm_q: np.ndarray | None = None
+    ) -> None:
         m, d = self.model, self.data
         mujoco.mj_resetData(m, d)
-        q = np.append(arm_q, GRIPPER_CLOSED)
-        d.qpos[self.qadr] = q
-        d.ctrl[:] = q
+        r = self.robot
+        arm_q = r.home if arm_q is None else arm_q
+        if r.default:
+            q = np.append(arm_q, GRIPPER_CLOSED)
+            d.qpos[self.qadr] = q
+            d.ctrl[:] = q
+        else:
+            d.qpos[self.qadr] = arm_q
+            d.ctrl[:] = self.to_ctrl(np.append(arm_q, r.g_closed))
         for name, (_c, x, y, yaw) in layout.blocks.items():
             adr = m.joint(f"{name}_free").qposadr[0]
             d.qpos[adr : adr + 3] = [x, y, CUBE_HALF]
