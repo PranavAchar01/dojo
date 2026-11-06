@@ -177,6 +177,12 @@ licences and the pinned Menagerie commit are in `SOURCES.md`. Code: `src/vla_for
   normalisation from the new robot's demos; the run's `init_from.reason` says which. SO-101 replay data is not
   mixed into a custom robot's training.
 
+Measured 2026-11-06 on the ViperX 300 (`vx300s.native.native`, 7-D actions, base policy carried over with 83 of
+86 weight tensors kept), one prompt each, 20 held-out scenes, under `taskpolicy -b`: "push the green block onto
+the blue square" 8/20 then 14/20 (70%) in 2:46; "pick up the red block and hold it up" 2/20 then 4/20 (20%) in
+2:37. Both below the 80% target: two short rounds are not enough to relearn the action layer for grasping. The
+scripted expert itself lifts on this arm in 6 of 6 seeds, so the gap is training time, not the robot.
+
 ### Router hook: `robot_feasibility`
 
 ```python

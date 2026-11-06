@@ -140,7 +140,9 @@ function robotMaterial(rid, rgba) {
   // other embodiments keep the colours their source models ship with
   const k = rgba.map((x) => x.toFixed(2)).join(",");
   if (!robotMats.has(k)) {
-    robotMats.set(k, new THREE.MeshPhysicalMaterial({ color: srgb(rgba), roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.4 }));
+    const dim = lum > 0.8 ? 0.72 / lum : 1; // near-white parts wash out under the key light
+    const c = srgb(rgba.slice(0, 3).map((x) => x * dim));
+    robotMats.set(k, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.4 }));
   }
   return robotMats.get(k);
 }
