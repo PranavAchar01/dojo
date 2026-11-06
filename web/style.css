@@ -145,3 +145,12 @@ form label { display: block; font-weight: 600; font-size: 22px; letter-spacing: 
   .sub { display: none; }
   .viewport { min-height: 360px; }
 }
+.skill .meta span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill .meta button { white-space: nowrap; }
+.loss-foot span:first-child { white-space: nowrap; }
+@media (min-width: 1101px) {
+  body { height: 100vh; overflow: hidden; }
+  main { grid-template-rows: minmax(0, 1fr); }
+  section.right, section.left { min-height: 0; overflow: hidden; }
+  .critic { max-height: 128px; overflow: auto; }
+}

@@ -1,8 +1,11 @@
 // Live demo recording: a real, visible Chrome window; the page records itself with tab capture +
 // MediaRecorder (?capture=1) while a prompt trains end to end in real time. Nothing is frame-stepped.
 //
-//   NODE_PATH=~/helloworld/hyperframes-trial/node_modules node scripts/record_demo.mjs "put the red block in the white bowl"
-import puppeteer from "puppeteer-core";
+//   PPTR_DIR=~/helloworld/hyperframes-trial/node_modules node scripts/record_demo.mjs "put the red block in the white bowl"
+import { createRequire } from "node:module";
+
+const require = createRequire(`${process.env.PPTR_DIR || "./node_modules"}/`);
+const puppeteer = require("puppeteer-core");
 
 const prompt = process.argv[2] || "put the red block in the white bowl";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -36,6 +39,11 @@ await page.type("#prompt", prompt, { delay: 55 });
 await sleep(700);
 await page.click("#go");
 const t0 = Date.now();
+// the page first shows the previous run; wait until this prompt's run has taken over the pipeline view
+await page.waitForFunction(() => !document.querySelector(".stage:last-child").classList.contains("done"), {
+  timeout: 60000,
+  polling: 200,
+});
 
 // wait for the registry to publish (or fail)
 await page.waitForFunction(

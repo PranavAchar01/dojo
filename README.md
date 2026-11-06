@@ -68,7 +68,33 @@ This is the root of the skill library and the replay buffer for every later fine
 
 ## Measured results
 
-RESULTS_TABLE
+Per-prompt runs on the Mac mini (M5 Pro, 64 GB), timed from the click to the published skill. Every run:
+parse (~3 s), 60 expert demos (~25-37 s), 55 s fine-tune with 50% base replay, 20 rollouts on held-out
+layouts (~10 s), critic. The critic retrains once if the rate is under 80% and time allows (budget 172 s).
+
+| prompt (as parsed) | started from | rounds (success on 20 held-out scenes) | total |
+|---|---|---|---|
+| put the red block in the white bowl | base | 17/20 (85%) | 110.1 s |
+| push the green block onto the blue square | base | 16/20 (80%) | 87.8 s |
+| pick up the yellow block and hold it up | base | 18/20 (90%) | 80.0 s |
+| stack the orange block on the red block | base | 10/20, retrain, 10/20 (50%) | 165.9 s |
+| put the blue block in the black bowl | skill "put the red block in the white bowl" | 16/20 (80%) | 95.5 s |
+| push the red block onto the orange square (asked for yellow; no yellow pad, the parser says so) | skill "push the green block..." | 15/20, retrain, 15/20 (75%) | 163.6 s |
+
+Base policy (pretrained once: 2400 expert attempts, 1836 kept, 183,734 frames, ~19 min collection, 40 min
+training, 53,496 steps, final loss 0.041), measured on 20 held-out layouts per motion:
+
+| motion | success | failures |
+|---|---|---|
+| pick and place | 18/20 | missed grasp 2 |
+| push | 14/20 | never reached 2, off course 4 |
+| lift | 18/20 | missed grasp 1, never reached 1 |
+| stack | 7/20 | missed target 8, missed grasp 3, other 2 |
+
+Ablation (pick and place, 356 demos, 300 s training, 30 held-out layouts): with a grounding token 24/30,
+without 25/30, so the grounding token is off by default.
+
+Stacking is the weak motion: the base gets 7/20 and a 3 minute fine-tune does not move it past 50%.
 
 ## What is real and what is scaffolded
 

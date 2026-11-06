@@ -265,7 +265,8 @@ class Forge:
                 "task",
                 f"parsed with {info.get('model')} in {info.get('seconds', 0):.1f}s: "
                 f"{spec.skill} {spec.obj}{' -> ' + spec.target if spec.target else ''}; "
-                f"success = {' & '.join(p['op'] for p in spec.success)}",
+                f"success = {' & '.join(p['op'] for p in spec.success)}"
+                + (f". {info['note']}" if info.get("note") else ""),
             )
             await ctx.send(
                 a["scene"].address,
