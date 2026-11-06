@@ -48,6 +48,9 @@ class Round:
     eval: dict = field(default_factory=dict)
     plan: dict = field(default_factory=dict)
     successes: list[bool] = field(default_factory=list)
+    loss: list[list[float]] = field(
+        default_factory=list
+    )  # [seconds, loss ema] as logged
 
 
 @dataclass
@@ -94,6 +97,7 @@ class Run:
                     "eval": r.eval,
                     "plan": r.plan,
                     "successes": r.successes,
+                    "loss": r.loss,
                 }
                 for r in self.rounds
             ],
@@ -239,7 +243,11 @@ class Forge:
             if not path.exists():
                 path = BASE_PATH
                 sid, reason = None, "starting from the multi-task base policy"
-            run.model, _meta = VLA.load(path, device())
+            if path.exists():
+                run.model, _meta = VLA.load(path, device())
+            else:  # no base trained yet on this machine: learn from scratch
+                sid, reason = None, "no base policy yet, training from scratch"
+                run.model = VLA(norm=run.data.norm()).to(device())
             run.init_from = {
                 "skill": sid,
                 "similarity": round(sim, 3),
@@ -249,7 +257,8 @@ class Forge:
             self.emit(run.id, "init", agent, **run.init_from)
 
         def log(e):
-            self.emit(run.id, "loss", agent, round=len(run.rounds), **e)
+            run.rounds[-1].loss.append([e["t"], round(e["ema"], 5)])
+            self.emit(run.id, "loss", agent, round=len(run.rounds) - 1, **e)
 
         with self.compute:
             st = train(
@@ -265,7 +274,7 @@ class Forge:
 
     def evaluate(self, run: Run, agent: str) -> dict:
         assert run.spec is not None and run.model is not None
-        rnd = len(run.rounds)
+        rnd = len(run.rounds) - 1
 
         def prog(p):
             self.emit(run.id, "eval_progress", agent, round=rnd, **p)
@@ -380,7 +389,10 @@ def load_replay(n: int) -> Demos:
     for p in shards:
         if d.episodes >= n:
             break
-        z = torch.load(p, weights_only=False)
+        try:
+            z = torch.load(p, weights_only=False)
+        except RuntimeError:  # a shard still being written by a running pretrain
+            continue
         for v, s, a, x, ins in zip(
             z["vis"], z["states"], z["actions"], z["aux"], z["instr"], strict=True
         ):

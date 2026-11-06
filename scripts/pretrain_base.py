@@ -18,10 +18,9 @@ from concurrent.futures import as_completed
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from vla_forge.datagen import demo_job, pool
-from vla_forge.learn import Demos, train
+from vla_forge.learn import Demos, load_shards, save_shard, train
 from vla_forge.policy import VLA
 from vla_forge.rollout import evaluate, summarize
 from vla_forge.sim.scene import BLOCK_COLORS
@@ -75,31 +74,6 @@ def collect(n: int, seed0: int, noise: float) -> None:
         if done % 50 == 0 or done == n:
             print(f"collect {done}/{n} ok {ok} {time.time() - t0:.0f}s", flush=True)
     shutil.rmtree(tmp, ignore_errors=True)
-
-
-def save_shard(d: Demos, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "vis": d.vis,
-            "states": d.states,
-            "actions": d.actions,
-            "aux": d.aux,
-            "instr": [d.instructions[i] for i in d.lang_idx],
-        },
-        path,
-    )
-
-
-def load_shards(paths: list[Path]) -> Demos:
-    d = Demos()
-    for p in paths:
-        z = torch.load(p, weights_only=False)
-        for v, s, a, x, ins in zip(
-            z["vis"], z["states"], z["actions"], z["aux"], z["instr"], strict=True
-        ):
-            d.add_encoded(v, s, a, x, ins)
-    return d
 
 
 def main():

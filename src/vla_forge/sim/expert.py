@@ -45,7 +45,9 @@ TRANSIT_SPEED = 0.12
 APPROACH_SPEED = 0.05
 LIFT_SPEED = 0.06
 GRIP_RATE = 2.5
-GRIP_SQUEEZE = 0.08  # gentle: a saturated squeeze creeps the block out of the jaws within a second
+GRIP_SQUEEZE = (
+    0.08  # gentle: a saturated squeeze creeps the block out of the jaws within a second
+)
 
 PUSH_Z = 0.012
 CONTACT = CUBE_HALF + 0.014
@@ -176,7 +178,9 @@ class Expert:
             self.step += 1
             if self.step % STEPS_PER_POLICY == 0:
                 if self.noise_std > 0:  # OU process, ~0.5 s correlation
-                    self.noise = 0.8 * self.noise + self.rng.normal(0, self.noise_std * 0.6, 5)
+                    self.noise = 0.8 * self.noise + self.rng.normal(
+                        0, self.noise_std * 0.6, 5
+                    )
                 if self.on_tick:
                     self.on_tick(self.sc)
         return float(np.linalg.norm(ee_goal - self.ee_cmd))

@@ -143,7 +143,9 @@ class Forge:
                     FORGE.emit(run.id, "error", agent, error=run.error)
                     self.finish(run)
                     if run.reply_to:
-                        await ctx.send(run.reply_to, _chat(f"{run.id}|error|{run.error}"))
+                        await ctx.send(
+                            run.reply_to, _chat(f"{run.id}|error|{run.error}")
+                        )
 
             return inner
 
@@ -244,14 +246,16 @@ class Forge:
             self.log(
                 run.id, "task", f'chat message from {sender[:14]}..: "{run.prompt}"'
             )
-            await self.run_lock.acquire()  # one prompt trains at a time; later ones queue here
+            await (
+                self.run_lock.acquire()
+            )  # one prompt trains at a time; later ones queue here
             self.active = run.id
             spec = await asyncio.to_thread(FORGE.parse, run)
             info = run.parse_info
             if spec is None:
                 self.finish(run)
                 run.status = "rejected"
-                run.error = info.get("reason", "not a tabletop task this robot can do")
+                run.error = info.get("note") or "not a tabletop task this robot can do"
                 FORGE.emit(run.id, "rejected", "task", reason=run.error)
                 await ctx.send(sender, _chat(f"{run.id}|rejected|{run.error}"))
                 return
@@ -507,7 +511,9 @@ class Forge:
         run = FORGE.new_run(prompt)
         self.pending[run.id] = self.loop.create_future()
         gw = self.agents["gateway"]
-        await gw._build_context().send(self.agents["task"].address, _chat(f"{run.id}|{prompt}"))
+        await gw._build_context().send(
+            self.agents["task"].address, _chat(f"{run.id}|{prompt}")
+        )
         return run
 
 

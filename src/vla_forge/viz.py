@@ -79,7 +79,6 @@ def export_scene(layout: Layout) -> dict:
     idx = {n: i for i, n in enumerate(bodies)}
     return {
         "bodies": bodies,
-        "meshes": {str(k): v for k, v in _robot_meshes().items()},
         "robot": robot,
         "blocks": [
             {
@@ -113,3 +112,19 @@ def export_scene(layout: Layout) -> dict:
             for n, (c, *_r) in layout.pads.items()
         ],
     }
+
+
+def preview(layout: Layout) -> dict:
+    """The scene plus one pose frame of it at rest (arm at home), for showing a layout before any rollout."""
+    from .sim.scene import Scene
+
+    sc = Scene(layout)
+    sc.reset(layout)
+    frame = sc.pose_frame()
+    sc.close()
+    return {**export_scene(layout), "frame": frame}
+
+
+def robot_meshes() -> dict:
+    """The SO-101 mesh buffers, served once per page load (/api/meshes)."""
+    return {str(k): v for k, v in _robot_meshes().items()}

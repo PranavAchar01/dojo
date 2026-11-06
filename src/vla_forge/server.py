@@ -12,7 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+import numpy as np
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -22,7 +23,8 @@ from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
 from .sim.scene import Layout
-from .viz import export_scene
+from .sim.tasks import TaskSpec, sample_layout
+from .viz import preview, robot_meshes
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 AGENTS: Agents | None = None
@@ -93,7 +95,19 @@ def run_scene(rid: str):
     run = FORGE.runs.get(rid) or _404()
     if not run.layouts:
         raise HTTPException(409, "scene not built yet")
-    return export_scene(Layout.from_json(run.layouts[0]))
+    return preview(Layout.from_json(run.layouts[0]))
+
+
+@app.get("/api/meshes")
+def meshes():
+    return robot_meshes()
+
+
+@app.get("/api/preview")
+def idle_preview():
+    """A resting scene for the empty page: the arm at home behind a few blocks."""
+    rng = np.random.default_rng(3)
+    return preview(sample_layout(TaskSpec("pick_place", "red", "white", 2), rng))
 
 
 @app.get("/api/runs/{rid}/rollout/{rnd}/{index}")
@@ -128,6 +142,15 @@ async def run_skill(sid: str):
     except TimeoutError:
         raise HTTPException(504, "skill agent did not answer") from None
     return {"reply": reply}
+
+
+@app.post("/api/capture")
+async def capture(req: Request):
+    """The page's own MediaRecorder upload (demo recording, ?capture=1); saved under demo/."""
+    out = WEB.parent / "demo" / f"vla-forge-{datetime.now():%Y%m%d-%H%M%S}.webm"
+    out.parent.mkdir(exist_ok=True)
+    out.write_bytes(await req.body())
+    return {"path": str(out), "bytes": out.stat().st_size}
 
 
 @app.get("/api/events")

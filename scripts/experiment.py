@@ -11,12 +11,35 @@ import time
 from pathlib import Path
 
 from vla_forge.datagen import demo_job, pool
-from vla_forge.learn import Demos, train
+from vla_forge.learn import Demos, load_shards, save_shard, train
 from vla_forge.policy import VLA
 from vla_forge.rollout import evaluate, summarize
 from vla_forge.sim.tasks import TaskSpec
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def collect_exp(a, spec, out, p, t1):
+    jobs = [
+        {
+            "spec": spec.to_json(),
+            "seed": s,
+            "out": str(out / f"ep{s:04d}.npz"),
+            "look_strength": a.look,
+            "noise": a.noise,
+        }
+        for s in range(a.demos)
+    ]
+    res = list(p.map(demo_job, jobs))
+    ok = [r for r in res if r["ok"]]
+    print(f"demos {len(ok)}/{len(res)} in {time.time() - t1:.1f}s")
+    t2 = time.time()
+    data = Demos()
+    for r in ok:
+        data.add_episode(r["path"], spec.instruction)
+        Path(r["path"]).unlink()
+    print(f"encoded {data.frames} frames in {time.time() - t2:.1f}s")
+    return data, ok
 
 
 def main():
@@ -36,6 +59,12 @@ def main():
     ap.add_argument("--state-noise", type=float, default=0.03)
     ap.add_argument("--no-state", action="store_true")
     ap.add_argument("--noise", type=float, default=0.0)
+    ap.add_argument(
+        "--cache",
+        default="",
+        help="encoded demos: reuse if present, else write after collecting",
+    )
+    ap.add_argument("--no-ground", action="store_true")
     a = ap.parse_args()
     spec = TaskSpec(
         a.skill, a.obj, a.target if a.skill != "lift" else None, a.distractors
@@ -45,24 +74,24 @@ def main():
     p = pool()
     print(f"pool ready {time.time() - t0:.1f}s")
     t1 = time.time()
-    jobs = [
-        {"spec": spec.to_json(), "seed": s, "out": str(out / f"ep{s:04d}.npz"), "look_strength": a.look, "noise": a.noise}
-        for s in range(a.demos)
-    ]
-    res = list(p.map(demo_job, jobs))
-    ok = [r for r in res if r["ok"]]
-    print(f"demos {len(ok)}/{len(res)} in {time.time() - t1:.1f}s")
-    t2 = time.time()
-    data = Demos()
-    for r in ok:
-        data.add_episode(r["path"], spec.instruction)
-    print(f"encoded {data.frames} frames in {time.time() - t2:.1f}s")
+    cache = Path(a.cache) if a.cache else None
+    if cache and cache.exists():
+        data = load_shards([cache])
+        ok = []
+        print(f"cached {data.episodes} episodes / {data.frames} frames")
+    else:
+        data, ok = collect_exp(a, spec, out, p, t1)
+        if cache:
+            save_shard(data, cache)
     if a.init:
         model, _ = VLA.load(Path(a.init))
     else:
         from vla_forge.policy import HeadConfig
 
-        model = VLA(HeadConfig(use_state=not a.no_state), norm=data.norm())
+        model = VLA(
+            HeadConfig(use_state=not a.no_state, ground=not a.no_ground),
+            norm=data.norm(),
+        )
     print(f"trainable params {model.trainable_params():,}")
     t3 = time.time()
     st = train(
@@ -78,9 +107,19 @@ def main():
         model.save(Path(a.save), {"instruction": spec.instruction})
     if a.eval_train:
         tl = [r["layout"] for r in ok[: a.eval_train]]
-        rt = evaluate(model, spec, len(tl), seed0=0, layouts=tl, record=False, look_strength=a.look)
+        rt = evaluate(
+            model,
+            spec,
+            len(tl),
+            seed0=0,
+            layouts=tl,
+            record=False,
+            look_strength=a.look,
+        )
         st_ = summarize(rt)
-        print(f"eval on training layouts {st_['succeeded']}/{st_['n']} failures {st_['failures']}")
+        print(
+            f"eval on training layouts {st_['succeeded']}/{st_['n']} failures {st_['failures']}"
+        )
     t4 = time.time()
     rolls = evaluate(model, spec, a.eval, record=False, look_strength=a.look)
     s = summarize(rolls)

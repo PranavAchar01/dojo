@@ -28,10 +28,13 @@ class HeadConfig:
     act_dim: int = 6
     state_dim: int = 6
     cams: int = 2
-    aux_dim: int = 5  # auxiliary: target block xyz + goal xy, predicted from the image tokens
+    aux_dim: int = (
+        5  # auxiliary: target block xyz + goal xy, predicted from the image tokens
+    )
     latents: int = 8  # learned queries per camera that summarise its 37 DINOv2 tokens
     dropout: float = 0.1
     use_state: bool = True  # False: the arm's joint readings are hidden; actions come from the images alone
+    ground: bool = False  # ablation (neutral at 400 demos: 24/30 vs 25/30). True: the first half of the layers locates the blocks; the action queries read that estimate
 
 
 class ActionHead(nn.Module):
@@ -47,23 +50,59 @@ class ActionHead(nn.Module):
         nn.init.zeros_(self.film.bias)
         # per-camera latent queries (Perceiver-style): one cross-attention read of the camera's tokens
         self.lat = nn.Parameter(torch.randn(cfg.cams, cfg.latents, d) * 0.02)
-        self.lat_lang = nn.Linear(TXT_DIM, d)  # the instruction shifts what the latents look for
-        self.xattn = nn.MultiheadAttention(d, cfg.heads, dropout=cfg.dropout, batch_first=True)
+        self.lat_lang = nn.Linear(
+            TXT_DIM, d
+        )  # the instruction shifts what the latents look for
+        self.xattn = nn.MultiheadAttention(
+            d, cfg.heads, dropout=cfg.dropout, batch_first=True
+        )
         self.xnorm_q = nn.LayerNorm(d)
         self.xnorm_kv = nn.LayerNorm(d)
-        self.xmlp = nn.Sequential(nn.LayerNorm(d), nn.Linear(d, 4 * d), nn.GELU(), nn.Linear(4 * d, d))
-        self.state_proj = nn.Sequential(nn.Linear(cfg.state_dim, d), nn.GELU(), nn.Linear(d, d))
-        self.queries = nn.Parameter(torch.randn(cfg.chunk + 1, d) * 0.02)  # K action queries + 1 aux query
-        self.type_emb = nn.Parameter(torch.randn(4, d) * 0.02)  # lang, state, vision latents, action queries
-        layer = nn.TransformerEncoderLayer(
-            d, cfg.heads, 4 * d, cfg.dropout, activation="gelu", batch_first=True, norm_first=True
+        self.xmlp = nn.Sequential(
+            nn.LayerNorm(d), nn.Linear(d, 4 * d), nn.GELU(), nn.Linear(4 * d, d)
         )
-        self.enc = nn.TransformerEncoder(layer, cfg.layers, enable_nested_tensor=False)
+        self.state_proj = nn.Sequential(
+            nn.Linear(cfg.state_dim, d), nn.GELU(), nn.Linear(d, d)
+        )
+        self.queries = nn.Parameter(
+            torch.randn(cfg.chunk + 1, d) * 0.02
+        )  # K action queries + 1 aux query
+        self.type_emb = nn.Parameter(
+            torch.randn(4, d) * 0.02
+        )  # lang, state, vision latents, action queries
+        layer = nn.TransformerEncoderLayer(
+            d,
+            cfg.heads,
+            4 * d,
+            cfg.dropout,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
+        if cfg.ground:
+            # spatial grounding: layers 1..L/2 predict where the target block and goal are (supervised by the
+            # aux loss); that estimate becomes a token that layers L/2+1..L turn into joint targets
+            n1 = cfg.layers // 2
+            self.enc1 = nn.TransformerEncoder(layer, n1, enable_nested_tensor=False)
+            self.enc = nn.TransformerEncoder(
+                layer, cfg.layers - n1, enable_nested_tensor=False
+            )
+            self.norm1 = nn.LayerNorm(d)
+            self.ground_proj = nn.Sequential(
+                nn.Linear(cfg.aux_dim, d), nn.GELU(), nn.Linear(d, d)
+            )
+            self.ground_type = nn.Parameter(torch.randn(d) * 0.02)
+        else:
+            self.enc = nn.TransformerEncoder(
+                layer, cfg.layers, enable_nested_tensor=False
+            )
         self.norm = nn.LayerNorm(d)
         self.out = nn.Linear(d, cfg.act_dim)
         self.aux_out = nn.Linear(d, cfg.aux_dim)
 
-    def forward(self, vis: torch.Tensor, lang: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, vis: torch.Tensor, lang: torch.Tensor, state: torch.Tensor
+    ) -> torch.Tensor:
         """vis [B, cams, 37, 384], lang [B, 768], state [B, 6] (normalised) -> [B, K, 6] (normalised)."""
         b, cams = vis.shape[:2]
         if not self.cfg.use_state:
@@ -71,7 +110,9 @@ class ActionHead(nn.Module):
         v = self.vis_proj(vis.to(self.lat.dtype)) + self.vis_pos
         g, beta = self.film(lang).chunk(2, -1)
         v = v * (1 + g[:, None, None]) + beta[:, None, None]
-        q = (self.lat[None] + self.lat_lang(lang)[:, None, None]).flatten(0, 1)  # [B*cams, L, d]
+        q = (self.lat[None] + self.lat_lang(lang)[:, None, None]).flatten(
+            0, 1
+        )  # [B*cams, L, d]
         kv = self.xnorm_kv(v.flatten(0, 1))  # [B*cams, 37, d]
         z = q + self.xattn(self.xnorm_q(q), kv, kv, need_weights=False)[0]
         z = (z + self.xmlp(z)).view(b, cams * self.cfg.latents, -1)
@@ -84,6 +125,14 @@ class ActionHead(nn.Module):
             ],
             1,
         )
+        if self.cfg.ground:
+            h1 = self.enc1(tokens)
+            self.last_aux = self.aux_out(
+                self.norm1(h1[:, -1])
+            )  # read by the trainer only
+            gtok = self.ground_proj(self.last_aux) + self.ground_type
+            h = self.norm(self.enc(torch.cat([h1, gtok[:, None]], 1)))
+            return self.out(h[:, -self.cfg.chunk - 2 : -2])
         h = self.norm(self.enc(tokens))
         self.last_aux = self.aux_out(h[:, -1])  # read by the trainer only
         return self.out(h[:, -self.cfg.chunk - 1 : -1])

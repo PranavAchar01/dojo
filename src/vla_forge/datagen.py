@@ -39,7 +39,9 @@ def demo_job(args: dict) -> dict:
         f, w = s.render_obs()
         imgs.append(np.stack([f, w]))
         states.append(s.joint_pos())
-        ctrls.append(s.cmd.copy())  # the expert's clean command (the executed one may carry DART noise)
+        ctrls.append(
+            s.cmd.copy()
+        )  # the expert's clean command (the executed one may carry DART noise)
         g = s.body_pos("goal")[:2] if has_goal else np.zeros(2)
         aux.append(np.concatenate([s.body_pos("target"), g]))
 

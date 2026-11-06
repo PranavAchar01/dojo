@@ -355,7 +355,9 @@ class Scene:
     def __init__(self, layout: Layout):
         self.layout = layout
         self.model = build_spec(layout).compile()
-        self.model.light_castshadow[:] = 0  # policy cameras: no shadow pass (render cost), same in train and eval
+        self.model.light_castshadow[:] = (
+            0  # policy cameras: no shadow pass (render cost), same in train and eval
+        )
         self.data = mujoco.MjData(self.model)
         m = self.model
         self.qadr = np.array([m.joint(j).qposadr[0] for j in JOINTS])
