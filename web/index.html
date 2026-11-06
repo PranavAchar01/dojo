@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLA Forge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="mark"></span>VLA Forge</div>
+  <div class="sub">type a task &middot; agents train a vision-language-action policy &middot; watch it run</div>
+  <div class="status"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></div>
+</header>
+
+<main>
+  <section class="left">
+    <form id="prompt-form" autocomplete="off">
+      <label for="prompt">Have a robot&hellip;</label>
+      <div class="prompt-row">
+        <input id="prompt" placeholder="drop the red cube into the white bowl" maxlength="300">
+        <button id="go" type="submit" aria-label="Train">Train</button>
+      </div>
+      <div class="examples">
+        <button type="button" class="ex">put the red block in the white bowl</button>
+        <button type="button" class="ex">slide the green cube onto the blue square</button>
+        <button type="button" class="ex">pick up the yellow block and hold it up</button>
+      </div>
+    </form>
+
+    <div class="clock">
+      <div><span id="elapsed">0:00</span><span class="of"> / 3:00</span></div>
+      <div id="run-title" class="run-title">No run yet</div>
+    </div>
+
+    <ol id="pipeline" class="pipeline"></ol>
+  </section>
+
+  <section class="center">
+    <div class="viewport">
+      <canvas id="three"></canvas>
+      <div class="vp-top">
+        <div id="vp-caption" class="vp-caption">SO-101 &middot; MuJoCo</div>
+        <div id="vp-badge" class="vp-badge hidden"></div>
+      </div>
+      <div class="vp-bottom">
+        <div id="round-tabs" class="round-tabs"></div>
+        <div id="chips" class="chips"></div>
+      </div>
+      <div id="vp-progress" class="vp-progress hidden"><div></div></div>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="card">
+      <div class="card-h"><span>Training loss</span><span id="loss-now" class="mono"></span></div>
+      <svg id="loss" class="loss" viewBox="0 0 300 110" preserveAspectRatio="none"></svg>
+      <div class="loss-foot mono"><span id="loss-steps"></span><span id="loss-init"></span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span>Measured success</span><span class="muted">20 held-out scenes</span></div>
+      <div id="rounds" class="rounds"></div>
+      <div id="critic" class="critic"></div>
+    </div>
+    <div class="card grow">
+      <div class="card-h"><span>Skill library</span><span id="skill-count" class="muted"></span></div>
+      <div id="skills" class="skills"></div>
+    </div>
+  </section>
+</main>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
