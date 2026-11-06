@@ -28,3 +28,10 @@ Third-party material and design credits.
 6. Encoders
    facebook/dinov2-small (Apache-2.0) and google/siglip2-base-patch16-224 (Apache-2.0), loaded from the
    local Hugging Face cache.
+
+7. Robot parts for the builder (vendor/menagerie)
+   From MuJoCo Menagerie, https://github.com/google-deepmind/mujoco_menagerie, commit
+   98a70c569c4c1b6da467a20012f766ee1f8dc521, used unmodified, each folder with its upstream LICENSE:
+   trs_so_arm100 (Apache-2.0), low_cost_robot_arm (Apache-2.0), trossen_wx250s and trossen_vx300s
+   (BSD-3-Clause, Trossen Robotics), robotiq_2f85 (BSD-2-Clause, ROS-Industrial), franka_emika_panda hand.xml
+   (Apache-2.0). Full table in SOURCES.md.

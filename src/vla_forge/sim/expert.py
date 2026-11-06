@@ -21,7 +21,6 @@ from .scene import (
     BOWL_R,
     CUBE_HALF,
     GRIPPER_CLOSED,
-    HOME,
     STEPS_PER_CONTROL,
     STEPS_PER_POLICY,
     TIMESTEP,
@@ -62,13 +61,18 @@ LATERAL_ABORT = 0.012
 
 class IK:
     def __init__(self, scene: Scene, w_ori=0.1, w_post=0.02, damping=1e-3):
+        r = scene.robot
         self.m = scene.model
         self.d = mujoco.MjData(self.m)
-        self.site = self.m.site("gripperframe").id
-        self.qadr = scene.qadr[:5]
-        self.dof = scene.dofadr[:5]
-        ids = [self.m.joint(i).id for i in range(5)]
+        self.site = self.m.site(r.tcp_site).id
+        self.n = r.n_arm
+        self.qadr = scene.qadr[: self.n]
+        self.dof = scene.dofadr[: self.n]
+        ids = [self.m.joint(j).id for j in r.arm_joints]
         self.lo, self.hi = self.m.jnt_range[ids, 0], self.m.jnt_range[ids, 1]
+        self.home = r.home
+        # a locked wrist roll cannot turn the jaws onto a block face: the heading term is dropped
+        self.use_heading = self.n >= 5
         self.w_ori, self.w_post, self.damping = w_ori, w_post, damping
         self.heading: np.ndarray | None = None
 
@@ -88,7 +92,7 @@ class IK:
             pos, mat = self.fk(q)
             ep = target - pos
             eo = np.cross(mat[:, 0], DOWN)
-            if self.heading is not None:
+            if self.heading is not None and self.use_heading:
                 eo = eo + np.cross(mat[:, 2], self.heading)
             if np.linalg.norm(ep) < tol and np.linalg.norm(eo) < 0.02:
                 break
@@ -97,8 +101,8 @@ class IK:
             e = np.concatenate([ep, self.w_ori * eo])
             JJt = J @ J.T + self.damping * np.eye(6)
             dq = J.T @ np.linalg.solve(JJt, e)
-            N = np.eye(5) - J.T @ np.linalg.solve(JJt, J)
-            dq += N @ (self.w_post * (HOME - q))
+            N = np.eye(self.n) - J.T @ np.linalg.solve(JJt, J)
+            dq += N @ (self.w_post * (self.home - q))
             q = np.clip(q + np.clip(dq, -0.2, 0.2), self.lo, self.hi)
         pos, _ = self.fk(q)
         return q, float(np.linalg.norm(target - pos))
@@ -142,13 +146,22 @@ class Expert:
         """noise > 0 is DART: the executed joint command carries a slowly varying perturbation (std `noise`
         rad) while `scene.cmd` keeps the clean command, so recorded labels show how to get back on track."""
         self.sc, self.spec, self.on_tick = scene, spec, on_tick
+        r = self.r = (
+            scene.robot
+        )  # the embodiment's gripper commands, jaw-centre offsets and home pose
         self.noise_std = noise
         self.rng = rng or np.random.default_rng()
-        self.noise = np.zeros(5)
+        self.noise = np.zeros(r.n_arm)
         self.ik = IK(scene)
-        self.q_cmd = HOME.copy()
-        self.ee_cmd = self.ik.fk(HOME)[0]
-        self.g_cmd = self.g_goal = GRIPPER_CLOSED
+        self.q_cmd = r.home.copy()
+        self.ee_cmd = self.ik.fk(r.home)[0]
+        self.g_cmd = self.g_goal = r.g_closed
+        # the gripper moves through its whole stroke in the same time on every embodiment
+        self.grip_rate = (
+            GRIP_RATE
+            if r.default
+            else GRIP_RATE * abs(r.g_open - r.g_closed) / (GRIP_OPEN - GRIPPER_CLOSED)
+        )
         self.step = 0
         self.calm = False
         self.max_ik_err = 0.0
@@ -168,14 +181,13 @@ class Expert:
             else self.ee_cmd + delta * (stepmax / dist)
         )
         self.g_cmd += float(
-            np.clip(self.g_goal - self.g_cmd, -GRIP_RATE * DT, GRIP_RATE * DT)
+            np.clip(self.g_goal - self.g_cmd, -self.grip_rate * DT, self.grip_rate * DT)
         )
         self.q_cmd, err = self.ik.solve(self.ee_cmd, self.q_cmd)
         self.max_ik_err = max(self.max_ik_err, err)
         d = self.sc.data
         self.sc.cmd = np.r_[self.q_cmd, self.g_cmd]
-        d.ctrl[:5] = self.q_cmd + self.noise
-        d.ctrl[5] = self.g_cmd
+        d.ctrl[:] = self.sc.to_ctrl(np.r_[self.q_cmd + self.noise, self.g_cmd])
         for _ in range(STEPS_PER_CONTROL):
             mujoco.mj_step(self.sc.model, d)
             self.step += 1
@@ -186,7 +198,7 @@ class Expert:
                     self.noise = 0.6 * self.noise
                 elif self.noise_std > 0:  # OU process, ~0.5 s correlation
                     self.noise = 0.8 * self.noise + self.rng.normal(
-                        0, self.noise_std * 0.6, 5
+                        0, self.noise_std * 0.6, self.r.n_arm
                     )
                 if self.on_tick:
                     self.on_tick(self.sc)
@@ -210,32 +222,32 @@ class Expert:
         self.goto(self.ee_cmd.copy(), TRANSIT_SPEED, settle)
 
     def home(self):
-        self.g_goal = GRIPPER_CLOSED
+        self.g_goal = self.r.g_closed
         self.ik.heading = None
-        self.goto(self.ik.fk(HOME)[0], TRANSIT_SPEED, settle=0.5)
+        self.goto(self.ik.fk(self.r.home)[0], TRANSIT_SPEED, settle=0.5)
 
     # skills
     def grasp(self, avoid_xy=None):
         sc = self.sc
         c0 = sc.body_pos("target")
         self.ik.heading = grasp_heading(c0[:2], sc.body_yaw("target"), avoid_xy)
-        above = site_for_block(c0, self.ik.heading, CENTRE_OPEN)
-        self.g_goal = GRIP_OPEN
+        above = site_for_block(c0, self.ik.heading, self.r.centre_open)
+        self.g_goal = self.r.g_open
         self.goto([*above[:2], HOVER_Z], TRANSIT_SPEED)
         self.goto(above, APPROACH_SPEED)
         self.calm = (
             True  # the squeeze itself is precise; recovery is learned on the way down
         )
         self.goto(
-            site_for_block(c0, self.ik.heading, CENTRE_GRASP),
+            site_for_block(c0, self.ik.heading, self.r.centre_grasp),
             APPROACH_SPEED * 0.5,
             settle=0.05,
         )
-        self.grip(GRIP_SQUEEZE, settle=0.4)
+        self.grip(self.r.g_squeeze, settle=0.4)
         self.calm = False
         c = sc.body_pos("target")
         self.goto(
-            site_for_block([*c[:2], CARRY_Z], self.ik.heading, CENTRE_GRASP),
+            site_for_block([*c[:2], CARRY_Z], self.ik.heading, self.r.centre_grasp),
             LIFT_SPEED,
             settle=0.1,
         )
@@ -243,7 +255,7 @@ class Expert:
     def place_at(self, xy, release_z, correct_slip=False):
         """Carry over xy, correct for slip in the grasp, lower and release. DART noise fades out over the
         target (a perturbed release is a dropped block, and those demos would just be thrown away)."""
-        over = site_for_block([*xy, CARRY_Z], self.ik.heading, CENTRE_GRASP)
+        over = site_for_block([*xy, CARRY_Z], self.ik.heading, self.r.centre_grasp)
         self.goto(over, TRANSIT_SPEED, settle=0.15)
         self.calm = True
         self.hold(0.3)
@@ -258,7 +270,7 @@ class Expert:
         aim = self.ee_cmd.copy()
         aim[2] += release_z - CARRY_Z
         self.goto(aim, LIFT_SPEED, settle=0.1)
-        self.grip(GRIP_OPEN, settle=0.4)
+        self.grip(self.r.g_open, settle=0.4)
         self.goto([*self.ee_cmd[:2], HOVER_Z + 0.02], LIFT_SPEED, settle=0.0)
         self.calm = False
 
@@ -282,7 +294,7 @@ class Expert:
         elif sk == "lift":
             self.grasp()
             c = self.sc.body_pos("target")
-            up = site_for_block([*c[:2], 0.11], self.ik.heading, CENTRE_GRASP)
+            up = site_for_block([*c[:2], 0.11], self.ik.heading, self.r.centre_grasp)
             up[:2] *= 0.9  # draw it in a little toward the base while lifting
             self.goto(up, LIFT_SPEED, settle=1.2)
         elif sk == "push":
@@ -297,10 +309,10 @@ class Expert:
         """Closed jaws come down to hover just above the block's top face, and stay there."""
         c = self.sc.body_pos("target")
         self.ik.heading = grasp_heading(c[:2], self.sc.body_yaw("target"))
-        self.g_goal = GRIPPER_CLOSED
+        self.g_goal = self.r.g_closed
         tip = (
             np.array([*c[:2], 2 * CUBE_HALF + TOUCH_GAP])
-            - CENTRE_CLOSED * self.ik.heading
+            - self.r.centre_closed * self.ik.heading
         )
         self.goto([*tip[:2], HOVER_Z], TRANSIT_SPEED)
         self.goto(tip, APPROACH_SPEED, settle=1.2)
@@ -308,7 +320,7 @@ class Expert:
     def push(self, max_segments=4):
         sc = self.sc
         target = sc.body_pos("goal")[:2]
-        self.g_goal = GRIPPER_CLOSED
+        self.g_goal = self.r.g_closed
         for _ in range(max_segments):
             c0 = sc.body_pos("target")[:2]
             v = target - c0

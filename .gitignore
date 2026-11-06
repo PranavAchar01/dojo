@@ -11,3 +11,5 @@ demo/*.webm
 *.log
 archive/
 demo/narration/
+.cache/
+MUJOCO_LOG.TXT
