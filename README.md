@@ -235,6 +235,17 @@ End to end: 29/30 parts in the right tote (97%), 252 s of line time, 6.9 parts p
 of 12 parts (seed 7) put 12/12 in the right tote, 6.6 parts per minute. The one miss was a blue part dropped on
 the way by station 2.
 
+The line in demo v4 ("Blue and Red Kitting Line", typed and trained live in the recording, 2026-11-06):
+
+| Station | Controller | Trained in | Held-out success | On the line (30 parts, seed 7) | Mean cycle |
+|---|---|---|---|---|---|
+| 1 blue to yellow tote | VLA, fine-tuned from "put the yellow block in the yellow bin" | 93 s, 1 round | 17/20 (85%) | 10/10 | 7.4 s |
+| 2 red to green tote | VLA, fine-tuned from "put the green block in the green bin" | 167 s, 2 rounds (15/20 first) | 17/20 (85%) | 8/8 | 7.8 s |
+| 3 everything else to gray | scripted (ViperX 300) | none | n/a | 12/12 | 10.3 s |
+
+End to end: 30/30 in the right tote, 249 s of line time, 7.2 parts per simulated minute. From typing the line to
+the finished run took 4.9 minutes of wall time.
+
 ## What is real and what is scaffolded
 
 Real:

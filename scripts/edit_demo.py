@@ -4,9 +4,12 @@
 
 Reads <webm>.marks.json (written by record_demo.mjs) and demo/narration/<name>.wav. Every other second of the
 recording plays at 1x. Narration cues are given in seconds of the recording, so they follow the speed-up.
+BADGE=1 burns demo/speed-badge.png (the page's own 4x badge) onto the sped-up cuts, where the page put it, for
+takes recorded while the badge lived inside the Sim view and so never showed on the Line tab.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,15 +20,15 @@ FAST = 4.0
 # narration line -> where it starts, as (anchor in marks, offset in output seconds after that anchor)
 CUES = [
     ("hook", "zero", 0.5),
-    ("t1_train", "speed0", 0.5),
-    ("t1_done", "simple_done", -0.2),
-    ("chain", "chain", 2.5),
-    ("far", "far", 2.5),
-    ("library", "library", 0.5),
-    ("robot", "robot", 3.0),
-    ("widowx", "widowx", 2.0),
-    ("custom", "custom", 0.5),
-    ("close", "ladder", 0.4),
+    ("describe", "describe", 0.3),
+    ("cards", "cards", 0.3),
+    ("train", "speed0", 0.4),
+    ("round2", "speed2", 0.5),
+    ("trained", "replay", 0.3),
+    ("replay", "replay", 9.0),
+    ("results", "results", 0.3),
+    ("library", "library", 0.3),
+    ("close", "close", 0.5),
 ]
 
 
@@ -52,35 +55,64 @@ def main() -> None:
         **{f"start{i}": p["start"] for i, p in enumerate(marks["prompts"])},
         **{f"published{i}": p["published"] for i, p in enumerate(marks["prompts"])},
     }
+    # tab capture can open on a frame of a different size before the page settles: size every cut like the
+    # frame one second in
+    probe = ["ffprobe", "-v", "error", "-select_streams", "v", "-read_intervals", "1%+#1",
+             "-show_entries", "frame=width,height", "-of", "csv=p=0", str(src)]  # fmt: skip
+    w, h = (
+        subprocess.run(probe, check=True, capture_output=True, text=True)
+        .stdout.split()[0]
+        .split(",")[:2]
+    )
+    fit = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
     cuts, t = [], 0.0
     for a, b in spans:
         cuts += [(t, a, 1.0), (a, b, FAST)]
         t = b
     cuts.append((t, marks["end"], 1.0))
-    parts, labels = [], []
+    # BADGE: style.css .speed sits fixed at top 64px, right 28px. It goes on the uncut source, lit only inside the
+    # logged spans. The PNG loops at 30 fps: a single still frame stops drawing after its own 0.04 s
+    badge = os.environ.get("BADGE") == "1"
+    parts, labels, feed = [], [], ["[0:v]"] * len(cuts)
+    if badge:
+        on = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in spans)
+        feed = [f"[i{i}]" for i in range(len(cuts))]
+        parts.append(
+            f"[0:v][1:v]overlay=W-w-28:64:shortest=1:enable='{on}',split={len(cuts)}{''.join(feed)}"
+        )
     for i, (a, b, f) in enumerate(cuts):
         parts.append(
-            f"[0:v]trim={a:.3f}:{b:.3f},setpts=(PTS-STARTPTS)/{f},fps=30[v{i}]"
+            f"{feed[i]}trim={a:.3f}:{b:.3f},setpts=(PTS-STARTPTS)/{f},fps=30,{fit}[v{i}]"
         )
         labels.append(f"[v{i}]")
     graph = ";".join(parts) + f";{''.join(labels)}concat=n={len(cuts)}:v=1:a=0[v]"
-    inputs, amix = [], []
-    for k, (name, anchor, off) in enumerate(CUES, start=1):
+    # narration is mixed in its own pass, then muxed: one graph for both lost all but the first half second of
+    # audio on a 6-minute capture
+    inputs, agraph, amix = [], [], []
+    for k, (name, anchor, off) in enumerate(CUES):
         at = to_out(anchors[anchor]) + off
         inputs += ["-i", str(ROOT / "demo/narration" / f"{name}.wav")]
         ms = int(at * 1000)
-        graph += f";[{k}:a]aresample=48000,adelay={ms}|{ms}[a{k}]"
+        agraph.append(f"[{k}:a]aresample=48000,adelay={ms}|{ms}[a{k}]")
         amix.append(f"[a{k}]")
         print(f"{name:9s} {at:6.1f}s")
-    graph += f";{''.join(amix)}amix=inputs={len(amix)}:normalize=0,apad[a]"
+    agraph.append(f"{''.join(amix)}amix=inputs={len(amix)}:normalize=0,apad[a]")
     total = to_out(marks["end"])
+    mix = out.with_suffix(".narration.wav")
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(agraph), "-map", "[a]",
+         "-t", f"{total:.3f}", "-ac", "2", str(mix)],
+        check=True,
+    )  # fmt: skip
     cmd = [
-        "ffmpeg", "-y", "-v", "error", "-i", str(src), *inputs,
-        "-filter_complex", graph, "-map", "[v]", "-map", "[a]", "-t", f"{total:.3f}",
+        "ffmpeg", "-y", "-v", "error", "-i", str(src),
+        *(["-loop", "1", "-framerate", "30", "-i", str(ROOT / "demo/speed-badge.png")] if badge else []), "-i", str(mix),
+        "-filter_complex", graph, "-map", "[v]", "-map", f"{2 if badge else 1}:a", "-t", f"{total:.3f}",
         "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-movflags", "+faststart", str(out),
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out),
     ]  # fmt: skip
     subprocess.run(cmd, check=True)
+    mix.unlink()
     print(f"total {total:.1f}s -> {out}")
 
 

@@ -51,6 +51,7 @@ const mark = async (name) => {
   marks.at[name] = await now();
   console.log(`${name} @ ${marks.at[name].toFixed(1)}s`);
 };
+const view = (v) => page.evaluate((x) => window.setView(x), v);
 const mood = () => page.evaluate(() => document.querySelector("#view-line .ln-head .mascot")?.dataset.mood || "");
 const scrollLine = (sel, block = "start") =>
   page.evaluate((s, b) => document.querySelector(s)?.scrollIntoView({ block: b, behavior: "smooth" }), sel, block);
