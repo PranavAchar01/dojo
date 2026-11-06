@@ -8,9 +8,10 @@ grows by recursion: a new skill is always a child of an existing one.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import torch
@@ -21,7 +22,13 @@ from .sim.tasks import TaskSpec
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS_DIR = ROOT / "skills"
 BASE_PATH = ROOT / "models" / "base.pt"
+TILES_DIR = (
+    SKILLS_DIR / "tiles"
+)  # per skill: thumb.png (a frame of its own rollout) + replay.json.gz
 SAME_SKILL_BONUS = 0.15
+ROBOT = os.environ.get(
+    "VLA_FORGE_ROBOT", "so101"
+)  # robot config id; the customizer adds others
 
 
 @dataclass
@@ -42,6 +49,19 @@ class Skill:
         default_factory=list
     )  # composed skills: [{instruction, skill_id}, ...]; no checkpoint
     prompt: str = ""
+    # library tile
+    name: str = ""  # what the owner calls it; defaults to the instruction
+    robot: str = "so101"
+    origin: str = (
+        "prompt"  # prompt | remix | scratch | step (trained for a chain) | chain
+    )
+    train_seconds: float = 0.0  # time spent in the training loop itself (all rounds)
+    thumb_png: str = ""  # relative to ROOT; a real frame of one of its own rollouts
+    replay: str = ""  # relative to ROOT; recorded rollout(s) for the tile's player
+    replay_source: str = ""  # "held-out eval" or "test"
+    tests: list = field(
+        default_factory=list
+    )  # [{t, n, succeeded}], every Test run on fresh scenes
 
     @property
     def composite(self) -> bool:
@@ -57,8 +77,11 @@ class Registry:
         self.lock = threading.Lock()
         self.skills: dict[str, Skill] = {}
         if path.exists():
+            known = {f.name for f in fields(Skill)}
             for d in json.loads(path.read_text()):
-                self.skills[d["id"]] = Skill(**d)
+                self.skills[d["id"]] = Skill(
+                    **{k: v for k, v in d.items() if k in known}
+                )
         self._emb: dict[str, torch.Tensor] = {}
 
     def _save(self) -> None:
@@ -76,6 +99,21 @@ class Registry:
         with self.lock:
             self.skills[skill_id].agent_address = address
             self._save()
+
+    def update(self, skill_id: str, **changes) -> Skill:
+        with self.lock:
+            sk = self.skills[skill_id]
+            for k, v in changes.items():
+                setattr(sk, k, v)
+            self._save()
+            return sk
+
+    def add_test(self, skill_id: str, result: dict) -> Skill:
+        with self.lock:
+            sk = self.skills[skill_id]
+            sk.tests.append(result)
+            self._save()
+            return sk
 
     def ordered(self) -> list[Skill]:
         return sorted(self.skills.values(), key=lambda s: -s.created)

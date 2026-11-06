@@ -1,9 +1,10 @@
 """Fetch.ai uAgents: one agent per stage, talking over real uAgents messages inside one Bureau.
 
-    gateway --ChatMessage--> task --TaskReady--> scene --SceneReady--> data --DemosReady--> trainer
+    gateway --ChatMessage--> task --RouteTask--> router --TaskReady--> scene --SceneReady--> data --DemosReady--> trainer
     (composed tasks) task --ComposeTask--> planner --SkillQuery--> skill-<id> --SkillOffer--> planner
                      planner --TaskReady(child run)--> scene ... registry --SkillPublished--> task --StepTrained-->
                      planner --Execute--> executor --Publish--> registry
+    router: reuse a library tile, refuse (not feasible / too complex, with the reason), or go on to train / plan
     trainer --PolicyTrained--> eval --EvalReport--> critic --(Retrain)--> data   (the self-improvement loop)
                                                    critic --(Publish)--> registry --SkillPublished--> task
     task --ChatMessage--> whoever asked (the web UI's gateway, or ASI:One once registered on Agentverse)
@@ -34,6 +35,7 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
+from . import tiles
 from .pipeline import EVAL_N, FIRST_DEMOS, FIRST_TRAIN, FORGE, Round, Run
 from .registry import ROOT, Skill
 
@@ -41,6 +43,19 @@ BUREAU_PORT = int(os.environ.get("VLA_FORGE_AGENT_PORT", "8102"))
 SEED_FILE = (
     ROOT / ".agent-seed"
 )  # local secret, gitignored: gives every agent a stable address
+
+
+class RouteTask(Model):  # task -> router: parsed, now decide what it needs
+    run_id: str
+
+
+DECISION_WORDS = {
+    "reuse": "reuse a tile",
+    "train": "train a new skill",
+    "chain": "chain skills",
+    "too_complex": "too complex",
+    "not_feasible": "not feasible",
+}
 
 
 class TaskReady(Model):
@@ -246,6 +261,10 @@ class Forge:
             "executor",
             "Runs a composed task with each step's skill policy in 20 held-out scenes.",
         )
+        router = self.agent(
+            "router",
+            "Decides what a parsed prompt needs: reuse a tile, train, chain, or refuse with a reason.",
+        )
         a = self.agents
 
         # gateway: the UI talks to the task agent exactly as ASI:One would, over the chat protocol
@@ -302,6 +321,7 @@ class Forge:
             self.active = run.id
             spec = await asyncio.to_thread(FORGE.parse, run)
             info = run.parse_info
+            note = f". {info['note']}" if info.get("note") else ""
             if run.composite:
                 FORGE.emit(
                     run.id,
@@ -315,32 +335,77 @@ class Forge:
                     run.id,
                     "task",
                     f"parsed with {info.get('model')} in {info.get('seconds', 0):.1f}s: a tier 3 task in "
-                    f"{len(run.steps)} steps"
-                    + (f". {info['note']}" if info.get("note") else ""),
+                    f"{len(run.steps)} steps{note}",
                 )
-                await ctx.send(a["planner"].address, ComposeTask(run_id=run.id))
-                return
-            if spec is None:
-                self.finish(run)
-                run.status = "rejected"
-                run.error = info.get("note") or "not a tabletop task this robot can do"
-                FORGE.emit(run.id, "rejected", "task", reason=run.error)
-                await ctx.send(sender, _chat(f"{run.id}|rejected|{run.error}"))
-                return
-            FORGE.emit(
-                run.id, "task", "task", spec=spec.to_json(), parse=info, tier=run.tier
-            )
+            elif spec is None:
+                self.log(
+                    run.id,
+                    "task",
+                    f"parsed with {info.get('model')}: no task this arm can learn{note}",
+                )
+            else:
+                FORGE.emit(
+                    run.id,
+                    "task",
+                    "task",
+                    spec=spec.to_json(),
+                    parse=info,
+                    tier=run.tier,
+                )
+                self.log(
+                    run.id,
+                    "task",
+                    f"parsed with {info.get('model')} in {info.get('seconds', 0):.1f}s: "
+                    f"{spec.skill} {spec.obj}{' -> ' + spec.target if spec.target else ''}; "
+                    f"success = {' & '.join(p['op'] for p in spec.success)}{note}",
+                )
+            await ctx.send(a["router"].address, RouteTask(run_id=run.id))
+
+        @router.on_message(RouteTask)
+        @self.guarded("router")
+        async def on_route(ctx: Context, sender: str, msg: RouteTask):
+            run = FORGE.runs[msg.run_id]
+            r = await asyncio.to_thread(FORGE.route, run)
+            FORGE.emit(run.id, "route", "router", **r.to_json())
             self.log(
                 run.id,
-                "task",
-                f"parsed with {info.get('model')} in {info.get('seconds', 0):.1f}s: "
-                f"{spec.skill} {spec.obj}{' -> ' + spec.target if spec.target else ''}; "
-                f"success = {' & '.join(p['op'] for p in spec.success)}"
-                + (f". {info['note']}" if info.get("note") else ""),
+                "router",
+                f"{DECISION_WORDS[r.decision]}: {r.reason}",
+                checks=[c.__dict__ for c in r.checks],
             )
+            if r.refused:
+                self.finish(run)
+                run.status, run.error = "rejected", r.reason
+                run.seconds = round(run.elapsed(), 1)
+                FORGE.emit(
+                    run.id,
+                    "rejected",
+                    "router",
+                    reason=r.reason,
+                    decision=r.decision,
+                    suggestion=r.suggestion,
+                )
+                await ctx.send(run.reply_to, _chat(f"{run.id}|rejected|{r.reason}"))
+                return
+            if r.decision == "reuse":
+                self.finish(run)
+                run.status, run.skill_id = "reused", r.skill_id
+                run.seconds = round(run.elapsed(), 1)
+                sk = FORGE.registry.skills[r.skill_id]
+                FORGE.emit(run.id, "reused", "router", skill=sk.id, tile=tiles.tile(sk))
+                await ctx.send(
+                    run.reply_to,
+                    _chat(
+                        f"{run.id}|reused|'{sk.instruction}' is already a tile: skill-{sk.id}"
+                    ),
+                )
+                return
+            if run.composite:
+                await ctx.send(a["planner"].address, ComposeTask(run_id=run.id))
+                return
             await ctx.send(
                 a["scene"].address,
-                TaskReady(run_id=run.id, spec=json.dumps(spec.to_json())),
+                TaskReady(run_id=run.id, spec=json.dumps(run.spec.to_json())),
             )
 
         @t_chat.on_message(ChatAcknowledgement)
@@ -731,8 +796,10 @@ class Forge:
         self.running = True
         await self.bureau.run_async()
 
-    async def submit(self, prompt: str) -> Run:
-        run = FORGE.new_run(prompt)
+    async def submit(
+        self, prompt: str, mode: str = "auto", from_skill: str = ""
+    ) -> Run:
+        run = FORGE.new_run(prompt, mode, from_skill)
         self.pending[run.id] = self.loop.create_future()
         gw = self.agents["gateway"]
         await gw._build_context().send(

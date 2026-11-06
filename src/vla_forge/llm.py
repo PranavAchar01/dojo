@@ -130,12 +130,24 @@ distractors: how many other blocks share the table in a single task (0-2); use 2
 empty table.
 checks (single tasks only): extra predicates for the success check from {json.dumps(PREDICATES)};
 usually [] or ["undisturbed"] when the user asks not to touch the other blocks.
+mentions: every physical object or place the request names, exactly as the user wrote it (phrase), with kind
+"block", "bowl" or "square" when it is one of those, else "other" (a cup, the floor, a shelf, the laundry, a
+drawer...), and the colour word the user used for it (null if none). Report what the user said here, not the
+substitute you picked: a "pink block" stays color "pink" even though the steps use another colour.
 """
 
 TASK_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["feasible", "note", "kind", "steps", "distractors", "checks"],
+    "required": [
+        "feasible",
+        "note",
+        "kind",
+        "steps",
+        "distractors",
+        "checks",
+        "mentions",
+    ],
     "properties": {
         "feasible": {"type": "boolean"},
         "note": {"type": "string"},
@@ -157,6 +169,22 @@ TASK_SCHEMA = {
         "checks": {
             "type": "array",
             "items": {"type": "string", "enum": list(PREDICATES)},
+        },
+        "mentions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["phrase", "kind", "color"],
+                "properties": {
+                    "phrase": {"type": "string"},
+                    "kind": {
+                        "type": "string",
+                        "enum": ["block", "bowl", "square", "other"],
+                    },
+                    "color": {"type": ["string", "null"]},
+                },
+            },
         },
     },
 }
@@ -194,17 +222,30 @@ def parse_task(prompt: str) -> tuple[TaskSpec | list[Step] | None, dict]:
         return spec, {
             "model": "rules",
             "note": f"language model unavailable ({e}); used the keyword parser",
+            "kind": "single",
+            "motion_word": rule_motion(prompt)[1],
+            "raw_steps": 1,
         }
     info = {
         "model": model,
         "seconds": round(time.time() - t0, 2),
         "note": raw.get("note", ""),
+        "mentions": [
+            {
+                "phrase": str(m.get("phrase", ""))[:60],
+                "kind": m.get("kind"),
+                "color": m.get("color"),
+            }
+            for m in (raw.get("mentions") or [])[:12]
+        ],
     }
     steps_raw = raw.get("steps") or []
+    info["raw_steps"] = len(steps_raw)
     if not raw.get("feasible", True) or not steps_raw:
         return None, info
     if raw.get("kind") == "composite" and len(steps_raw) > 1:
         steps, dropped = validate(steps_raw)
+        info["dropped"] = dropped
         if dropped:
             info["note"] = (info["note"] + ". " if info["note"] else "") + dropped
         if len(steps) > 1:
@@ -231,6 +272,25 @@ def parse_task(prompt: str) -> tuple[TaskSpec | list[Step] | None, dict]:
     return spec, info
 
 
+MOTION_WORDS = (
+    ("stack", ("stack", " on top")),
+    ("push", ("push", "slide", "shove", "nudge")),
+    ("pick_place", ("bowl", "put", "place", "drop")),
+    ("reach", ("touch", "reach", "point")),
+    ("lift", ("lift", "pick up", "raise", "hold")),
+)
+
+
+def rule_motion(prompt: str) -> tuple[str, str | None]:
+    """(skill, the word that chose it, or None when nothing in the sentence names a motion: lift is a guess)."""
+    p = " " + prompt.lower()
+    for skill, words in MOTION_WORDS:
+        for w in words:
+            if w in p:
+                return skill, w.strip()
+    return "lift", None
+
+
 def rule_parse(prompt: str) -> TaskSpec:
     """Keyword fallback when no language model is reachable."""
     p = prompt.lower()
@@ -239,16 +299,7 @@ def rule_parse(prompt: str) -> TaskSpec:
         for c in re.findall(r"[a-z]+", p)
         if c in BLOCK_COLORS or c in BOWL_COLORS or c in PAD_COLORS
     ]
-    if "stack" in p or " on top" in p:
-        skill = "stack"
-    elif "push" in p or "slide" in p:
-        skill = "push"
-    elif "bowl" in p or "put" in p or "place" in p:
-        skill = "pick_place"
-    elif "touch" in p or "reach" in p or "point" in p:
-        skill = "reach"
-    else:
-        skill = "lift"
+    skill, _word = rule_motion(prompt)
     obj = next((c for c in colors if c in BLOCK_COLORS), "red")
     rest = colors[colors.index(obj) + 1 :] if obj in colors else colors
     target = _valid_target(skill, rest[0] if rest else None)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,11 +15,12 @@ from uuid import uuid4
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
+from . import tiles
 from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
@@ -55,6 +57,16 @@ app = FastAPI(lifespan=lifespan)
 
 class Prompt(BaseModel):
     prompt: str
+    mode: str = "auto"  # auto | train (never reuse) | scratch (from the base) | remix (from from_skill)
+    from_skill: str = ""
+
+
+class TestReq(BaseModel):
+    n: int = 5
+
+
+class Rename(BaseModel):
+    name: str
 
 
 @app.get("/")
@@ -80,8 +92,91 @@ async def prompt(p: Prompt):
     text = " ".join(p.prompt.split())[:300]
     if not text:
         raise HTTPException(400, "empty prompt")
-    run = await AGENTS.submit(text)
+    if p.mode not in ("auto", "train", "scratch", "remix"):
+        raise HTTPException(400, "mode is auto, train, scratch or remix")
+    if p.mode == "remix" and p.from_skill not in FORGE.registry.skills:
+        raise HTTPException(404, "no such tile to remix")
+    run = await AGENTS.submit(text, p.mode, p.from_skill if p.mode == "remix" else "")
     return {"run": run.id}
+
+
+# ---------------------------------------------------------------- library
+
+
+@app.get("/api/library")
+def library():
+    return {
+        "tiles": [tiles.tile(s) for s in FORGE.registry.ordered()],
+        "active": FORGE.runs[AGENTS.active].summary()
+        if AGENTS and AGENTS.active in FORGE.runs
+        else None,
+    }
+
+
+def _skill(sid: str):
+    return FORGE.registry.skills.get(sid) or _404()
+
+
+@app.get("/api/skills/{sid}/thumb.png")
+def thumb(sid: str):
+    sk = _skill(sid)
+    if not sk.thumb_png:
+        _404()
+    return FileResponse(
+        tiles.ROOT / sk.thumb_png,
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/api/skills/{sid}/replay/{index}")
+def replay(sid: str, index: int):
+    sk = _skill(sid)
+    if not sk.replay:
+        _404()
+    rolls = tiles.load_replay(sk)
+    if not 0 <= index < len(rolls):
+        _404()
+    summary = [{"success": r["success"], "failure": r["failure"]} for r in rolls]
+    return Response(
+        json.dumps({**rolls[index], "all": summary, "source": sk.replay_source}),
+        media_type="application/json",
+    )
+
+
+@app.patch("/api/skills/{sid}")
+def rename(sid: str, r: Rename):
+    _skill(sid)
+    name = " ".join(r.name.split())[:80]
+    return tiles.tile(FORGE.registry.update(sid, name=name))
+
+
+@app.post("/api/skills/{sid}/test")
+async def test_skill(sid: str, r: TestReq):
+    """Run the tile's policy on fresh random scenes (never its training or held-out seeds); progress over SSE."""
+    _skill(sid)
+    n = min(max(r.n, 1), 20)
+    tid = uuid4().hex[:8]
+    task = asyncio.get_running_loop().run_in_executor(
+        None, FORGE.test_skill, sid, tid, n
+    )
+    task.add_done_callback(
+        lambda f: (
+            f.exception()
+            and FORGE.emit(
+                f"test-{tid}", "test_error", "eval", skill=sid, error=str(f.exception())
+            )
+        )
+    )
+    return {"test": tid, "n": n}
+
+
+@app.get("/api/tests/{tid}/rollout/{index}")
+def test_rollout(tid: str, index: int):
+    t = FORGE.tests.get(tid) or _404()
+    if not 0 <= index < len(t["rolls"]):
+        _404()
+    return FORGE.test_payload(tid, index)
 
 
 @app.get("/api/runs/{rid}")
@@ -185,4 +280,9 @@ app.mount("/static", StaticFiles(directory=WEB), name="static")
 def main():
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8100, log_level="warning")
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=int(os.environ.get("VLA_FORGE_PORT", "8100")),
+        log_level="warning",
+    )
