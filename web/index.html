@@ -6,7 +6,7 @@
 <title>VLA Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/library.css">
 <link rel="stylesheet" href="/static/line.css">
@@ -17,35 +17,46 @@
 <body>
 <div class="app" id="app">
   <header class="top">
-    <button class="icon" id="toggle-left" title="Chat panel" aria-label="Toggle chat panel">
-      <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M8 4v12"/></svg>
-    </button>
-    <span class="brand"><span class="mascot sm" data-follow></span></span>
-    <nav class="crumbs">
-      <span>vla-forge</span><i>/</i><span>skills</span><i>/</i><b id="crumb-run">new task</b>
-    </nav>
-    <div class="seg" role="tablist">
-      <button class="on" data-view="sim">Sim</button>
-      <button data-view="line">Line</button>
-      <button data-view="robot">Robot</button>
-      <button data-view="skills">Library</button>
-      <button data-view="ladder">Ladder</button>
+    <div class="top-row">
+      <div class="crumb">
+        <span class="brand"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</span>
+        <span class="sep">/</span><span class="crumb-mid">skills</span><span class="sep">/</span>
+        <b class="title" id="crumb-run">new task</b>
+        <span class="sv"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></span>
+      </div>
+      <div class="top-r">
+        <div class="pill-btn clock" title="wall clock for this prompt"><span id="elapsed" class="num">0:00</span><span class="dim num">/ 3:00</span></div>
+        <button class="btn dark" id="call-last" aria-label="Call skill agent" disabled>
+          <svg viewBox="0 0 20 20"><path d="M6 4.5v11l9-5.5z"/></svg><span class="cl-label">Call skill agent</span>
+        </button>
+      </div>
     </div>
-    <div class="top-right">
-      <div class="clock mono" title="wall clock for this prompt"><span id="elapsed">0:00</span><span class="dim"> / 3:00</span></div>
-      <div class="status"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></div>
-      <button class="primary" id="call-last" aria-label="Call skill agent" disabled>
-        <svg viewBox="0 0 20 20"><path d="M6 4.5v11l9-5.5z"/></svg><span class="cl-label">Call skill agent</span>
-      </button>
-      <button class="icon" id="toggle-right" title="Inspector" aria-label="Toggle inspector">
-        <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M12 4v12"/></svg>
-      </button>
+    <div class="toolrow">
+      <div class="tg">
+        <button class="ib" id="toggle-left" title="Chat panel" aria-label="Toggle chat panel">
+          <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M8 4v12"/></svg>
+        </button>
+      </div>
+      <div class="tg view">
+        <div class="seg" role="tablist">
+          <button class="on" data-view="sim">Sim</button>
+          <button data-view="line">Line</button>
+          <button data-view="robot">Robot</button>
+          <button data-view="skills">Library</button>
+          <button data-view="ladder">Ladder</button>
+        </div>
+      </div>
+      <div class="tg">
+        <button class="ib" id="toggle-right" title="Inspector" aria-label="Toggle inspector">
+          <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M12 4v12"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
   <div class="body">
     <aside class="chat" id="chat-panel">
-      <div class="chat-tabs"><span class="tab on">New chat</span><button class="icon sm" id="new-chat" aria-label="New chat">+</button></div>
+      <div class="rp-head"><h2>Chat</h2><button class="ib sm" id="new-chat" title="New chat" aria-label="New chat"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></button></div>
       <div class="thread" id="thread">
         <div class="empty" id="empty">
           <div class="hero-bot">
@@ -75,7 +86,7 @@
     <section class="canvas">
       <div class="view" id="view-sim">
         <canvas id="three"></canvas>
-        <div class="boot" id="boot"><span class="mascot xl" data-follow></span><div class="boot-bar"><i></i></div></div>
+        <div class="boot" id="boot"><div class="rl-card"><span class="mascot xl" data-follow></span><div class="boot-bar"><i></i></div><span class="boot-t">Warming up the agents</span></div></div>
         <div class="caption">
           <span id="tier" class="tier hidden"></span>
           <span id="vp-caption">SO-101 &middot; MuJoCo</span>
@@ -83,17 +94,17 @@
         <div id="vp-badge" class="badge hidden"></div>
         <div id="step-badge" class="step-badge hidden"></div>
 
-        <div class="tools left">
-          <button data-cam="orbit" class="on"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg>Orbit</button>
-          <button data-cam="front"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="10" rx="1.5"/></svg>Front</button>
-          <button data-cam="top"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="1.5"/><circle cx="10" cy="10" r="2"/></svg>Top</button>
+        <div class="navc">
+          <button data-cam="orbit" class="vc-btn on" title="Orbit" aria-label="Orbit camera"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg></button>
+          <button data-cam="front" class="vc-btn" title="Front" aria-label="Front camera"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="10" rx="1.5"/></svg></button>
+          <button data-cam="top" class="vc-btn" title="Top" aria-label="Top camera"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="1.5"/><circle cx="10" cy="10" r="2"/></svg></button>
         </div>
 
         <ol class="rail" id="rail"></ol>
 
         <div class="pill" id="playbar">
           <button id="pb-prev" aria-label="Previous rollout">&minus;</button>
-          <span class="mono" id="pb-label">rollout &middot;</span>
+          <span class="num" id="pb-label">rollout &middot;</span>
           <button id="pb-next" aria-label="Next rollout">+</button>
           <button id="pb-replay" class="txt">Replay</button>
           <div class="pb-progress"><div id="pb-fill"></div></div>
@@ -105,7 +116,7 @@
       <div class="view hidden" id="view-robot">
         <div class="doc build">
           <div class="doc-h">
-            <h2>Build the robot</h2>
+            <h2>Build the <em>robot</em></h2>
             <p>Pick an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. The forge assembles them into one MuJoCo file, checks it, and trains the next skill on it.</p>
           </div>
           <div class="build-grid">
@@ -113,9 +124,9 @@
             <aside class="assembly">
               <div class="asm-view">
                 <canvas id="asm"></canvas>
-                <div class="asm-cap"><b id="asm-name"></b><span class="mono dim" id="asm-id"></span></div>
+                <div class="asm-cap"><b id="asm-name"></b><span class="num dim" id="asm-id"></span></div>
                 <div class="asm-load hidden" id="asm-load"><span class="spin"></span>assembling</div>
-                <div class="asm-legend mono"><span><i class="k ok"></i>reached</span><span><i class="k bad"></i>missed</span><span><i class="k tcp"></i>tool point</span></div>
+                <div class="asm-legend"><span><i class="k ok"></i>reached</span><span><i class="k bad"></i>missed</span><span><i class="k tcp"></i>tool point</span></div>
               </div>
               <div class="asm-body">
                 <div class="mono dim asm-facts" id="asm-facts"></div>
@@ -136,7 +147,7 @@
       <div class="view hidden" id="view-ladder">
         <div class="doc">
           <div class="doc-h">
-            <h2>Scaling ladder</h2>
+            <h2>Scaling <em>ladder</em></h2>
             <p>Every row is one prompt, timed from typing to a published skill agent, with success measured on 20 held-out scenes. Tier 1 is one motion, tier 2 carries a block somewhere, tier 3 chains published skill agents.</p>
           </div>
           <div id="ladder"></div>
@@ -146,7 +157,7 @@
       <div class="view hidden" id="view-skills">
         <div class="doc">
           <div class="doc-h">
-            <h2>Skill library</h2>
+            <h2>Skill <em>library</em></h2>
             <p>Every finished skill is saved as a tile: a frame from its own rollout, its success on held-out scenes, and how long it took to train. Replay it, test it on scenes it has never seen, remix it with a new prompt, or start a new skill from the base policy. Each tile is also its own agent with a chat endpoint.</p>
           </div>
           <div class="lib-bar">
@@ -157,7 +168,7 @@
             <select id="lib-sort" aria-label="Sort">
               <option value="new">Newest</option><option value="rate">Best success</option><option value="fast">Fastest</option>
             </select>
-            <button class="primary" id="lib-new" type="button"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>New skill from scratch</button>
+            <button class="primary btn-pill" id="lib-new" type="button"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>New skill from scratch</button>
           </div>
           <div id="lib-count" class="lib-count"></div>
           <div id="skills" class="tiles"></div>
@@ -172,9 +183,9 @@
 
     <aside class="inspector" id="inspector">
       <div class="sec">
-        <div class="sec-h"><span class="lbl">Training loss</span><span id="loss-now" class="mono v"></span></div>
+        <div class="sec-h"><span class="lbl">Training loss</span><span id="loss-now" class="num v"></span></div>
         <svg id="loss" class="loss" viewBox="0 0 300 96" preserveAspectRatio="none"></svg>
-        <div class="foot mono"><span id="loss-steps"></span><span id="loss-init"></span></div>
+        <div class="foot num"><span id="loss-steps"></span><span id="loss-init"></span></div>
       </div>
       <div class="sec">
         <div class="sec-h"><span class="lbl">Measured success</span><span class="dim">20 held-out scenes</span></div>

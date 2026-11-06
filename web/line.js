@@ -32,7 +32,7 @@ host.innerHTML = `
   <header class="ln-head">
     <span class="mascot md" data-follow></span>
     <div class="ln-title">
-      <h1>Factory line</h1>
+      <h1>Factory <em>line</em></h1>
       <p>Describe the line. Each station gets its own trained VLA or a scripted cell, then the whole line runs. All in simulation.</p>
     </div>
     <select class="ln-pick" aria-label="Saved lines"></select>
