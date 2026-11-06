@@ -6,7 +6,7 @@
 <title>VLA Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
@@ -18,6 +18,7 @@
     <button class="icon" id="toggle-left" title="Chat panel" aria-label="Toggle chat panel">
       <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M8 4v12"/></svg>
     </button>
+    <span class="brand"><span class="mascot sm" data-follow></span></span>
     <nav class="crumbs">
       <span>vla-forge</span><i>/</i><span>skills</span><i>/</i><b id="crumb-run">new task</b>
     </nav>
@@ -43,6 +44,10 @@
       <div class="chat-tabs"><span class="tab on">New chat</span><button class="icon sm" id="new-chat" aria-label="New chat">+</button></div>
       <div class="thread" id="thread">
         <div class="empty" id="empty">
+          <div class="hero-bot">
+            <span class="mascot lg" data-follow></span>
+            <span class="bb-thought on" aria-hidden="true"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
+          </div>
           <h1>What should the arm <em>learn</em>?</h1>
           <p>Type a task. Agents turn it into a success check, collect demos, fine-tune a vision-language-action policy from the nearest skill, and measure it on 20 scenes it never saw.</p>
           <div class="examples">
@@ -66,6 +71,7 @@
     <section class="canvas">
       <div class="view" id="view-sim">
         <canvas id="three"></canvas>
+        <div class="boot" id="boot"><span class="mascot xl" data-follow></span><div class="boot-bar"><i></i></div></div>
         <div class="caption">
           <span id="tier" class="tier hidden"></span>
           <span id="vp-caption">SO-101 &middot; MuJoCo</span>
@@ -139,5 +145,6 @@
   </div>
 </div>
 <script type="module" src="/static/app.js"></script>
+<script type="module" src="/static/mascot.js"></script>
 </body>
 </html>
