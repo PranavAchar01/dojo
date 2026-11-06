@@ -58,76 +58,168 @@ function resetStages(composite) {
 
 // ---------------------------------------------------------------- 3D
 const canvas = $("#three");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping; // keeps the block colours true, like a product render
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // PCF honours shadow.radius, so the key light casts a soft edge
 const scene3 = new THREE.Scene();
-scene3.background = new THREE.Color(0xf1f1f2);
+const STUDIO = new THREE.Color(0xeeeef0); // the page's zinc-50 card, so the set melts into the UI
+scene3.background = STUDIO;
+scene3.fog = new THREE.Fog(STUDIO, 3.2, 7.5);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene3.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene3.environmentIntensity = 0.75;
+scene3.environmentIntensity = 0.55;
 
-const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 20);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 30);
 camera.up.set(0, 0, 1);
-camera.position.set(1.16, -0.78, 0.68);
+camera.position.set(1.32, -0.98, 0.6);
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(0.12, 0.0, 0.1);
+controls.target.set(0.13, 0.0, 0.11);
 controls.enableDamping = true;
 controls.minDistance = 0.35;
-controls.maxDistance = 2.2;
+controls.maxDistance = 2.6;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.35;
 controls.update();
 
-const key = new THREE.DirectionalLight(0xfff4e6, 2.2);
-key.position.set(0.9, -0.6, 1.6);
+// three-point studio lighting: a warm soft key that casts the shadows, a cool fill from the sky, a rim from behind
+const key = new THREE.DirectionalLight(0xfff3e4, 2.4);
+key.position.set(0.95, -0.7, 1.7);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = -0.6; key.shadow.camera.right = 0.6;
-key.shadow.camera.top = 0.6; key.shadow.camera.bottom = -0.6;
-key.shadow.camera.near = 0.5; key.shadow.camera.far = 3;
-key.shadow.radius = 5;
-key.shadow.bias = -0.0004;
-key.shadow.normalBias = 0.002;
-key.target.position.set(0.18, 0, 0);
+key.shadow.camera.left = -1.1; key.shadow.camera.right = 1.1;
+key.shadow.camera.top = 1.1; key.shadow.camera.bottom = -1.1;
+key.shadow.camera.near = 0.5; key.shadow.camera.far = 4.5;
+key.shadow.radius = 4;
+key.shadow.blurSamples = 16;
+key.shadow.bias = -0.0003;
+key.shadow.normalBias = 0.0015;
+key.target.position.set(0.2, 0, -0.2);
 scene3.add(key, key.target);
-const rim = new THREE.DirectionalLight(0xdfe8ff, 0.6);
-rim.position.set(-0.8, 0.9, 0.9);
+scene3.add(new THREE.HemisphereLight(0xf7f8ff, 0xd9d6d0, 0.55));
+const rim = new THREE.DirectionalLight(0xe4ecff, 0.9);
+rim.position.set(-1.1, 1.0, 1.0);
 scene3.add(rim);
 
-// table: a real CC0 wood texture (Poly Haven, wood_table_001), softly lit, with a floor that catches shadow
-const texLoader = new THREE.TextureLoader();
-const woodMap = texLoader.load("/static/assets/wood_diff.jpg");
-woodMap.colorSpace = THREE.SRGBColorSpace;
-for (const t of [woodMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.2, 1.6); t.anisotropy = 8; }
-const tableTop = new THREE.Mesh(
-  new RoundedBoxGeometry(0.9, 1.2, 0.04, 4, 0.006),
-  new THREE.MeshStandardMaterial({ map: woodMap, color: 0xf3e2cf, roughness: 0.82, envMapIntensity: 0.25 }),
-);
-tableTop.position.set(0.2, 0, -0.02);
-tableTop.receiveShadow = true;
-scene3.add(tableTop);
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.ShadowMaterial({ opacity: 0.12 }));
-floor.position.z = -0.75;
-floor.receiveShadow = true;
-scene3.add(floor);
-const legMat = new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 0.5, metalness: 0.4 });
-for (const [x, y] of [[-0.2, -0.55], [-0.2, 0.55], [0.6, -0.55], [0.6, 0.55]]) {
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.71, 24), legMat);
-  leg.rotation.x = Math.PI / 2;
-  leg.position.set(x, y, -0.395);
-  leg.castShadow = true;
-  scene3.add(leg);
+// seamless cyclorama: a floor that curves up into a wall all the way round, so every orbit angle sees a studio
+{
+  const pts = [];
+  const floorZ = -0.75, flat = 2.4, cove = 1.4;
+  pts.push(new THREE.Vector2(0.001, floorZ));
+  pts.push(new THREE.Vector2(flat, floorZ));
+  for (let i = 1; i <= 24; i++) {
+    const a = (i / 24) * Math.PI * 0.5;
+    pts.push(new THREE.Vector2(flat + cove * Math.sin(a), floorZ + cove * (1 - Math.cos(a))));
+  }
+  pts.push(new THREE.Vector2(flat + cove, 6));
+  const g = new THREE.LatheGeometry(pts, 96);
+  g.rotateX(Math.PI / 2);
+  const cyc = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xe6e6e9, roughness: 1, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.3 }));
+  cyc.position.set(0.2, 0, 0);
+  cyc.receiveShadow = true;
+  scene3.add(cyc);
 }
 
+// soft radial texture for contact shadows (ambient occlusion where things touch a surface)
+function blobTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, "rgba(0,0,0,0.55)");
+  r.addColorStop(0.45, "rgba(0,0,0,0.28)");
+  r.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = r;
+  g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const BLOB = blobTexture();
+function contactShadow(size, opacity) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWrite: false, opacity, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+  );
+  m.renderOrder = 1;
+  return m;
+}
+
+// lab bench: pale ash top (the CC0 Poly Haven wood, washed out to sit with the zinc UI) on a brushed aluminium frame
+const texLoader = new THREE.TextureLoader();
+function washedWood(mat) { // canvas size is fixed before the texture is made: GPU texture storage cannot be resized
+  texLoader.load("/static/assets/wood_diff.jpg", (tex) => {
+    const img = tex.image;
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(img, 0, 0);
+    // remap the dark walnut grain onto a pale ash range by hand (canvas filters are not honoured everywhere)
+    const d = g.getImageData(0, 0, c.width, c.height);
+    const px = d.data;
+    let lo = 255, hi = 0;
+    for (let i = 0; i < px.length; i += 16) { const l = 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; lo = Math.min(lo, l); hi = Math.max(hi, l); }
+    for (let i = 0; i < px.length; i += 4) {
+      const l = ((0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) - lo) / Math.max(1, hi - lo);
+      const v = 0.80 + 0.17 * l; // grain survives as a 17% swing
+      px[i] = 255 * v; px[i + 1] = 255 * v * 0.955; px[i + 2] = 255 * v * 0.89;
+    }
+    g.putImageData(d, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1.0, 1.4);
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    mat.map = t;
+    mat.needsUpdate = true;
+    tex.dispose();
+  });
+}
+const TOP = { w: 0.9, d: 1.2, t: 0.036 };
+const tableTop = new THREE.Mesh(
+  new RoundedBoxGeometry(TOP.w, TOP.d, TOP.t, 6, 0.008),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, envMapIntensity: 0.35 }),
+);
+washedWood(tableTop.material);
+tableTop.position.set(0.2, 0, -TOP.t / 2);
+tableTop.receiveShadow = true;
+tableTop.castShadow = true;
+scene3.add(tableTop);
+const alu = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, roughness: 0.32, metalness: 0.9, envMapIntensity: 0.9 });
+const frameZ = -TOP.t, legH = 0.75 + frameZ;
+for (const [x, y] of [[-0.21, -0.56], [-0.21, 0.56], [0.61, -0.56], [0.61, 0.56]]) {
+  const leg = new THREE.Mesh(new RoundedBoxGeometry(0.036, 0.036, legH, 3, 0.004), alu);
+  leg.position.set(x, y, frameZ - legH / 2);
+  leg.castShadow = leg.receiveShadow = true;
+  scene3.add(leg);
+  const foot = contactShadow(0.16, 0.5);
+  foot.position.set(x, y, -0.7495);
+  scene3.add(foot);
+}
+for (const [x, y, sx, sy] of [[0.2, -0.56, 0.82, 0.03], [0.2, 0.56, 0.82, 0.03], [-0.21, 0, 0.03, 1.12], [0.61, 0, 0.03, 1.12]]) {
+  const rail = new THREE.Mesh(new RoundedBoxGeometry(sx, sy, 0.05, 3, 0.004), alu);
+  rail.position.set(x, y, frameZ - 0.03);
+  rail.castShadow = true;
+  scene3.add(rail);
+}
+const lowShelf = new THREE.Mesh(new RoundedBoxGeometry(0.82, 1.12, 0.02, 3, 0.004), new THREE.MeshStandardMaterial({ color: 0x2c2d31, roughness: 0.7, metalness: 0.2 }));
+lowShelf.position.set(0.2, 0, -0.6);
+lowShelf.castShadow = lowShelf.receiveShadow = true;
+scene3.add(lowShelf);
+const benchShadow = contactShadow(1.9, 0.35);
+benchShadow.scale.set(1, 1.3, 1);
+benchShadow.position.set(0.2, 0, -0.7493);
+scene3.add(benchShadow);
+
 const MAT = {
-  printed: new THREE.MeshPhysicalMaterial({ color: 0xf0bd2c, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.4, sheen: 0.2 }),
-  motor: new THREE.MeshPhysicalMaterial({ color: 0x1b1b1d, roughness: 0.32, metalness: 0.15, clearcoat: 0.4 }),
-  other: new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.5 }),
+  // matte 3D-printed PLA shells, satin anodised-looking servo cases
+  printed: new THREE.MeshPhysicalMaterial({ color: 0xf2c53a, roughness: 0.62, sheen: 0.25, sheenRoughness: 0.7, sheenColor: 0xfff2c8, envMapIntensity: 0.6 }),
+  motor: new THREE.MeshPhysicalMaterial({ color: 0x26272b, roughness: 0.36, metalness: 0.65, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 1.0 }),
+  other: new THREE.MeshStandardMaterial({ color: 0xa4a6aa, roughness: 0.35, metalness: 0.8 }),
 };
 const geomCache = new Map();
 const meshesP = fetch("/api/meshes").then((r) => r.json());
@@ -167,6 +259,7 @@ let world = null; // { root, bodies: Object3D[] }
 function buildWorld(sc) {
   if (world) scene3.remove(world.root);
   const root = new THREE.Group();
+  const blobs = [];
   const bodies = sc.bodies.map(() => {
     const o = new THREE.Group();
     root.add(o);
@@ -187,21 +280,23 @@ function buildWorld(sc) {
     const s = b.half * 2;
     const m = new THREE.Mesh(
       new RoundedBoxGeometry(s, s, s, 4, 0.0025),
-      new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.38, clearcoat: 0.5, clearcoatRoughness: 0.3 }),
+      new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.5, clearcoat: 0.22, clearcoatRoughness: 0.45, envMapIntensity: 0.7 }),
     );
     m.castShadow = m.receiveShadow = true;
     bodies[b.body].add(m);
+    blobs.push({ body: b.body, mesh: contactShadow(s * 2.4, 0.55), lift: 0.06 });
   }
   for (const b of sc.bowls) {
     const m = new THREE.Mesh(
       bowlGeometry(b.r, b.h),
-      new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.18, clearcoat: 1.0, clearcoatRoughness: 0.08, side: THREE.DoubleSide }),
+      new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.3, clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 0.9, side: THREE.DoubleSide }),
     );
     m.castShadow = m.receiveShadow = true;
     bodies[b.body].add(m);
+    blobs.push({ body: b.body, mesh: contactShadow(b.r * 2.9, 0.5), lift: 1 });
   }
   for (const p of sc.pads) {
-    const mat = new THREE.MeshStandardMaterial({ color: srgb(p.rgb), roughness: 0.7 });
+    const mat = new THREE.MeshStandardMaterial({ color: srgb(p.rgb), roughness: 0.85, envMapIntensity: 0.4 });
     const t = p.half, w = 0.006;
     for (const [x, y, sx, sy] of [[t, 0, w, t + w], [-t, 0, w, t + w], [0, t, t + w, w], [0, -t, t + w, w]]) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(sx * 2, sy * 2, 0.0012), mat);
@@ -210,8 +305,12 @@ function buildWorld(sc) {
       bodies[p.body].add(m);
     }
   }
+  const base = contactShadow(0.2, 0.6); // under the arm's base plate
+  base.position.set(0, 0, 0.0004);
+  root.add(base);
+  for (const b of blobs) root.add(b.mesh);
   scene3.add(root);
-  world = { root, bodies, n: sc.bodies.length };
+  world = { root, bodies, blobs, n: sc.bodies.length };
 }
 function applyFrame(frame) {
   if (!world || !frame) return;
@@ -220,6 +319,11 @@ function applyFrame(frame) {
     const k = i * 7; // per body: x y z, then quaternion w x y z (MuJoCo order)
     world.bodies[i].position.set(frame[k], frame[k + 1], frame[k + 2]);
     world.bodies[i].quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
+  }
+  for (const b of world.blobs) { // contact shadows stay on the table and fade as the object lifts
+    const p = world.bodies[b.body].position;
+    b.mesh.position.set(p.x, p.y, 0.0004);
+    b.mesh.material.opacity = (b.base ??= b.mesh.material.opacity) * Math.max(0, 1 - Math.max(0, p.z - 0.02) / b.lift);
   }
 }
 
@@ -240,7 +344,7 @@ function resize() {
 new ResizeObserver(resize).observe(canvas.parentElement);
 resize();
 const CAMS = {
-  orbit: { pos: [1.16, -0.78, 0.68], target: [0.12, 0.0, 0.1], rotate: true },
+  orbit: { pos: [1.32, -0.98, 0.6], target: [0.13, 0.0, 0.11], rotate: true },
   front: { pos: [1.2, -0.02, 0.52], target: [0.16, 0.0, 0.06], rotate: false },
   top: { pos: [0.2, -0.06, 1.05], target: [0.2, 0.0, 0.0], rotate: false },
 };
