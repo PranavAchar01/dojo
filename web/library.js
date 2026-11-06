@@ -2,6 +2,8 @@
 // parent, robot). Tiles replay, test on fresh scenes, remix, or start a new skill from the base policy.
 // Also draws the router's verdict and the progress card for a run (parse, route, demos, train, eval, save).
 
+import { robotLabel } from "./builder.js";
+
 const F = () => window.forge;
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -439,7 +441,7 @@ function tileEl(t, byId) {
   } else {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
-  th.append(el("span", "tile-tier mono", t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", "tile-robot mono", t.robot));
+  th.append(el("span", "tile-tier mono", t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${t.robot !== "so101" ? " custom" : ""}`, robotLabel(t.robot)));
   if (t.replay) {
     const pl = el("button", "tile-play");
     pl.setAttribute("aria-label", "Replay");

@@ -208,3 +208,25 @@ def test_route_json_round_trips(reg):
     js = decide("touch the red mug", reg).to_json()
     assert js["decision"] == "not_feasible"
     assert all({"name", "ok", "detail"} <= set(c) for c in js["checks"])
+
+
+def test_robot_that_cannot_grasp_is_refused(reg):
+    """The WidowX jaw opens 25 mm: a pick needs 38 mm, so the router refuses with the robot check's reason."""
+    r = decide("pick up the red block", reg, robot="wx250s.native.native")
+    assert r.decision == "not_feasible"
+    assert "38 mm" in r.reason
+    assert any(c.name == "robot" and not c.ok for c in r.checks)
+    ok = decide(
+        "push the red block onto the orange square", reg, robot="wx250s.native.native"
+    )
+    assert ok.decision == "train"
+
+
+def test_reuse_only_on_the_same_robot(reg):
+    spec = rule_parse("touch the red block")
+    tile(reg, spec, 1.0, robot="vx300s.native.native")
+    assert decide("touch the red block", reg).decision == "train"
+    assert (
+        decide("touch the red block", reg, robot="vx300s.native.native").decision
+        == "reuse"
+    )

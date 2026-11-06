@@ -151,7 +151,7 @@ class VLA(nn.Module):
         super().__init__()
         self.cfg = cfg or HeadConfig()
         self.head = ActionHead(self.cfg)
-        n = norm or Norm([0.0] * 6, [1.0] * 6)
+        n = norm or Norm([0.0] * self.cfg.act_dim, [1.0] * self.cfg.act_dim)
         self.register_buffer("mu", torch.tensor(n.mean, dtype=torch.float32))
         self.register_buffer("sd", torch.tensor(n.std, dtype=torch.float32))
 
@@ -179,6 +179,41 @@ class VLA(nn.Module):
         m = VLA(HeadConfig(**ck["cfg"]))
         m.load_state_dict(ck["state"])
         return m.to(device), ck.get("meta", {})
+
+    def for_embodiment(self, act_dim: int, norm: Norm) -> tuple[VLA, str]:
+        """This policy moved onto another robot. The normalisation is reset from that robot's demos. When the
+        action size differs, the state input layer and the action output layer are new (randomly initialised)
+        and everything else (cross-attention, transformer, queries) keeps its trained weights."""
+        if act_dim == self.cfg.act_dim:
+            m = VLA(self.cfg, norm)
+            own = {k: v for k, v in self.state_dict().items() if k not in ("mu", "sd")}
+            m.load_state_dict(own, strict=False)
+            return (
+                m,
+                "same action size: all head weights kept, normalisation reset for the new joints",
+            )
+        cfg = HeadConfig(
+            **{**asdict(self.cfg), "act_dim": act_dim, "state_dim": act_dim}
+        )
+        m = VLA(cfg, norm)
+        mine = m.state_dict()
+        keep = {
+            k: v
+            for k, v in self.state_dict().items()
+            if k in mine and k not in ("mu", "sd") and mine[k].shape == v.shape
+        }
+        m.load_state_dict(keep, strict=False)
+        fresh = sorted(
+            {
+                k.rsplit(".", 2)[0]
+                for k in mine
+                if k not in keep and k not in ("mu", "sd")
+            }
+        )
+        return m, (
+            f"{self.cfg.act_dim}-D to {act_dim}-D actions: {len(keep)} of {len(mine) - 2} weight tensors kept, "
+            f"new {', '.join(fresh)}"
+        )
 
     def trainable_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
