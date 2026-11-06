@@ -14,12 +14,18 @@ Third-party material and design credits.
 
 4. Interface design
    The editor layout and visual language of the page (top bar with segmented tabs, chat panel with tool
-   status pills, floating tool groups on the canvas, bottom tab bar, the zinc palette and the Geist /
-   Instrument Serif type pairing) are modelled on the public website of HeyPCB, https://heypcb.ai.
+   status pills, floating tool groups on the canvas, bottom tab bar and the Geist / Geist Mono /
+   Instrument Serif type set, the same three families heypcb.ai loads) are modelled on the public website of HeyPCB, https://heypcb.ai.
    HeyPCB's open-source repositories (github.com/heypcb) contain hardware designs under CERN-OHL-S and an
    MIT-licensed MCP server, but no interface code, so nothing was copied: the look was recreated from the
    public site with this project's own HTML, CSS and JavaScript. No HeyPCB logo, name or asset appears in
    the interface. HeyPCB is not affiliated with this project.
+
+4a. Motion and mascot
+   The animations (entrance rises, keycap buttons with a halo ring, blink, float, cheer, ripple, thought
+   cloud, shimmer loaders) are ported from Etch, the author's own earlier project, and recoloured to this
+   page's violet accent. The robot mascot is drawn in code (web/mascot.js) as an original character in the
+   two-tall-eyes, no-mouth style of simple chatbot icons; it is not a copy of any company's mark.
 
 5. Fonts
    Geist and Geist Mono (Vercel, SIL Open Font License 1.1) and Instrument Serif (SIL Open Font License
