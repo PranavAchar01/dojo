@@ -1,8 +1,10 @@
-hook	hook	This is VLA Forge. You tell it what the robot arm should do, and it trains a policy for that in under three minutes.
-t1_train	explain	First, a tier one task: touch the red block. Nothing close exists yet, so it collects expert demos in sim and trains from the base policy. I sped this part up four times.
-t1_done	proud	It published in about seventy seconds. It worked in all twenty scenes it never trained on, and that's the policy's own rollout you're watching.
-t3_plan	explain	Now a tier three task. Sort the blue and green blocks into the bowls of the same color. The planner splits it into two steps and asks the skill agents who can do each one.
-t3_train	wait	We already have a blue bowl skill, so that step gets reused. There's no green one, so it trains one right now, starting from the blue skill, on tables that look like the full task.
-t3_child	proud	The green skill got seventeen of twenty on its own check, so the critic publishes it and the planner gets the new agent's answer.
-t3_done	honest	Then both policies run back to back on twenty new scenes. Step one worked thirteen times, step two ten, and the whole task ten out of twenty. Here's one of the misses.
-close	close	Every prompt ends up on the ladder with its tier, its time, and the success we measured.
+hook	hook	This is VLA Forge. You tell a robot arm what to do in plain words, and it trains a policy for that and saves it as a skill once it's tested.
+t1_train	explain	First, something simple: touch the yellow block. The router checks that the arm can reach it. Then it collects demos in sim and fine-tunes from the closest skill it has. I sped this part up four times.
+t1_done	proud	The whole run took seventy-three seconds. It worked in nineteen of twenty scenes it never trained on, and this is its own rollout.
+chain	explain	One rung up is two steps in one prompt. The library already has this chain, so the router just reuses that tile. It measured fifty percent end to end.
+far	honest	If I ask for something the arm can't do, like lifting a block sixty centimeters, it says no and tells me why. The jaws top out at fifty-three.
+library	explain	Every skill lands here as a tile with its success rate and train time. You can test one on fresh scenes or remix it with a new prompt.
+robot	explain	In the Robot tab you build the arm itself. Here I swap in a ViperX and lock its wrist roll. Each part comes from a real open-source model.
+widowx	honest	The WidowX fails one check because its fingers only open twenty-five millimeters. It can still train reach and push, so I make it active. When I ask it to pick up a block, the router refuses and gives the finger width as the reason.
+custom	proud	This tile was trained on the ViperX. On five fresh scenes it pushed the block onto the square three times.
+close	close	Every prompt ends up on the ladder with its tier, how long it took, and the success we measured.
