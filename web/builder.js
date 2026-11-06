@@ -105,9 +105,9 @@ function partURL(slot, id, arm = sel.arm) {
 function closeUp(v) { // a box around the tool point big enough for the wrist and the jaw
   const lo = new THREE.Vector3().fromArray(v.bbox[0]);
   const hi = new THREE.Vector3().fromArray(v.bbox[1]);
-  const h = 0.17 * hi.distanceTo(lo);
+  const h = 0.19 * hi.distanceTo(lo);
   const c = new THREE.Vector3().fromArray(v.tcp);
-  c.z += 0.4 * h;
+  c.z += 0.5 * h;
   return [[c.x - h, c.y - h, c.z - h], [c.x + h, c.y + h, c.z + h]];
 }
 
@@ -173,7 +173,7 @@ async function drainThumbs() {
       }
       const g = partGroup(v);
       thumb.s.add(g);
-      if (onArm(slot, id) && v.tcp) frame(thumb.cam, closeUp(v), [1.1, -0.9, 0.55]);
+      if (onArm(slot, id) && v.tcp) frame(thumb.cam, closeUp(v), [0.7, -1, 0.5], 1.1);
       else frame(thumb.cam, v.bbox);
       thumb.r.render(thumb.s, thumb.cam);
       img.src = thumb.r.domElement.toDataURL("image/png");
@@ -249,6 +249,13 @@ function showAssembly(rid, view) {
   g.add(tcp);
   asm.s.add(g);
   asmRobot = g;
+  if (asm.framed !== rid.split(".")[0]) { // a new arm: frame it and its reach map, then let the viewer orbit
+    asm.framed = rid.split(".")[0];
+    const lo = view.bbox[0].map((v, i) => Math.min(v, [0.1, -0.2, 0][i]));
+    const hi = view.bbox[1].map((v, i) => Math.max(v, [0.3, 0.2, 0][i]));
+    asm.controls.target.copy(frame(asm.cam, [lo, hi], [1.1, -0.95, 0.62], 1.05));
+    asm.controls.update();
+  }
 }
 
 // ---------------------------------------------------------------- page
@@ -340,10 +347,11 @@ function checkRow(ok, name, detail, level) {
   li.append(ic, tx);
   return li;
 }
-function failCard(title, detail) {
+function failCard(title, detail, partial = false) {
   const f = $("#asm-fail");
   f.innerHTML = "";
-  f.append(el("div", "lbl", "Cannot train on this robot"), el("b", "", title), el("div", "d", detail));
+  f.classList.toggle("partial", partial);
+  f.append(el("div", "lbl", partial ? "Some skills are off on this robot" : "Cannot train on this robot"), el("b", "", title), el("div", "d", detail));
   f.classList.remove("hidden");
 }
 function renderReport(rid, rep) {
@@ -362,17 +370,19 @@ function renderReport(rid, rep) {
   if (rep.stroke_mm) facts.push(`fingers ${rep.stroke_mm[0]}-${rep.stroke_mm[1]} mm`);
   if (rep.mass_kg) facts.push(`${rep.mass_kg} kg`);
   $("#asm-facts").textContent = facts.join(" · ");
-  if (!rep.ok) failCard(rep.failure ? rep.failure.split(":")[0] : "A check failed", rep.failure ? rep.failure.split(": ").slice(1).join(": ") : "");
+  const usable = rep.usable ?? (rep.ok && any);
+  if (!rep.ok) failCard(rep.failure ? rep.failure.split(":")[0] : "A check failed", rep.failure ? rep.failure.split(": ").slice(1).join(": ") : "", usable);
   else if (!any) failCard("No skill fits this robot", "Every skill fails a reach or grip check; see the list below.");
   const ub = $("#use-robot");
-  ub.disabled = !rep.ok || !any || rid === active;
+  ub.disabled = !usable || rid === active;
   ub.textContent = rid === active ? "Skills train on this robot" : "Train the next skill on this robot";
   const note = $("#use-note");
-  note.textContent = rep.ok && rep.act_dim && rep.act_dim !== 6
+  const limits = usable && rep.usable_reason && rep.usable_reason !== "every skill fits" ? `It ${rep.usable_reason}. ` : "";
+  note.textContent = limits + (usable && rep.act_dim && rep.act_dim !== 6
     ? `${rep.act_dim} action dimensions instead of 6: the policy keeps its vision and language trunk and retrains its action layers on this robot's demos.`
-    : rep.ok && rid !== "so101"
+    : usable && rid !== "so101"
       ? "Same 6 action dimensions: the policy keeps every layer and fine-tunes on this robot's own demos."
-      : "";
+      : "");
 }
 
 async function useRobot() {

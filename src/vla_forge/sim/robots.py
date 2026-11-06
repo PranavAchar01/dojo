@@ -292,6 +292,17 @@ def make_id(arm: str, wrist: str = "native", effector: str = "native") -> str:
     return DEFAULT if rid == "so101.native.native" else rid
 
 
+def label(robot_id: str) -> str:
+    """A robot id as people say it: 'WidowX 250 6DOF', 'ViperX 300 6DOF + Robotiq 2F-85 gripper'."""
+    arm, wrist, eff = parse_id(robot_id)
+    s = ARMS[arm].source.name
+    if wrist == "locked":
+        s += ", roll locked"
+    if eff != "native" and EFFECTORS[eff] is not None:
+        s += f" + {EFFECTORS[eff].source.name}"
+    return s
+
+
 def is_default(robot_id: str) -> bool:
     return parse_id(robot_id) == ("so101", "native", "native")
 
@@ -1317,6 +1328,43 @@ def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
         True,
         f"reaches {f[need]:.0%} of the workspace at {need} height; fingers open {w_lo:.0f}-{w_hi:.0f} mm",
     )
+
+
+SKILLS = ("reach", "push", "lift", "pick_place", "stack")
+# checks that only matter for some skills: a robot failing them can still train the skills it can do,
+# and the router refuses the rest with robot_feasibility's reason
+TASK_CHECKS = ("Fingers fit a 3 cm block", "Reaches the table workspace")
+
+
+def usable(robot_id: str) -> tuple[bool, str, dict]:
+    """Can skills train on this robot at all? (ok, reason, {skill: {ok, reason}}). Every check that is not
+    task-specific must pass, and at least one skill must be feasible."""
+    rep = report(robot_id)
+    feas = {
+        k: dict(zip(("ok", "reason"), robot_feasibility(robot_id, k), strict=True))
+        for k in SKILLS
+    }
+    bad = next(
+        (
+            c
+            for c in rep["checks"]
+            if c["level"] == "block" and not c["ok"] and c["name"] not in TASK_CHECKS
+        ),
+        None,
+    )
+    if bad:
+        return False, f"{bad['name']}: {bad['detail']}", feas
+    can = [k for k, v in feas.items() if v["ok"]]
+    if not can:
+        return False, rep["failure"] or "no skill fits this robot", feas
+    name = {"pick_place": "pick and place"}
+    cannot = [name.get(k, k) for k, v in feas.items() if not v["ok"]]
+    why = (
+        "every skill fits"
+        if not cannot
+        else f"trains {', '.join(name.get(k, k) for k in can)}; the router refuses {', '.join(cannot)}"
+    )
+    return True, why, feas
 
 
 # ------------------------------------------------------------------ catalog for the page
