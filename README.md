@@ -145,12 +145,12 @@ without 25/30, so the grounding token is off by default.
 
 ## Interface
 
-The page is modelled on the public website of HeyPCB (heypcb.ai): top bar with breadcrumb and segmented tabs,
-chat on the left with tool status pills, floating tool groups on the canvas, a stage rail, a bottom tab bar for
-rollouts, an inspector on the right, zinc palette with one safety-orange accent, Geist and Geist Mono only. HeyPCB's GitHub repositories
-hold hardware (CERN-OHL-S) and an MIT MCP server but no interface code, so nothing was copied; the look was
-rebuilt with this project's own HTML, CSS and JavaScript, with no HeyPCB name or logo in the page. Not
-affiliated. Details and other credits in `NOTICE`.
+The interface is ported from Etch, the author's own earlier project: top bar with breadcrumb and live status,
+a toolbar with segmented view tabs, the chat panel on the left, an inspector on the right, white floating cards
+over the stage, a dark dock for playback, serif headings with an italic accent word, Figtree and Averia Serif
+Libre. Etch's blue accent is swapped for one safety orange. The mascot is an original monochrome robot drawn as
+one SVG in `web/mascot.js`. HeyPCB was checked as a source and has no open interface code, so nothing of
+theirs is used. Details and other credits in `NOTICE`.
 
 ## Custom robots (the Robot tab)
 
