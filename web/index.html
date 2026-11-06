@@ -23,6 +23,7 @@
     </nav>
     <div class="seg" role="tablist">
       <button class="on" data-view="sim">Sim</button>
+      <button data-view="robot">Robot</button>
       <button data-view="ladder">Ladder</button>
       <button data-view="skills">Skills</button>
     </div>
@@ -55,7 +56,7 @@
       <form class="composer" id="prompt-form" autocomplete="off">
         <textarea id="prompt" rows="2" maxlength="300" placeholder="Tell the forge what the arm should do..."></textarea>
         <div class="composer-row">
-          <span class="chip-mode"><span class="sq"></span>SO-101 &middot; sim</span>
+          <button type="button" class="chip-mode" onclick="setView('robot')" title="Change the robot"><span class="sq"></span><span id="robot-chip">SO-101 &middot; sim</span></button>
           <button class="send" id="go" type="submit" aria-label="Train" disabled>
             <svg viewBox="0 0 20 20"><path d="M10 15V5M5.5 9.5 10 5l4.5 4.5"/></svg>
           </button>
@@ -88,6 +89,37 @@
           <button id="pb-next" aria-label="Next rollout">+</button>
           <button id="pb-replay" class="txt">Replay</button>
           <div class="pb-progress"><div id="pb-fill"></div></div>
+        </div>
+      </div>
+
+      <div class="view hidden" id="view-robot">
+        <div class="doc build">
+          <div class="doc-h">
+            <h2>Build the robot</h2>
+            <p>Pick an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. The forge assembles them into one MuJoCo file, checks it, and trains the next skill on it.</p>
+          </div>
+          <div class="build-grid">
+            <div class="slots" id="slots"></div>
+            <aside class="assembly">
+              <div class="asm-view">
+                <canvas id="asm"></canvas>
+                <div class="asm-cap"><b id="asm-name"></b><span class="mono dim" id="asm-id"></span></div>
+                <div class="asm-load hidden" id="asm-load"><span class="spin"></span>assembling</div>
+                <div class="asm-legend mono"><span><i class="k ok"></i>reached</span><span><i class="k bad"></i>missed</span><span><i class="k tcp"></i>tool point</span></div>
+              </div>
+              <div class="asm-body">
+                <div class="mono dim asm-facts" id="asm-facts"></div>
+                <div id="asm-fail" class="fail-card hidden"></div>
+                <div class="sec-h"><span class="lbl">Checks</span><span id="asm-sum" class="dim"></span></div>
+                <ul id="checks" class="checks"></ul>
+                <div class="sec-h"><span class="lbl">Skills it can learn</span></div>
+                <ul id="feas" class="checks"></ul>
+                <button class="primary use" id="use-robot" disabled>Train the next skill on this robot</button>
+                <div class="use-note" id="use-note"></div>
+              </div>
+            </aside>
+          </div>
+          <details class="not-offered"><summary>Parts looked at and left out</summary><ul id="not-offered"></ul></details>
         </div>
       </div>
 
