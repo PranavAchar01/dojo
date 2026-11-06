@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+models/
+skills/*.pt
+skills/registry.json
+demo/*.webm
+.agent-seed
+.env
+*.log
