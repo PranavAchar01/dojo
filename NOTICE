@@ -26,7 +26,9 @@ Third-party material and design credits.
    cloud, shimmer loaders) are ported from Etch, the author's own earlier project, and recoloured to this
    page's factory safety-orange accent (#ff5a1f). The robot mascot is an original character, built from square
    tiles and drawn in code (web/mascot.js): hazard-stripe hard hat, dark visor, two tall pixel eyes, no mouth,
-   in the spirit of simple chatbot icons; it is not a copy of any company's mark.
+   antenna lamp. It is original art made for this project: its silhouette, face, proportions and colours are
+   our own, and it does not reproduce or adapt any existing character or company mark. Only the general genre
+   (a friendly robot built from pixel tiles) is shared with other work.
 
 5. Fonts
    Geist and Geist Mono (Vercel, SIL Open Font License 1.1), loaded from Google Fonts. No other typeface.
