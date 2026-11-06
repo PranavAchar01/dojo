@@ -9,3 +9,5 @@ demo/*.webm
 .agent-seed
 .env
 *.log
+archive/
+demo/narration/

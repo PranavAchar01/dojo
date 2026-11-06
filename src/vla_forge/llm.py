@@ -16,6 +16,7 @@ from functools import lru_cache
 
 import openai
 
+from .compose import Step, validate
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS
 from .sim.tasks import PREDICATES, SKILLS, TaskSpec, default_success
 
@@ -107,57 +108,55 @@ def _chat_json(system: str, user: str, schema: dict) -> tuple[dict, str]:
 # ------------------------------------------------------------------ task parsing
 
 TASK_SYSTEM = f"""You turn a request for a robot into a task for a simulated SO-101 arm on a tabletop.
-The arm can learn exactly four skills:
-- pick_place: pick a block and put it in a bowl. target = bowl colour, one of {list(BOWL_COLORS)}.
+The arm can learn exactly five skills:
+- reach: move the closed gripper down to hover just above a block ("touch", "point at", "go to"). target = null.
 - push: push a block across the table onto a taped square. target = square colour, one of {list(PAD_COLORS)}.
 - lift: pick a block up and hold it in the air. target = null.
+- pick_place: pick a block and put it in a bowl. target = bowl colour, one of {list(BOWL_COLORS)}.
 - stack: put one block on top of another block. target = the lower block's colour.
 Blocks are 3 cm cubes coloured one of {list(BLOCK_COLORS)}.
-Map the request onto the closest skill. If it names an object or colour the scene does not have, choose the
-closest available one and say so in `note`. Set feasible=false only when no skill is even close (for example
-"fold the laundry"), and explain in `note`.
-distractors: how many other blocks share the table (0-2); use 2 unless the user asks for an empty table.
-instruction: a short imperative sentence for the policy, in the canonical form, e.g. "put the red block in the
-white bowl", "push the green block onto the blue square", "pick up the blue block and hold it up",
-"stack the red block on the blue block".
-success: the programmatic success check, a list of predicates over the final state, using only these ops:
-{json.dumps(PREDICATES)}. Fields: block ("target"), bowl/pad/base ("goal"), min_z (metres, lift only).
+
+kind = "single" when the request is one skill: fill `steps` with exactly that one step.
+kind = "composite" when the request needs several skills in a row ("sort the blocks into the bowls of the
+same colour", "clear the table", "put X in the bowl and push Y onto the square", "build a tower"). Then
+`steps` lists 2-3 steps in the order the arm should do them, each one of push / pick_place / stack only.
+Composite rules: each block is moved once; each bowl or square receives one block; towers are two blocks.
+If the request is vague ("clear the table"), choose concrete colours yourself and say which in `note`.
+
+If the request names an object or colour the scene does not have, choose the closest available one and say so
+in `note`. Set feasible=false only when no skill is even close (for example "fold the laundry"), and explain in
+`note`.
+distractors: how many other blocks share the table in a single task (0-2); use 2 unless the user asks for an
+empty table.
+checks (single tasks only): extra predicates for the success check from {json.dumps(PREDICATES)};
+usually [] or ["undisturbed"] when the user asks not to touch the other blocks.
 """
 
 TASK_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": [
-        "feasible",
-        "note",
-        "skill",
-        "object_color",
-        "target_color",
-        "distractors",
-        "instruction",
-        "success",
-    ],
+    "required": ["feasible", "note", "kind", "steps", "distractors", "checks"],
     "properties": {
         "feasible": {"type": "boolean"},
         "note": {"type": "string"},
-        "skill": {"type": "string", "enum": list(SKILLS)},
-        "object_color": {"type": "string", "enum": list(BLOCK_COLORS)},
-        "target_color": {"type": ["string", "null"]},
-        "distractors": {"type": "integer"},
-        "instruction": {"type": "string"},
-        "success": {
+        "kind": {"type": "string", "enum": ["single", "composite"]},
+        "steps": {
             "type": "array",
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["op", "block", "goal", "min_z"],
+                "required": ["skill", "object_color", "target_color"],
                 "properties": {
-                    "op": {"type": "string", "enum": list(PREDICATES)},
-                    "block": {"type": "string"},
-                    "goal": {"type": ["string", "null"]},
-                    "min_z": {"type": ["number", "null"]},
+                    "skill": {"type": "string", "enum": list(SKILLS)},
+                    "object_color": {"type": "string", "enum": list(BLOCK_COLORS)},
+                    "target_color": {"type": ["string", "null"]},
                 },
             },
+        },
+        "distractors": {"type": "integer"},
+        "checks": {
+            "type": "array",
+            "items": {"type": "string", "enum": list(PREDICATES)},
         },
     },
 }
@@ -174,38 +173,19 @@ def _valid_target(skill: str, color: str | None) -> str | None:
     return next(iter(table))
 
 
-def _clean_success(skill: str, raw: list[dict]) -> list[dict]:
-    """Keep only predicates that make sense for the skill; always include the skill's core predicate."""
-    core = default_success(skill)
-    allowed = {
-        "pick_place": {"in_bowl", "still", "undisturbed"},
-        "push": {"on_pad", "still", "undisturbed"},
-        "lift": {"lifted", "undisturbed"},
-        "stack": {"on_block", "still", "undisturbed"},
-    }[skill]
-    out = []
-    for p in raw or []:
-        op = p.get("op")
-        if op not in allowed:
-            continue
+def _clean_success(skill: str, extra: list[str]) -> list[dict]:
+    """The skill's own predicates plus the extra checks that make sense for it."""
+    out = default_success(skill)
+    allowed = {"still", "undisturbed"} if skill != "lift" else {"undisturbed"}
+    for op in extra or []:
         q = {"op": op, "block": "target"}
-        if op == "in_bowl":
-            q["bowl"] = "goal"
-        elif op == "on_pad":
-            q["pad"] = "goal"
-        elif op == "on_block":
-            q["base"] = "goal"
-        elif op == "lifted":
-            q["min_z"] = float(min(max(p.get("min_z") or 0.05, 0.04), 0.08))
-        if q not in out:
+        if op in allowed and q not in out:
             out.append(q)
-    if not any(p["op"] == core[0]["op"] for p in out):
-        out.insert(0, core[0])
     return out
 
 
-def parse_task(prompt: str) -> tuple[TaskSpec | None, dict]:
-    """Sentence -> (TaskSpec or None if infeasible, info dict for the log)."""
+def parse_task(prompt: str) -> tuple[TaskSpec | list[Step] | None, dict]:
+    """Sentence -> (TaskSpec for one skill, a list of Steps for a composed task, or None if infeasible; info)."""
     t0 = time.time()
     try:
         raw, model = _chat_json(TASK_SYSTEM, prompt, TASK_SCHEMA)
@@ -215,11 +195,29 @@ def parse_task(prompt: str) -> tuple[TaskSpec | None, dict]:
             "model": "rules",
             "note": f"language model unavailable ({e}); used the keyword parser",
         }
-    if not raw.get("feasible", True):
-        return None, {"model": model, "note": raw.get("note", "")}
-    skill = raw["skill"] if raw.get("skill") in SKILLS else "pick_place"
-    obj = raw["object_color"] if raw.get("object_color") in BLOCK_COLORS else "red"
-    target = _valid_target(skill, raw.get("target_color"))
+    info = {
+        "model": model,
+        "seconds": round(time.time() - t0, 2),
+        "note": raw.get("note", ""),
+    }
+    steps_raw = raw.get("steps") or []
+    if not raw.get("feasible", True) or not steps_raw:
+        return None, info
+    if raw.get("kind") == "composite" and len(steps_raw) > 1:
+        steps, dropped = validate(steps_raw)
+        if dropped:
+            info["note"] = (info["note"] + ". " if info["note"] else "") + dropped
+        if len(steps) > 1:
+            info["kind"] = "composite"
+            return steps, info
+        steps_raw = [
+            s.to_json() | {"object_color": s.obj, "target_color": s.target}
+            for s in steps
+        ] or steps_raw
+    r = steps_raw[0]
+    skill = r["skill"] if r.get("skill") in SKILLS else "pick_place"
+    obj = r["object_color"] if r.get("object_color") in BLOCK_COLORS else "red"
+    target = _valid_target(skill, r.get("target_color"))
     if skill == "stack" and target == obj:
         target = next(c for c in BLOCK_COLORS if c != obj)
     spec = TaskSpec(
@@ -227,14 +225,10 @@ def parse_task(prompt: str) -> tuple[TaskSpec | None, dict]:
         obj=obj,
         target=target,
         distractors=int(min(max(raw.get("distractors", 2), 0), 2)),
-        success=_clean_success(skill, raw.get("success", [])),
+        success=_clean_success(skill, raw.get("checks", [])),
     )
-    return spec, {
-        "model": model,
-        "seconds": round(time.time() - t0, 2),
-        "note": raw.get("note", ""),
-        "llm_instruction": raw.get("instruction", ""),
-    }
+    info["kind"] = "single"
+    return spec, info
 
 
 def rule_parse(prompt: str) -> TaskSpec:
@@ -251,6 +245,8 @@ def rule_parse(prompt: str) -> TaskSpec:
         skill = "push"
     elif "bowl" in p or "put" in p or "place" in p:
         skill = "pick_place"
+    elif "touch" in p or "reach" in p or "point" in p:
+        skill = "reach"
     else:
         skill = "lift"
     obj = next((c for c in colors if c in BLOCK_COLORS), "red")

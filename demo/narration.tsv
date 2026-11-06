@@ -1,0 +1,8 @@
+hook	hook	This is VLA Forge. You tell it what the robot arm should do, and it trains a policy for that in under three minutes.
+t1_train	explain	First, a tier one task: touch the red block. Nothing close exists yet, so it collects expert demos in sim and trains from the base policy. I sped this part up four times.
+t1_done	proud	It published in about seventy seconds. It worked in all twenty scenes it never trained on, and that's the policy's own rollout you're watching.
+t3_plan	explain	Now a tier three task. Sort the blue and green blocks into the bowls of the same color. The planner splits it into two steps and asks the skill agents who can do each one.
+t3_train	wait	We already have a blue bowl skill, so that step gets reused. There's no green one, so it trains one right now, starting from the blue skill, on tables that look like the full task.
+t3_child	proud	The green skill got seventeen of twenty on its own check, so the critic publishes it and the planner gets the new agent's answer.
+t3_done	honest	Then both policies run back to back on twenty new scenes. Step one worked thirteen times, step two ten, and the whole task ten out of twenty. Here's one of the misses.
+close	close	Every prompt ends up on the ladder with its tier, its time, and the success we measured.

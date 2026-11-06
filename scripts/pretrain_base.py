@@ -31,8 +31,13 @@ DATA = ROOT / "models" / "base_data"
 SHARD = 100  # episodes per feature shard
 
 
+# stacking is the hardest motion (a 3.6 cm landing zone on a block that can be knocked over), so it gets the
+# biggest share of the demonstrations; reach is the easiest
+WEIGHTS = {"reach": 0.12, "push": 0.18, "lift": 0.14, "pick_place": 0.24, "stack": 0.32}
+
+
 def random_spec(rng: np.random.Generator) -> TaskSpec:
-    skill = SKILLS[int(rng.integers(len(SKILLS)))]
+    skill = SKILLS[int(rng.choice(len(SKILLS), p=[WEIGHTS[s] for s in SKILLS]))]
     obj = list(BLOCK_COLORS)[int(rng.integers(len(BLOCK_COLORS)))]
     targets = [t for t in valid_targets(skill) if t != obj or skill != "stack"]
     target = targets[int(rng.integers(len(targets)))] if targets else None
@@ -118,7 +123,8 @@ def main():
         spec = random_spec(rng)
         while spec.skill != skill:
             spec = random_spec(rng)
-        s = summarize(evaluate(model, spec, a.eval, seed0=2_000_000, record=False))
+        n = a.eval * 2 if skill == "stack" else a.eval
+        s = summarize(evaluate(model, spec, n, seed0=2_000_000, record=False))
         report["skills"][spec.instruction] = {
             "succeeded": s["succeeded"],
             "n": s["n"],

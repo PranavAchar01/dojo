@@ -37,6 +37,15 @@ class Skill:
     seconds: float = 0.0  # wall clock of the run that produced it
     agent_address: str = ""
     thumb: list = field(default_factory=list)  # one pose frame for the gallery card
+    tier: int = 1
+    steps: list = field(
+        default_factory=list
+    )  # composed skills: [{instruction, skill_id}, ...]; no checkpoint
+    prompt: str = ""
+
+    @property
+    def composite(self) -> bool:
+        return bool(self.steps)
 
     def task(self) -> TaskSpec:
         return TaskSpec.from_json(self.spec)
@@ -71,23 +80,33 @@ class Registry:
     def ordered(self) -> list[Skill]:
         return sorted(self.skills.values(), key=lambda s: -s.created)
 
+    def exact(self, instruction: str) -> Skill | None:
+        """The best published single skill for exactly this instruction (what a composed task reuses)."""
+        hits = [
+            s
+            for s in self.skills.values()
+            if not s.composite and s.instruction == instruction
+        ]
+        return max(hits, key=lambda s: (s.success_rate, s.created)) if hits else None
+
     def nearest(self, spec: TaskSpec) -> tuple[str | None, Path, float, str]:
         """(skill id or None for the base, checkpoint, similarity, human-readable reason)."""
-        if not self.skills:
+        singles = [s for s in self.skills.values() if not s.composite]
+        if not singles:
             return (
                 None,
                 BASE_PATH,
                 0.0,
                 "no skills yet: starting from the multi-task base policy",
             )
-        names = [s.instruction for s in self.skills.values()]
+        names = [s.instruction for s in singles]
         missing = [n for n in [*names, spec.instruction] if n not in self._emb]
         if missing:
             for n, e in zip(missing, encode_text(missing), strict=True):
                 self._emb[n] = e.float().cpu()
         q = self._emb[spec.instruction]
         best, best_sim = None, -1.0
-        for s in self.skills.values():
+        for s in singles:
             sim = float(q @ self._emb[s.instruction]) + (
                 SAME_SKILL_BONUS if s.task().skill == spec.skill else 0.0
             )

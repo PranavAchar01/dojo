@@ -68,7 +68,7 @@ def state():
     return {
         "ready": FORGE.ready,
         "active": AGENTS.active,
-        "runs": [FORGE.runs[r].summary() for r in FORGE.order[-12:]],
+        "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
         "skills": [s.__dict__ for s in FORGE.registry.ordered()],
         "agents": {n: a.address for n, a in AGENTS.agents.items()},
     }

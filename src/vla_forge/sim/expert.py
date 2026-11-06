@@ -37,6 +37,8 @@ GRIP_DEPTH = 0.012
 CENTRE_OPEN = 0.024
 CENTRE_GRASP = 0.0135
 HOVER_Z = 0.07
+TOUCH_GAP = 0.012  # reach: gripper frame this far above the block's top face
+CENTRE_CLOSED = 0.006
 JAW_REACH = 0.05
 BOWL_CLEAR = 0.02
 CARRY_Z = 0.075
@@ -148,6 +150,7 @@ class Expert:
         self.ee_cmd = self.ik.fk(HOME)[0]
         self.g_cmd = self.g_goal = GRIPPER_CLOSED
         self.step = 0
+        self.calm = False
         self.max_ik_err = 0.0
         self.max_seconds = max_seconds
         scene.cmd = np.r_[self.q_cmd, self.g_cmd]
@@ -177,7 +180,11 @@ class Expert:
             mujoco.mj_step(self.sc.model, d)
             self.step += 1
             if self.step % STEPS_PER_POLICY == 0:
-                if self.noise_std > 0:  # OU process, ~0.5 s correlation
+                if (
+                    self.calm
+                ):  # precise phase: the perturbation fades out instead of being redrawn
+                    self.noise = 0.6 * self.noise
+                elif self.noise_std > 0:  # OU process, ~0.5 s correlation
                     self.noise = 0.8 * self.noise + self.rng.normal(
                         0, self.noise_std * 0.6, 5
                     )
@@ -216,12 +223,16 @@ class Expert:
         self.g_goal = GRIP_OPEN
         self.goto([*above[:2], HOVER_Z], TRANSIT_SPEED)
         self.goto(above, APPROACH_SPEED)
+        self.calm = (
+            True  # the squeeze itself is precise; recovery is learned on the way down
+        )
         self.goto(
             site_for_block(c0, self.ik.heading, CENTRE_GRASP),
             APPROACH_SPEED * 0.5,
             settle=0.05,
         )
         self.grip(GRIP_SQUEEZE, settle=0.4)
+        self.calm = False
         c = sc.body_pos("target")
         self.goto(
             site_for_block([*c[:2], CARRY_Z], self.ik.heading, CENTRE_GRASP),
@@ -230,8 +241,12 @@ class Expert:
         )
 
     def place_at(self, xy, release_z, correct_slip=False):
+        """Carry over xy, correct for slip in the grasp, lower and release. DART noise fades out over the
+        target (a perturbed release is a dropped block, and those demos would just be thrown away)."""
         over = site_for_block([*xy, CARRY_Z], self.ik.heading, CENTRE_GRASP)
         self.goto(over, TRANSIT_SPEED, settle=0.15)
+        self.calm = True
+        self.hold(0.3)
         if correct_slip:
             for _ in range(4):
                 err = np.asarray(xy) - self.sc.body_pos("target")[:2]
@@ -245,6 +260,7 @@ class Expert:
         self.goto(aim, LIFT_SPEED, settle=0.1)
         self.grip(GRIP_OPEN, settle=0.4)
         self.goto([*self.ee_cmd[:2], HOVER_Z + 0.02], LIFT_SPEED, settle=0.0)
+        self.calm = False
 
     def run(self):
         self.hold(0.3)
@@ -272,8 +288,22 @@ class Expert:
         elif sk == "push":
             self.push()
             self.home()
+        elif sk == "reach":
+            self.reach()
         else:
             raise ValueError(sk)
+
+    def reach(self):
+        """Closed jaws come down to hover just above the block's top face, and stay there."""
+        c = self.sc.body_pos("target")
+        self.ik.heading = grasp_heading(c[:2], self.sc.body_yaw("target"))
+        self.g_goal = GRIPPER_CLOSED
+        tip = (
+            np.array([*c[:2], 2 * CUBE_HALF + TOUCH_GAP])
+            - CENTRE_CLOSED * self.ik.heading
+        )
+        self.goto([*tip[:2], HOVER_Z], TRANSIT_SPEED)
+        self.goto(tip, APPROACH_SPEED, settle=1.2)
 
     def push(self, max_segments=4):
         sc = self.sc
