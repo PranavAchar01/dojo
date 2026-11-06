@@ -321,20 +321,27 @@ class Forge:
             ),
         )
         self.registry.add(skill)
-        self._save_tile(skill, run.rollouts[0], [st.instruction for st in run.steps])
+        self._save_tile(
+            skill, run.rollouts[0], [st.instruction for st in run.steps], run_id=run.id
+        )
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)
         run.status = "published"
         return skill
 
     def _save_tile(
-        self, skill: Skill, rolls: list, instructions=None, source="held-out eval"
+        self,
+        skill: Skill,
+        rolls: list,
+        instructions=None,
+        source="held-out eval",
+        run_id: str = "",
     ) -> None:
         """The tile's thumbnail and replay, written next to the registry, then the 'saved' moment."""
-        self.emit("", "saving", "registry", skill=skill.id)
+        self.emit(run_id, "saving", "registry", skill=skill.id)
         fields = tiles.save_assets(skill, rolls, source, instructions)
         sk = self.registry.update(skill.id, **fields)
-        self.emit("", "saved", "registry", tile=tiles.tile(sk))
+        self.emit(run_id, "saved", "registry", tile=tiles.tile(sk))
 
     def _layout(self, run: Run, rng: np.random.Generator) -> Layout:
         """A training or held-out scene. A step trained for a composed task sees that task's tables."""
@@ -559,7 +566,7 @@ class Forge:
             ),
         )
         self.registry.add(skill)
-        self._save_tile(skill, run.rollouts[run.best_round])
+        self._save_tile(skill, run.rollouts[run.best_round], run_id=run.id)
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)
         run.status = "published"
@@ -624,7 +631,9 @@ class Forge:
         self.tests[tid] = {"skill": sid, "rolls": rolls, "instructions": instructions}
         sk = self.registry.add_test(sid, res)
         if not sk.replay:  # tiles from before the library: their first test gives them a picture and a replay
-            self._save_tile(sk, rolls, instructions, source="test")
+            self._save_tile(
+                sk, rolls, instructions, source="test", run_id=f"test-{tid}"
+            )
             sk = self.registry.skills[sid]
         self.emit(
             f"test-{tid}",
