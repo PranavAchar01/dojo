@@ -20,14 +20,22 @@ import numpy as np
 import torch
 
 from . import llm
+from .compose import Step, step_layout
+from .compose import sample_layout as compose_layout
 from .datagen import demo_job, pool
 from .encoders import device, encode_images, encode_text
 from .learn import Demos, train
 from .policy import VLA
 from .registry import BASE_PATH, ROOT, Registry, Skill
-from .rollout import env_pool, evaluate, summarize
+from .rollout import (
+    env_pool,
+    evaluate,
+    evaluate_composed,
+    summarize,
+    summarize_composed,
+)
 from .sim.scene import Layout, Scene
-from .sim.tasks import TaskSpec, sample_layout
+from .sim.tasks import TIER, TaskSpec, sample_layout
 from .viz import export_scene
 
 DEADLINE = 172.0  # seconds from prompt to published skill (the brief's budget is 180)
@@ -73,6 +81,23 @@ class Run:
     seconds: float = 0.0
     reply_to: str = ""  # chat sender to answer when the skill is published
     error: str = ""
+    # tier 3: a composed task holds its steps; each missing step is a child run of the normal pipeline
+    steps: list[Step] = field(default_factory=list)
+    plan: list[dict] = field(
+        default_factory=list
+    )  # per step: instruction, skill_id, source, child, ...
+    parent: str = ""
+    step_index: int = -1
+
+    @property
+    def composite(self) -> bool:
+        return bool(self.steps)
+
+    @property
+    def tier(self) -> int:
+        if self.steps:
+            return 3
+        return TIER.get(self.spec.skill, 1) if self.spec else 0
 
     def elapsed(self) -> float:
         return time.time() - self.t0
@@ -104,6 +129,11 @@ class Run:
             "best_round": self.best_round,
             "skill_id": self.skill_id,
             "error": self.error,
+            "tier": self.tier,
+            "steps": [st.to_json() for st in self.steps],
+            "plan": self.plan,
+            "parent": self.parent,
+            "step_index": self.step_index,
         }
 
 
@@ -167,19 +197,119 @@ class Forge:
         return run
 
     # stages (blocking; called from agent handlers via asyncio.to_thread)
-    def parse(self, run: Run) -> TaskSpec | None:
+    def parse(self, run: Run) -> TaskSpec | list[Step] | None:
         run.t0 = time.time()
         run.status = "running"
-        spec, info = llm.parse_task(run.prompt)
+        out, info = llm.parse_task(run.prompt)
         run.parse_info = info
-        run.spec = spec
-        return spec
+        if isinstance(out, list):
+            run.steps = out
+        else:
+            run.spec = out
+        return out
+
+    # tier 3
+    def plan(self, run: Run) -> list[dict]:
+        """Which published skill agent does each step, and which steps must be trained first."""
+        seed = int(hashlib.sha1(run.id.encode()).hexdigest()[:8], 16)
+        run.layouts = [compose_layout(run.steps, np.random.default_rng(seed)).to_json()]
+        run.plan = []
+        for k, st in enumerate(run.steps):
+            sk = self.registry.exact(st.instruction)
+            run.plan.append(
+                {
+                    "step": k,
+                    "instruction": st.instruction,
+                    "skill": st.skill,
+                    "tier": TIER[st.skill],
+                    "skill_id": sk.id if sk else "",
+                    "address": sk.agent_address if sk else "",
+                    "success_rate": sk.success_rate if sk else None,
+                    "source": "reuse" if sk else "train",
+                    "child": "",
+                    "seconds": 0.0,
+                }
+            )
+        return run.plan
+
+    def child_run(self, parent: Run, k: int) -> Run:
+        """A missing step becomes its own one-skill run (with its own 3-minute budget)."""
+        st = parent.steps[k]
+        child = self.new_run(st.instruction)
+        child.spec = st.single()
+        child.parent, child.step_index = parent.id, k
+        child.status, child.t0 = "running", time.time()
+        child.parse_info = {"model": "planner", "kind": "single"}
+        parent.plan[k]["child"] = child.id
+        return child
+
+    def compose_eval(self, run: Run, agent: str) -> dict:
+        """Run the composed task with the step skills' own policies in EVAL_N held-out composed scenes."""
+        seed = int(hashlib.sha1(run.id.encode()).hexdigest()[:8], 16)
+        rng = np.random.default_rng(seed)
+        run.layouts = [compose_layout(run.steps, rng).to_json() for _ in range(EVAL_N)]
+        models = []
+        for p in run.plan:
+            sk = self.registry.skills[p["skill_id"]]
+            m, _ = VLA.load(ROOT / sk.model, device())
+            models.append(m)
+        specs = [st.in_scene() for st in run.steps]
+
+        def prog(p):
+            self.emit(run.id, "compose_progress", agent, **p)
+
+        t0 = time.time()
+        with self.compute:
+            rolls = evaluate_composed(
+                models, specs, run.layouts, record=True, on_progress=prog
+            )
+        s = summarize_composed(rolls, len(specs))
+        s["seconds"] = round(time.time() - t0, 1)
+        run.rollouts[0] = rolls
+        run.rounds = [Round(0, eval=s, successes=[r.success for r in rolls])]
+        run.best_round = 0
+        return s
+
+    def publish_composite(self, run: Run) -> Skill:
+        slug = re.sub(r"[^a-z0-9]+", "-", run.prompt.lower()).strip("-")[:48]
+        sid = f"{slug}-{run.id[-4:]}"
+        ev = run.rounds[0].eval
+        ok_roll = next((r for r in run.rollouts[0] if r.success), run.rollouts[0][0])
+        skill = Skill(
+            id=sid,
+            instruction=run.prompt,
+            spec={},
+            model="",
+            parent=None,
+            success_rate=ev["success_rate"],
+            n_eval=ev["n"],
+            seconds=round(run.elapsed(), 1),
+            thumb=ok_roll.frames[-1] if ok_roll.frames else [],
+            tier=3,
+            steps=[
+                {"instruction": p["instruction"], "skill_id": p["skill_id"]}
+                for p in run.plan
+            ],
+            prompt=run.prompt,
+        )
+        self.registry.add(skill)
+        run.skill_id = sid
+        run.seconds = round(run.elapsed(), 1)
+        run.status = "published"
+        return skill
+
+    def _layout(self, run: Run, rng: np.random.Generator) -> Layout:
+        """A training or held-out scene. A step trained for a composed task sees that task's tables."""
+        assert run.spec is not None
+        if run.parent:
+            return step_layout(self.runs[run.parent].steps, run.step_index, rng)
+        return sample_layout(run.spec, rng)
 
     def scene(self, run: Run) -> dict:
         assert run.spec is not None
         seed = int(hashlib.sha1(run.id.encode()).hexdigest()[:8], 16)
         rng = np.random.default_rng(seed)
-        run.layouts = [sample_layout(run.spec, rng).to_json() for _ in range(EVAL_N)]
+        run.layouts = [self._layout(run, rng).to_json() for _ in range(EVAL_N)]
         lay = Layout.from_json(run.layouts[0])
         sc = Scene(lay)
         sc.reset(lay)
@@ -201,7 +331,11 @@ class Forge:
                 "out": str(out / f"ep{i:03d}.npz"),
                 "noise": DART_NOISE,
             }
-            if near:
+            if run.parent:
+                j["layout"] = self._layout(
+                    run, np.random.default_rng(base_seed + i)
+                ).to_json()
+            elif near:
                 j["near"] = near[i % len(near)]
             jobs.append(j)
         p = pool()
@@ -359,6 +493,8 @@ class Forge:
             n_eval=best.eval["n"],
             seconds=round(run.elapsed(), 1),
             thumb=ok_roll.frames[-1] if ok_roll.frames else [],
+            tier=TIER[run.spec.skill],
+            prompt=run.prompt,
         )
         self.registry.add(skill)
         run.skill_id = sid
@@ -368,6 +504,20 @@ class Forge:
 
     def rollout_payload(self, run: Run, rnd: int, index: int) -> dict:
         r = run.rollouts[rnd][index]
+        if run.composite:
+            return {
+                "round": rnd,
+                "index": index,
+                "success": r.success,
+                "failure": r.failure,
+                "steps_ok": r.steps_ok,
+                "held": r.held,
+                "phase_frames": r.phase_frames,
+                "instructions": [st.instruction for st in run.steps],
+                "fps": 30,
+                "scene": export_scene(Layout.from_json(r.layout)),
+                "frames": r.frames,
+            }
         return {
             "round": rnd,
             "index": index,

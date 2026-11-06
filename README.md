@@ -37,7 +37,7 @@ work behind each agent lives in `src/vla_forge/pipeline.py` and runs in worker t
 loop stays responsive. Each stage streams its logs, demo counts, loss and evaluation to the page over SSE.
 
 **The recursion.** Every published skill becomes its own chat-protocol agent (`skill-<id>`), callable from the
-page ("Call agent") or by any other agent. The next prompt starts from the nearest existing skill (SigLIP text
+page ("Call skill agent") or by any other agent. The next prompt starts from the nearest existing skill (SigLIP text
 similarity of the instructions plus a same-motion bonus) and falls back to the multi-task base policy, so the
 library grows from itself. Every fine-tune mixes in replay of the base data so older skills are not forgotten.
 
@@ -66,35 +66,91 @@ Expert demos for random (skill, colour, target) tasks with domain randomization 
 feature shards under `models/base_data/`, then the head is trained and measured per skill (`models/base.json`).
 This is the root of the skill library and the replay buffer for every later fine-tune.
 
+## The scaling ladder
+
+Prompts come in three tiers, and the page tags each one.
+
+- Tier 1, one motion: reach, push, lift.
+- Tier 2, carry a block somewhere: put it in a bowl, stack it on another block.
+- Tier 3, composed tasks: several tier 1-2 steps in one scene ("sort the blue and green blocks into the bowls
+  of the same color").
+
+A tier 3 prompt goes to the planner agent instead of the single-skill chain:
+
+```
+task agent ── ComposeTask ──> planner agent ── SkillQuery ──> skill-<id> agents (one per step that exists)
+                                 │    <── SkillOffer (measured success rate) ──┘
+                                 │ step with no skill: a child run through the normal one-prompt pipeline
+                                 │    <── StepTrained (from the task agent when the child publishes)
+                                 v
+                              executor agent: runs every step's own policy back to back in 20 held-out
+                                 composed scenes, then Publish -> registry (the composite becomes a skill too)
+```
+
+The planner (OpenAI) splits the sentence into steps (`compose.py` checks that the scene can hold them). Each
+step either reuses a published skill agent or is trained on the fly in under 3 minutes, starting from the
+nearest skill. A step trained for a composed task collects its demos and held-out checks in that task's own
+scenes (`compose.step_layout`): the other bowls and squares are on the table, and half the time the earlier
+steps are already done. Without that, the green bowl skill below scored 18/20 on single-skill tables and 5/20
+inside the sort task, and the whole task went 0/20; with it, the same prompt went to 10/20.
+
+In the composed run each step's policy runs until its own success check holds, then homes, and the next
+step's policy takes over. A rollout counts as a success only if every step's check is true at the end.
+
 ## Measured results
 
-Per-prompt runs on the Mac mini (M5 Pro, 64 GB), timed from the click to the published skill. Every run:
-parse (~3 s), 60 expert demos (~25-37 s), 55 s fine-tune with 50% base replay, 20 rollouts on held-out
-layouts (~10 s), critic. The critic retrains once if the rate is under 80% and time allows (budget 172 s).
+Mac mini (M5 Pro, 64 GB), timed from the click to the published skill agent, success on 20 held-out scenes.
+Runs in order, so later prompts can start from earlier skills (`runs/ladder.jsonl`, `scripts/ladder.py`).
 
-| prompt (as parsed) | started from | rounds (success on 20 held-out scenes) | total |
-|---|---|---|---|
-| put the red block in the white bowl | base | 17/20 (85%) | 110.1 s |
-| push the green block onto the blue square | base | 16/20 (80%) | 87.8 s |
-| pick up the yellow block and hold it up | base | 18/20 (90%) | 80.0 s |
-| stack the orange block on the red block | base | 10/20, retrain, 10/20 (50%) | 165.9 s |
-| put the blue block in the black bowl | skill "put the red block in the white bowl" | 16/20 (80%) | 95.5 s |
-| push the red block onto the orange square (asked for yellow; no yellow pad, the parser says so) | skill "push the green block..." | 15/20, retrain, 15/20 (75%) | 163.6 s |
+| tier | prompt | started from | rounds | time | success |
+|---|---|---|---|---|---|
+| 1 | push the green block onto the blue square | base | 9/20, retrain, 15/20 | 164.0 s | 15/20 |
+| 1 | pick up the yellow block and hold it up | base | 19/20 | 79.6 s | 19/20 |
+| 2 | put the blue block in the blue bowl | base | 15/20, retrain, 17/20 | 165.5 s | 17/20 |
+| 2 | put the red block in the white bowl | skill "put the blue block in the blue bowl" | 14/20, retrain, 16/20 | 166.4 s | 16/20 |
+| 2 | stack the orange block on the red block | base | 12/20, retrain, 14/20 | 171.6 s | 14/20 |
+| 3 | put the red block in the white bowl and push the green block onto the blue square | reused 2 skill agents | step 1 17/20, step 2 11/20 | 26.4 s | 9/20 |
+| 3 | sort the blue and green blocks into the bowls of the same color | reused blue, trained green (88.8 s) | step 1 13/20, step 2 14/20 | 114.3 s | 10/20 |
+| 3 | push the red block onto the orange square and stack the yellow block on it | trained both (166.1 s, 168.1 s) | step 1 14/20, step 2 3/20 | 360.0 s | 2/20 |
 
-Base policy (pretrained once: 2400 expert attempts, 1836 kept, 183,734 frames, ~19 min collection, 40 min
-training, 53,496 steps, final loss 0.041), measured on 20 held-out layouts per motion:
+Earlier skills speed up later prompts: the tier 3 task made only of existing skills finished in 26 s, the one
+that reused one skill and trained one took 114 s, and the one that had to train both took 360 s. The weak spot
+is stacking onto a block that an earlier step just pushed (3/20).
 
-| motion | success | failures |
+The demo recording (`demo/vla-forge-demo-v2.mp4`) is a separate live take of two prompts: "touch the red
+block" from the base, 20/20 in 70.9 s, then the sort task again, reusing blue and training green (17/20 on its
+own, 96.8 s), 10/20 end to end in 122.4 s. Two other takes of the sort task after the scene fix measured 10/20
+and 6/20.
+
+Base policy v2 (pretrained once: 3200 expert attempts, 2783 kept, 252,754 frames, 66,419 steps in 3000 s,
+final loss 0.039), measured on held-out layouts per motion:
+
+| motion | v2 | v1 |
 |---|---|---|
-| pick and place | 18/20 | missed grasp 2 |
-| push | 14/20 | never reached 2, off course 4 |
-| lift | 18/20 | missed grasp 1, never reached 1 |
-| stack | 7/20 | missed target 8, missed grasp 3, other 2 |
+| reach | 20/20 | n/a |
+| push | 12/20 | 14/20 |
+| lift | 19/20 | 18/20 |
+| pick and place | 14/20 | 18/20 |
+| stack | 25/40 (62.5%) | 7/20 |
 
-Ablation (pick and place, 356 demos, 300 s training, 30 held-out layouts): with a grounding token 24/30,
+**What moved stacking.** v1 stacked 7/20 from the base and stalled at 50% after a 3 minute fine-tune. Three
+changes: the expert's DART noise now fades out ("calm") while it squeezes the block and while it places it,
+and it holds 0.3 s before letting go (the expert itself went from 14/30 to 24/30 stacks, so the demos stopped
+teaching sloppy placement); stack demos are weighted 0.32 in pretraining; and stack scenes carry distractor
+fixtures like the other motions. Base stacking went from 7/20 to 25/40, and the per-prompt stack skill from
+50% to 14/20 (70%).
+
+Ablation (v1, pick and place, 356 demos, 300 s training, 30 held-out layouts): with a grounding token 24/30,
 without 25/30, so the grounding token is off by default.
 
-Stacking is the weak motion: the base gets 7/20 and a 3 minute fine-tune does not move it past 50%.
+## Interface
+
+The page is modelled on the public website of HeyPCB (heypcb.ai): top bar with breadcrumb and segmented tabs,
+chat on the left with tool status pills, floating tool groups on the canvas, a stage rail, a bottom tab bar for
+rollouts, an inspector on the right, zinc palette, Geist and Instrument Serif. HeyPCB's GitHub repositories
+hold hardware (CERN-OHL-S) and an MIT MCP server but no interface code, so nothing was copied; the look was
+rebuilt with this project's own HTML, CSS and JavaScript, with no HeyPCB name or logo in the page. Not
+affiliated. Details and other credits in `NOTICE`.
 
 ## What is real and what is scaffolded
 
@@ -124,8 +180,9 @@ Scaffolded or limited:
 
 ```
 src/vla_forge/
-  agents.py      uAgents: gateway, task, scene, data, trainer, eval, critic, registry, skill-<id>
+  agents.py      uAgents: gateway, task, planner, executor, scene, data, trainer, eval, critic, registry, skill-<id>
   pipeline.py    the work behind each agent, run state, event bus
+  compose.py     tier 3: steps, composed scenes, per-step training scenes
   server.py      FastAPI: page, JSON API, SSE, skill calls through the gateway agent
   sim/           MuJoCo scene (SO-101 + blocks, bowls, tape squares), tasks + success predicates, scripted expert
   datagen.py     expert demos in worker processes
@@ -136,6 +193,6 @@ src/vla_forge/
   llm.py         task parser and critic (OpenAI, optional Llama)
   registry.py    skill library, nearest-skill lookup
   viz.py         scene export for three.js
-web/             one page: three.js renderer, pipeline view, loss, success, skill library
-scripts/         pretrain_base.py, experiment.py, record_demo.mjs, heavy.sh
+web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library
+scripts/         pretrain_base.py, experiment.py, ladder.py, record_demo.mjs, narrate.py, edit_demo.py, heavy.sh
 ```

@@ -1,0 +1,30 @@
+VLA Forge
+
+Third-party material and design credits.
+
+1. SO-101 robot model (vendor/so101)
+   From TheRobotStudio's SO-ARM100 repository, https://github.com/TheRobotStudio/SO-ARM100
+   Licensed under the Apache License 2.0. MJCF and STL meshes are used unmodified.
+
+2. Wood texture (web/assets/wood_diff.jpg, wood_rough.jpg)
+   "Wood Table 001" from Poly Haven, https://polyhaven.com, CC0.
+
+3. three.js (web/vendor/three)
+   https://threejs.org, MIT License.
+
+4. Interface design
+   The editor layout and visual language of the page (top bar with segmented tabs, chat panel with tool
+   status pills, floating tool groups on the canvas, bottom tab bar, the zinc palette and the Geist /
+   Instrument Serif type pairing) are modelled on the public website of HeyPCB, https://heypcb.ai.
+   HeyPCB's open-source repositories (github.com/heypcb) contain hardware designs under CERN-OHL-S and an
+   MIT-licensed MCP server, but no interface code, so nothing was copied: the look was recreated from the
+   public site with this project's own HTML, CSS and JavaScript. No HeyPCB logo, name or asset appears in
+   the interface. HeyPCB is not affiliated with this project.
+
+5. Fonts
+   Geist and Geist Mono (Vercel, SIL Open Font License 1.1) and Instrument Serif (SIL Open Font License
+   1.1), loaded from Google Fonts.
+
+6. Encoders
+   facebook/dinov2-small (Apache-2.0) and google/siglip2-base-patch16-224 (Apache-2.0), loaded from the
+   local Hugging Face cache.

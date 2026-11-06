@@ -23,13 +23,16 @@ from .scene import (
     Scene,
 )
 
-SKILLS = ("pick_place", "push", "lift", "stack")
+SKILLS = ("reach", "push", "lift", "pick_place", "stack")
+# the complexity ladder: tier 1 single motions, tier 2 pick-and-carry; tier 3 composes published skills
+TIER = {"reach": 1, "push": 1, "lift": 1, "pick_place": 2, "stack": 2}
 
 # predicates the success DSL understands
 PREDICATES = {
     "in_bowl": "block centre inside the bowl's inner radius and resting low",
     "on_pad": "block centre inside the taped square, on the table",
     "lifted": "block held above min_z metres",
+    "touching": "closed gripper hovering just above the block (within 2.5 cm sideways)",
     "on_block": "block resting on top of the other block",
     "still": "block not moving (speed below 2 cm/s)",
     "undisturbed": "every distractor within 3 cm of where it started",
@@ -81,6 +84,8 @@ def canonical_instruction(skill: str, obj: str, target: str | None) -> str:
         return f"push the {obj} block onto the {target} square"
     if skill == "lift":
         return f"pick up the {obj} block and hold it up"
+    if skill == "reach":
+        return f"touch the {obj} block"
     return f"stack the {obj} block on the {target} block"
 
 
@@ -94,6 +99,8 @@ def default_success(skill: str) -> list[dict]:
         return [{"op": "on_pad", "block": "target", "pad": "goal"}]
     if skill == "lift":
         return [{"op": "lifted", "block": "target", "min_z": 0.05}]
+    if skill == "reach":
+        return [{"op": "touching", "block": "target"}]
     return [
         {"op": "on_block", "block": "target", "base": "goal"},
         {"op": "still", "block": "target"},
@@ -141,6 +148,12 @@ def _pred(p: dict, scene: Scene, start: Layout | None) -> bool:
         )
     if op == "lifted":
         return bool(c[2] > float(p.get("min_z", 0.05)))
+    if op == "touching":
+        e = scene.ee_pos()
+        dz = e[2] - (c[2] + CUBE_HALF)
+        return bool(
+            np.linalg.norm(e[:2] - c[:2]) < TOUCH_XY and TOUCH_Z[0] < dz < TOUCH_Z[1]
+        )
     if op == "on_block":
         b = scene.body_pos(p.get("base", "goal"))
         return bool(
@@ -155,6 +168,9 @@ def _pred(p: dict, scene: Scene, start: Layout | None) -> bool:
 
 
 # ---------------------------------------------------------------- layouts
+
+TOUCH_XY = 0.025
+TOUCH_Z = (-0.01, 0.035)  # gripper frame height above the block's top face
 
 BLOCK_R = (0.14, 0.27)
 BLOCK_ANG = math.radians(36)
@@ -174,10 +190,23 @@ def _seg_dist(p, a, b) -> float:
     return float(np.linalg.norm(p - (a + t * ab)))
 
 
+EXTRA_P = (
+    0.6  # chance of each extra fixture (a second bowl, a second square) on the table
+)
+
+
 def sample_layout(
-    spec: TaskSpec, rng: np.random.Generator, near: dict | None = None, tries: int = 400
+    spec: TaskSpec,
+    rng: np.random.Generator,
+    near: dict | None = None,
+    tries: int = 400,
+    extra_p: float = EXTRA_P,
 ) -> Layout:
-    """Random layout for a spec. `near` pins the target block / goal near given xy (the critic's focus)."""
+    """Random layout for a spec. `near` pins the target block / goal near given xy (the critic's focus).
+
+    With probability extra_p each, a distractor bowl and a distractor square of other colours share the table,
+    so the policy has to read the goal's colour from the instruction, and scenes with several fixtures (the
+    composed tasks) stay inside the training distribution."""
     others = [
         c
         for c in BLOCK_COLORS
@@ -235,16 +264,42 @@ def sample_layout(
                 float(rng.uniform(-0.2, 0.2)),
             )
             placed.append(goal)
+        fixtures = [] if goal is None else [goal]
         ok = True
+        for kind, colors, half in (
+            ("bowls", BOWL_COLORS, BOWL_R),
+            ("pads", PAD_COLORS, PAD_HALF),
+        ):
+            if rng.random() >= extra_p:
+                continue
+            goal_kind = {"pick_place": "bowls", "push": "pads"}.get(spec.skill)
+            pool_c = [c for c in colors if kind != goal_kind or c != spec.target]
+            for _ in range(60):
+                p = _polar(rng, (0.16, 0.27), math.radians(42))
+                if any(np.linalg.norm(p - q) < half + CUBE_HALF + 0.04 for q in placed):
+                    continue
+                if any(np.linalg.norm(p - f) < half + BOWL_R + 0.03 for f in fixtures):
+                    continue
+                if goal is not None and _seg_dist(p, blk, goal) < half + 0.03:
+                    continue
+                if _seg_dist(p, np.zeros(2), blk) < half + 0.02:
+                    continue
+                lay_kind = getattr(lay, kind)
+                lay_kind["x" + kind[:-1] + "0"] = (
+                    pool_c[int(rng.integers(len(pool_c)))],
+                    float(p[0]),
+                    float(p[1]),
+                )
+                fixtures.append(p)
+                break
         for i in range(spec.distractors):
             for _ in range(60):
                 p = _polar(rng, BLOCK_R, BLOCK_ANG)
                 if any(np.linalg.norm(p - q) < 0.065 for q in placed):
                     continue
-                if (
-                    goal is not None
-                    and spec.skill != "stack"
-                    and np.linalg.norm(p - goal) < BOWL_R + 0.05
+                if any(
+                    np.linalg.norm(p - f) < BOWL_R + 0.05
+                    for f in (fixtures if spec.skill != "stack" else fixtures[1:])
                 ):
                     continue
                 if goal is not None and _seg_dist(p, blk, goal) < 0.055:

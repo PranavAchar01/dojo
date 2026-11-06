@@ -5,74 +5,139 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VLA Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
 </head>
 <body>
-<header>
-  <div class="brand"><span class="mark"></span>VLA Forge</div>
-  <div class="sub">type a task &middot; agents train a vision-language-action policy &middot; watch it run</div>
-  <div class="status"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></div>
-</header>
+<div class="app" id="app">
+  <header class="top">
+    <button class="icon" id="toggle-left" title="Chat panel" aria-label="Toggle chat panel">
+      <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M8 4v12"/></svg>
+    </button>
+    <nav class="crumbs">
+      <span>vla-forge</span><i>/</i><span>skills</span><i>/</i><b id="crumb-run">new task</b>
+    </nav>
+    <div class="seg" role="tablist">
+      <button class="on" data-view="sim">Sim</button>
+      <button data-view="ladder">Ladder</button>
+      <button data-view="skills">Skills</button>
+    </div>
+    <div class="top-right">
+      <div class="clock mono" title="wall clock for this prompt"><span id="elapsed">0:00</span><span class="dim"> / 3:00</span></div>
+      <div class="status"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></div>
+      <button class="primary" id="call-last" disabled>
+        <svg viewBox="0 0 20 20"><path d="M6 4.5v11l9-5.5z"/></svg>Call skill agent
+      </button>
+      <button class="icon" id="toggle-right" title="Inspector" aria-label="Toggle inspector">
+        <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M12 4v12"/></svg>
+      </button>
+    </div>
+  </header>
 
-<main>
-  <section class="left">
-    <form id="prompt-form" autocomplete="off">
-      <label for="prompt">Have a robot&hellip;</label>
-      <div class="prompt-row">
-        <input id="prompt" placeholder="drop the red cube into the white bowl" maxlength="300">
-        <button id="go" type="submit" aria-label="Train">Train</button>
+  <div class="body">
+    <aside class="chat" id="chat-panel">
+      <div class="chat-tabs"><span class="tab on">New chat</span><button class="icon sm" id="new-chat" aria-label="New chat">+</button></div>
+      <div class="thread" id="thread">
+        <div class="empty" id="empty">
+          <h1>What should the arm <em>learn</em>?</h1>
+          <p>Type a task. Agents turn it into a success check, collect demos, fine-tune a vision-language-action policy from the nearest skill, and measure it on 20 scenes it never saw.</p>
+          <div class="examples">
+            <button class="ex"><span class="t">T1</span>touch the red block</button>
+            <button class="ex"><span class="t">T2</span>put the blue block in the blue bowl</button>
+            <button class="ex"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
+          </div>
+        </div>
       </div>
-      <div class="examples">
-        <button type="button" class="ex">put the red block in the white bowl</button>
-        <button type="button" class="ex">slide the green cube onto the blue square</button>
-        <button type="button" class="ex">pick up the yellow block and hold it up</button>
+      <form class="composer" id="prompt-form" autocomplete="off">
+        <textarea id="prompt" rows="2" maxlength="300" placeholder="Tell the forge what the arm should do..."></textarea>
+        <div class="composer-row">
+          <span class="chip-mode"><span class="sq"></span>SO-101 &middot; sim</span>
+          <button class="send" id="go" type="submit" aria-label="Train" disabled>
+            <svg viewBox="0 0 20 20"><path d="M10 15V5M5.5 9.5 10 5l4.5 4.5"/></svg>
+          </button>
+        </div>
+      </form>
+    </aside>
+
+    <section class="canvas">
+      <div class="view" id="view-sim">
+        <canvas id="three"></canvas>
+        <div class="caption">
+          <span id="tier" class="tier hidden"></span>
+          <span id="vp-caption">SO-101 &middot; MuJoCo</span>
+        </div>
+        <div id="vp-badge" class="badge hidden"></div>
+        <div id="step-badge" class="step-badge hidden"></div>
+        <div id="speed" class="speed hidden">4x</div>
+
+        <div class="tools left">
+          <button data-cam="orbit" class="on"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg>Orbit</button>
+          <button data-cam="front"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="10" rx="1.5"/></svg>Front</button>
+          <button data-cam="top"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="1.5"/><circle cx="10" cy="10" r="2"/></svg>Top</button>
+        </div>
+
+        <ol class="rail" id="rail"></ol>
+
+        <div class="pill" id="playbar">
+          <button id="pb-prev" aria-label="Previous rollout">&minus;</button>
+          <span class="mono" id="pb-label">rollout &middot;</span>
+          <button id="pb-next" aria-label="Next rollout">+</button>
+          <button id="pb-replay" class="txt">Replay</button>
+          <div class="pb-progress"><div id="pb-fill"></div></div>
+        </div>
       </div>
-    </form>
 
-    <div class="clock">
-      <div><span id="elapsed">0:00</span><span class="of"> / 3:00</span></div>
-      <div id="run-title" class="run-title">No run yet</div>
-    </div>
-
-    <ol id="pipeline" class="pipeline"></ol>
-  </section>
-
-  <section class="center">
-    <div class="viewport">
-      <canvas id="three"></canvas>
-      <div class="vp-top">
-        <div id="vp-caption" class="vp-caption">SO-101 &middot; MuJoCo</div>
-        <div id="vp-badge" class="vp-badge hidden"></div>
+      <div class="view hidden" id="view-ladder">
+        <div class="doc">
+          <div class="doc-h">
+            <h2>Scaling ladder</h2>
+            <p>Every row is one prompt, timed from typing to a published skill agent, with success measured on 20 held-out scenes. Tier 1 is one motion, tier 2 carries a block somewhere, tier 3 chains published skill agents.</p>
+          </div>
+          <div id="ladder"></div>
+        </div>
       </div>
-      <div class="vp-bottom">
-        <div id="round-tabs" class="round-tabs"></div>
-        <div id="chips" class="chips"></div>
-      </div>
-      <div id="vp-progress" class="vp-progress hidden"><div></div></div>
-    </div>
-  </section>
 
-  <section class="right">
-    <div class="card">
-      <div class="card-h"><span>Training loss</span><span id="loss-now" class="mono"></span></div>
-      <svg id="loss" class="loss" viewBox="0 0 300 110" preserveAspectRatio="none"></svg>
-      <div class="loss-foot mono"><span id="loss-steps"></span><span id="loss-init"></span></div>
-    </div>
-    <div class="card">
-      <div class="card-h"><span>Measured success</span><span class="muted">20 held-out scenes</span></div>
-      <div id="rounds" class="rounds"></div>
-      <div id="critic" class="critic"></div>
-    </div>
-    <div class="card grow">
-      <div class="card-h"><span>Skill library</span><span id="skill-count" class="muted"></span></div>
-      <div id="skills" class="skills"></div>
-    </div>
-  </section>
-</main>
+      <div class="view hidden" id="view-skills">
+        <div class="doc">
+          <div class="doc-h">
+            <h2>Skill agents</h2>
+            <p>Each published skill is its own agent with a chat endpoint. Calling one runs its policy in a fresh random scene.</p>
+          </div>
+          <div id="skills" class="skills"></div>
+        </div>
+      </div>
+
+      <footer class="tabs">
+        <button class="page" id="round-pick"><span id="round-label">Round &middot;</span><svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg></button>
+        <div class="tabs-scroll" id="chips"></div>
+      </footer>
+    </section>
+
+    <aside class="inspector" id="inspector">
+      <div class="sec">
+        <div class="sec-h"><span class="lbl">Training loss</span><span id="loss-now" class="mono v"></span></div>
+        <svg id="loss" class="loss" viewBox="0 0 300 96" preserveAspectRatio="none"></svg>
+        <div class="foot mono"><span id="loss-steps"></span><span id="loss-init"></span></div>
+      </div>
+      <div class="sec">
+        <div class="sec-h"><span class="lbl">Measured success</span><span class="dim">20 held-out scenes</span></div>
+        <div id="rounds" class="rounds"></div>
+      </div>
+      <div class="sec" id="plan-sec">
+        <div class="sec-h"><span class="lbl">Plan</span><span id="plan-note" class="dim"></span></div>
+        <ol id="plan" class="plan"></ol>
+      </div>
+      <div class="sec grow">
+        <div class="sec-h"><span class="lbl">Critic</span></div>
+        <div id="critic" class="critic"><span class="dim">Reads the failed rollouts after each round and picks what to train next.</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>
