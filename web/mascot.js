@@ -1,31 +1,37 @@
-// The forge bot: a small violet robot with a white visor and two tall ink eyes.
+// The forge bot: a little robot built from square tiles (safety-orange shell, hazard stripe, dark visor, two tall white eyes).
 // It reads the page's own state (agent rail, rollout badge, ready dot) and shows one mood:
 // idle, think (agents working or warming up), ok (a successful rollout) or fail.
 // Motion is ported from Etch's bot (blink, float, cheer, ripple, thought cloud).
 
-let uid = 0;
+// Tile grid: 11 x 11 cells of 6 units. Every part of the bot is one or more square tiles.
+const CELL = 6, OY = 3;
+const tile = (c, r, cls) => `<rect class="t ${cls}" x="${c * CELL}" y="${OY + r * CELL}" width="${CELL}" height="${CELL}"/>`;
+const row = (r, c0, c1, cls) => { let o = ""; for (let c = c0; c <= c1; c++) o += tile(c, r, typeof cls === "function" ? cls(c) : cls); return o; };
+
+function buildTiles() {
+  let head = "";
+  head += row(2, 1, 9, (c) => (c % 2 ? "hz-a" : "hz-k"));            // hard-hat hazard stripe
+  for (let r = 3; r <= 6; r++) {                                       // side frame + dark visor
+    head += tile(1, r, "o") + tile(9, r, "o");
+    head += row(r, 2, 8, (c) => (r === 3 && c < 4 ? "v2" : "v1"));
+  }
+  head += row(7, 1, 9, "o") + row(8, 1, 9, "od");                      // jaw plate
+  const ears = tile(0, 4, "od") + tile(0, 5, "od") + tile(10, 4, "od") + tile(10, 5, "od");
+  const body = row(9, 3, 7, "k") + tile(5, 9, "hz-a");                 // shoulders with a lamp tile
+  const antenna = `<g class="mb-antenna">${tile(5, 1, "k")}${tile(5, 0, "bulb mb-bulb")}</g>`;
+  const eyes = `<g class="mb-eyes open">${tile(3, 4, "e")}${tile(3, 5, "e")}${tile(7, 4, "e")}${tile(7, 5, "e")}</g>` +
+    `<g class="mb-eyes happy">${tile(3, 4, "ea")}${tile(3, 5, "ea")}${tile(7, 4, "ea")}${tile(7, 5, "ea")}${tile(2, 6, "o")}${tile(8, 6, "o")}</g>` +
+    `<g class="mb-eyes sad">${tile(3, 5, "e")}${tile(7, 5, "e")}</g>`;
+  return { head, ears, body, antenna, eyes };
+}
+const TILES = buildTiles();
+
 export function mascotSVG() {
-  const g = `mb-g${++uid}`;
-  return `<svg viewBox="0 0 64 64" aria-hidden="true">
-  <defs>
-    <linearGradient id="${g}" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="var(--accent-400)"/><stop offset="1" stop-color="var(--accent-600)"/>
-    </linearGradient>
-  </defs>
+  return `<svg viewBox="0 0 66 66" shape-rendering="crispEdges" aria-hidden="true">
   <g class="mb-body">
-    <g class="mb-antenna"><path d="M32 15V7.5"/><circle class="mb-bulb" cx="32" cy="6" r="3.6"/></g>
-    <rect class="mb-ear" x="3.5" y="29" width="6" height="13" rx="3"/>
-    <rect class="mb-ear" x="54.5" y="29" width="6" height="13" rx="3"/>
-    <rect class="mb-head" x="8" y="14" width="48" height="42" rx="17" fill="url(#${g})"/>
-    <ellipse class="mb-shine" cx="19" cy="20.5" rx="6" ry="2.6" transform="rotate(-18 19 20.5)"/>
-    <rect class="mb-visor" x="14" y="22" width="36" height="27" rx="12"/>
-    <g class="mb-look">
-      <g class="mb-eyes open"><ellipse cx="25" cy="35.5" rx="3.7" ry="6.2"/><ellipse cx="39" cy="35.5" rx="3.7" ry="6.2"/></g>
-      <g class="mb-eyes happy"><path d="M21 37.5q4-6.5 8 0M35 37.5q4-6.5 8 0"/></g>
-      <g class="mb-eyes sad"><path d="M21.5 35.5h7M35.5 35.5h7"/></g>
-      <ellipse class="mb-cheek" cx="19.5" cy="43" rx="3.2" ry="1.9"/>
-      <ellipse class="mb-cheek" cx="44.5" cy="43" rx="3.2" ry="1.9"/>
-    </g>
+    ${TILES.antenna}${TILES.ears}${TILES.body}
+    <g class="mb-head">${TILES.head}</g>
+    <g class="mb-look">${TILES.eyes}</g>
   </g>
 </svg>`;
 }

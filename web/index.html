@@ -6,9 +6,10 @@
 <title>VLA Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/library.css">
+<link rel="stylesheet" href="/static/line.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
@@ -25,9 +26,10 @@
     </nav>
     <div class="seg" role="tablist">
       <button class="on" data-view="sim">Sim</button>
+      <button data-view="line">Line</button>
       <button data-view="robot">Robot</button>
-      <button data-view="ladder">Ladder</button>
       <button data-view="skills">Library</button>
+      <button data-view="ladder">Ladder</button>
     </div>
     <div class="top-right">
       <div class="clock mono" title="wall clock for this prompt"><span id="elapsed">0:00</span><span class="dim"> / 3:00</span></div>
@@ -98,6 +100,8 @@
           <div class="pb-progress"><div id="pb-fill"></div></div>
         </div>
       </div>
+
+      <div class="view hidden" id="view-line"></div>
 
       <div class="view hidden" id="view-robot">
         <div class="doc build">
@@ -191,5 +195,6 @@
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/mascot.js"></script>
 <script type="module" src="/static/library.js"></script>
+<script type="module" src="/static/line.js"></script>
 </body>
 </html>

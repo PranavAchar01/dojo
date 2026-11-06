@@ -1,45 +1,46 @@
-/* VLA Forge. Editor layout and palette modelled on heypcb.ai's public site (recreated, no code or assets copied).
-   Type is HeyPCB's set only: Geist, Geist Mono, Instrument Serif. One accent, forge violet, on black and white.
+/* VLA Forge. Editor layout modelled on heypcb.ai's public site (recreated, no code or assets copied).
+   Type is Geist and Geist Mono only. One accent, factory safety orange, on black, white and zinc.
    Motion (entrances, keycap buttons, halo, blink, float, cheer, ripple, shimmer) is ported from Etch. */
 :root {
   --bg: #ffffff;
-  --bg-raised: #fbfaff;
-  --bg-elevated: #f4f3f8;
-  --bg-hover: #f1effa;
-  --border: #e6e4ee;
-  --border-strong: #d3d0de;
-  --text: #0b0a12;
-  --text-muted: #545266;
-  --text-dim: #a3a1b3;
-  --prose: #3d3b4d;
+  --bg-raised: #fafafa;
+  --bg-elevated: #f4f4f5;
+  --bg-hover: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #09090b;
+  --text-muted: #52525b;
+  --text-dim: #71717a;
+  --prose: #3f3f46;
 
-  /* forge violet and its tints */
-  --accent: #6b4eff;
-  --accent-50: #f4f1ff;
-  --accent-100: #e9e3ff;
-  --accent-200: #d3c8ff;
-  --accent-300: #b3a2ff;
-  --accent-400: #8e76ff;
-  --accent-600: #5536f0;
-  --accent-700: #4426c8;
-  --accent-ink: #ffffff;
-  --accent-glow: color-mix(in srgb, var(--accent) 22%, transparent);
-  --blush: #ff8fc0;
+  /* factory safety orange and its tints. Fills use --accent with near-black ink (6.3:1);
+     accent-coloured text uses --accent-700 (5.7:1 on white, 4.7:1 on --accent-100). */
+  --accent: #ff5a1f;
+  --accent-50: #fff4ed;
+  --accent-100: #ffe4d3;
+  --accent-200: #ffc9a8;
+  --accent-300: #ffa070;
+  --accent-400: #ff7a3d;
+  --accent-600: #f04e14;
+  --accent-700: #b93a0a;
+  --accent-ink: #120a06;
+  --accent-glow: color-mix(in srgb, var(--accent) 24%, transparent);
+  --amber: #ffb020;
 
   --ok: var(--accent-700);
+  --ok-soft: var(--accent-50);
   --bad: #c42b2b;
   --bad-soft: #fde8e8;
-  --live: var(--accent);
+  --live: var(--accent-700);
 
   --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, monospace;
-  --serif: "Instrument Serif", Georgia, serif;
-  --shadow-float: 0 1px 2px rgb(20 10 60 / 0.05), 0 6px 18px -4px rgb(40 20 120 / 0.10);
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.05), 0 6px 18px -4px rgb(0 0 0 / 0.10);
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --keycap:
-    inset 0 1px 0 rgb(255 255 255 / 0.22),
-    inset 0 -2px 0 rgb(0 0 0 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.30),
+    inset 0 -2px 0 rgb(0 0 0 / 0.18),
     0 1px 0 rgb(0 0 0 / 0.12),
     0 8px 18px -8px color-mix(in srgb, var(--accent) 70%, transparent);
 }
@@ -47,8 +48,8 @@
 html { font-family: var(--sans); }
 html, body { margin: 0; height: 100%; }
 body {
-  background-color: #f7f6fb;
-  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--accent) 22%, #d9d8e2) 1px, transparent 0);
+  background-color: #f4f4f5;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--accent) 26%, #d4d4d8) 1px, transparent 0);
   background-size: 18px 18px;
   color: var(--text);
   font: 13.5px/1.5 var(--sans);
@@ -72,7 +73,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgb(20 10 60 / 0.05), 0 18px 48px -12px rgb(40 20 120 / 0.18);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 18px 48px -12px rgb(0 0 0 / 0.18);
   overflow: hidden;
   animation: ho-ws 420ms var(--ease-out) both;
 }
@@ -129,47 +130,58 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 
 /* ---------------------------------------------------------------- the mascot */
 .mascot { position: relative; display: inline-block; flex: none; line-height: 0; width: 22px; height: 22px; vertical-align: middle; }
-.mascot svg { width: 100%; height: 100%; overflow: visible; stroke: none; }
-.mascot.xs { width: 16px; height: 16px; }
-.mascot.sm { width: 26px; height: 26px; }
+.mascot svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: none; }
+.mascot.xs { width: 18px; height: 18px; }
+.mascot.sm { width: 28px; height: 28px; }
 .mascot.md { width: 34px; height: 34px; }
 .mascot.lg { width: 64px; height: 64px; }
 .mascot.xl { width: 84px; height: 84px; }
-.mb-body { transform-origin: 32px 56px; animation: bb-float 3.2s ease-in-out infinite; }
-.mb-head { filter: drop-shadow(0 2px 0 var(--accent-700)); }
-.mb-ear { fill: var(--accent-700); }
-.mb-shine { fill: #fff; opacity: 0.38; }
-.mb-visor { fill: #fff; }
-.mb-antenna path { stroke: var(--accent-700); stroke-width: 2.4; fill: none; }
-.mb-bulb { fill: var(--blush); transform-box: fill-box; transform-origin: center; }
+.mb-body { transform-origin: 33px 60px; animation: bb-float 3.2s ease-in-out infinite; }
+.mascot .t { stroke: rgb(0 0 0 / 0.16); stroke-width: 0.5; }
+.mascot .o { fill: var(--accent); }
+.mascot .od { fill: var(--accent-700); }
+.mascot .k { fill: #18181b; }
+.mascot .hz-a { fill: var(--amber); }
+.mascot .hz-k { fill: #18181b; }
+.mascot .v1 { fill: #1b1b1f; }
+.mascot .v2 { fill: #2e2e34; }
+.mascot .e { fill: #fff; stroke: none; }
+.mascot .ea { fill: var(--amber); }
+.mascot .bulb { fill: var(--amber); }
+.mb-bulb { transform-box: fill-box; transform-origin: center; }
 .mb-look { transform: translate(var(--look-x, 0), var(--look-y, 0)); transition: transform 140ms ease-out; }
-.mb-eyes.open ellipse { fill: var(--text); transform-box: fill-box; transform-origin: 50% 60%; animation: cta-blink 4.6s infinite; }
-.mb-eyes.happy path, .mb-eyes.sad path { stroke: var(--text); stroke-width: 3; fill: none; }
+.mb-eyes.open { transform-box: fill-box; transform-origin: 50% 60%; animation: cta-blink 4.6s infinite; }
 .mb-eyes.happy, .mb-eyes.sad { opacity: 0; }
-.mb-cheek { fill: var(--blush); opacity: 0.75; }
-/* think: eyes scan, the bulb glows */
+/* think: eyes scan, the lamp pulses */
 .mascot[data-mood="think"] .mb-eyes.open { animation: mb-scan 1.6s ease-in-out infinite; }
 .mascot[data-mood="think"] .mb-bulb { animation: mb-bulb 0.9s ease-in-out infinite; }
 .mascot[data-mood="think"] .mb-body { animation-duration: 1.4s; }
-/* ok: happy eyes, a cheer and a ripple */
+/* ok: chevron eyes, a cheer and a ripple */
 .mascot[data-mood="ok"] .mb-eyes.open { opacity: 0; }
 .mascot[data-mood="ok"] .mb-eyes.happy { opacity: 1; }
-.mascot[data-mood="ok"] .mb-cheek { opacity: 1; }
 .mascot.cheer .mb-body { animation: bs-cheer 0.5s ease-in-out 3; }
-.mascot.cheer::after { content: ""; position: absolute; inset: -20%; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: bs-ripple 0.6s ease-out 2; pointer-events: none; }
-/* fail: flat eyes, a small droop */
+.mascot.cheer::after { content: ""; position: absolute; inset: -20%; border-radius: 6px; border: 2px solid var(--accent); opacity: 0; animation: bs-ripple 0.6s ease-out 2; pointer-events: none; }
+/* fail: flat eyes, dimmed visor tiles, a small droop */
 .mascot[data-mood="fail"] .mb-eyes.open { opacity: 0; }
 .mascot[data-mood="fail"] .mb-eyes.sad { opacity: 1; }
-.mascot[data-mood="fail"] .mb-cheek { opacity: 0.25; }
+.mascot[data-mood="fail"] .mb-eyes.sad .e { fill: #ff7a7a; }
 .mascot[data-mood="fail"] .mb-body { animation: mb-droop 600ms var(--spring) both; }
-.mascot[data-mood="fail"] .mb-antenna { transform: rotate(-14deg); transform-origin: 32px 15px; transition: transform 300ms var(--spring); }
+.mascot[data-mood="fail"] .mb-antenna { transform: rotate(-18deg); transform-origin: 33px 15px; transition: transform 300ms var(--spring); }
 
 /* ---------------------------------------------------------------- layout */
 .body { flex: 1; min-height: 0; display: flex; }
-.chat { width: 300px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
+.chat { width: 300px; flex: none; transition: width 300ms var(--ease-out), opacity 220ms ease, border-color 300ms ease; overflow: hidden; display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
 .canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
-.inspector { width: 290px; flex: none; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.inspector { width: 290px; flex: none; transition: width 300ms var(--ease-out), opacity 220ms ease, border-color 300ms ease; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.chat > * { min-width: 300px; }
+.inspector > * { min-width: 290px; }
 .app.no-left .chat, .app.no-right .inspector { display: none; }
+/* immersive tabs (Line, Robot, Library, Ladder): the side panels slide away and the view takes the whole window */
+.app.immersive .chat, .app.immersive .inspector { width: 0; opacity: 0; border-color: transparent; pointer-events: none; visibility: hidden; transition: width 300ms var(--ease-out), opacity 200ms ease, border-color 300ms ease, visibility 0s 300ms; }
+.app.immersive #toggle-left, .app.immersive #toggle-right { opacity: 0; pointer-events: none; }
+#toggle-left, #toggle-right { transition: opacity 200ms ease, background 160ms ease, color 160ms ease, transform 160ms var(--spring); }
+.view:not(.hidden) { animation: view-in 300ms var(--ease-out) both; }
+@keyframes view-in { from { opacity: 0; translate: 0 12px; } }
 
 /* ---------------------------------------------------------------- chat */
 .chat-tabs { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-bottom: 1px solid var(--border); }
@@ -177,7 +189,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .thread { flex: 1; overflow-y: auto; padding: 18px 14px 10px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
 .empty { margin-top: auto; }
 .hero-bot { position: relative; width: 64px; height: 64px; margin: 0 0 18px 2px; animation: lib-rise 520ms var(--ease-out) both; }
-.empty h1 { font: 400 34px/1.05 var(--serif); letter-spacing: -0.01em; margin: 0 0 10px; animation: lib-rise 520ms var(--ease-out) 80ms both; }
+.empty h1 { font: 600 32px/1.05 var(--sans); letter-spacing: -0.03em; margin: 0 0 10px; animation: lib-rise 520ms var(--ease-out) 80ms both; }
 .empty h1 em { font-style: normal; color: var(--accent); }
 .empty p { color: var(--text-muted); margin: 0 0 16px; font-size: 13px; animation: lib-rise 520ms var(--ease-out) 140ms both; }
 .examples { display: flex; flex-direction: column; gap: 6px; }
@@ -185,7 +197,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .ex:nth-child(1) { animation-delay: 200ms; } .ex:nth-child(2) { animation-delay: 260ms; } .ex:nth-child(3) { animation-delay: 320ms; }
 .ex:hover { background: var(--accent-50); border-color: var(--accent-200); transform: translateX(3px); box-shadow: -3px 0 0 var(--accent); }
 .ex:active { transform: translateX(3px) scale(0.98); }
-.t { font: 500 10px/1 var(--mono); letter-spacing: 1px; color: var(--accent); flex: none; }
+.t { font: 500 10px/1 var(--mono); letter-spacing: 1px; color: var(--accent-700); flex: none; }
 
 /* Etch's thought cloud, rising out of the bot */
 .bb-thought { position: absolute; left: 70%; bottom: 72%; pointer-events: none; line-height: normal; transform-origin: 0% 100%; transform: scale(0.2); opacity: 0; transition: transform 420ms var(--spring), opacity 220ms ease; }
@@ -202,7 +214,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 
 .msg { animation: tt-in 300ms cubic-bezier(0.22, 0.9, 0.3, 1) both; }
 .msg .who { display: flex; align-items: center; gap: 6px; font: 500 10px/1 var(--mono); letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
-.msg.forge .who { color: var(--accent); }
+.msg.forge .who { color: var(--accent-700); }
 .msg .txt { color: var(--prose); font-size: 13.5px; }
 .msg.you .txt { color: var(--text); font-weight: 500; }
 .msg .note { color: var(--text-muted); font-size: 12.5px; margin-top: 4px; animation: note-in 0.22s ease-out both; }
@@ -290,7 +302,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round
 .rtab.pending .o { background: var(--accent-200); animation: ct-pulse 1.1s ease-in-out infinite; }
 .rtab:hover { background: var(--accent-50); }
 .rtab.sel { background: var(--accent-100); color: var(--accent-700); font-weight: 500; }
-.rtab.sel .n { color: var(--accent-400); }
+.rtab.sel .n { color: var(--accent-700); }
 
 /* ---------------------------------------------------------------- inspector */
 .sec { padding: 14px 14px 16px; border-bottom: 1px solid var(--border); animation: lib-rise 480ms var(--ease-out) both; }
@@ -324,10 +336,12 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .critic b { font-weight: 500; color: var(--accent-700); }
 
 /* ---------------------------------------------------------------- ladder + skills */
-#view-ladder, #view-skills, #view-robot { overflow-y: auto; background: var(--bg-raised); }
+#view-ladder, #view-skills, #view-robot, #view-line { overflow-y: auto; background: var(--bg-raised); }
 .view:not(.hidden) .doc { animation: bd-pop 0.26s var(--ease-out) both; }
 .doc { max-width: 980px; margin: 0 auto; padding: 34px 32px 60px; }
-.doc-h h2 { font: 400 36px/1.1 var(--serif); margin: 0 0 8px; letter-spacing: -0.01em; }
+.app.immersive .doc { max-width: none; padding: 44px clamp(28px, 5vw, 96px) 72px; }
+.app.immersive .doc-h p { max-width: 760px; font-size: 14px; }
+.doc-h h2 { font: 600 40px/1.05 var(--sans); margin: 0 0 8px; letter-spacing: -0.03em; }
 .doc-h p { margin: 0 0 24px; color: var(--text-muted); max-width: 640px; }
 #ladder:empty, #skills:empty { min-height: 180px; border-radius: 12px; background: linear-gradient(90deg, var(--bg-elevated), var(--accent-50), var(--bg-elevated)); background-size: 200% 100%; animation: gal-shimmer 1.4s linear infinite; }
 .tier-block { margin-bottom: 22px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: box-shadow 300ms ease, border-color 300ms ease, transform 300ms var(--ease-out); animation: lib-rise 520ms var(--ease-out) both; }
@@ -353,7 +367,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .skill:nth-child(5) { animation-delay: 200ms; } .skill:nth-child(6) { animation-delay: 250ms; } .skill:nth-child(n+7) { animation-delay: 300ms; }
 .skill:hover { transform: translateY(-3px); border-color: var(--accent-200); box-shadow: 0 22px 40px -28px color-mix(in srgb, var(--accent) 60%, transparent); }
 .skill.new { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-glow); }
-.skill .lbl { color: var(--accent); }
+.skill .lbl { color: var(--accent-700); }
 .skill .ins { font-weight: 500; font-size: 13.5px; }
 .skill .meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
 .skill .meta .pct { font-family: var(--mono); color: var(--accent-700); background: var(--accent-50); padding: 1px 6px; border-radius: 6px; }
@@ -389,7 +403,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 @keyframes bs-cheer { 50% { transform: translateY(-7px) rotate(-4deg); } }
 @keyframes bs-ripple { from { opacity: 0.45; transform: scale(0.3); } to { opacity: 0; transform: scale(1.4); } }
 @keyframes mb-scan { 0%, 100% { transform: translateX(-1.6px); } 50% { transform: translate(1.6px, -1px); } }
-@keyframes mb-bulb { 50% { transform: scale(1.35); fill: var(--accent-300); } }
+@keyframes mb-bulb { 50% { transform: scale(1.35); fill: #fff3c4; } }
 @keyframes mb-droop { to { transform: translateY(2px) rotate(-6deg); } }
 @keyframes draw { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
 @keyframes grow-x { from { transform: scaleX(0); } }
@@ -406,14 +420,17 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   .crumbs, #toggle-left, #toggle-right, .clock { display: none; }
   #call-last { padding-inline: 12px; white-space: nowrap; }
   #call-last .cl-label { font-size: 0; }
-  #call-last .cl-label::after { content: "Call agent"; font-size: 13px; }
+  #call-last .cl-label::after { content: "Call"; font-size: 13px; }
   .seg { margin-left: 0; }
   .top-right { gap: 8px; }
   .status #ready-text { display: none; }
   .primary { height: 28px; padding: 0 10px; font-size: 12.5px; }
   .primary svg { display: none; }
-  .seg button { padding: 4px 10px; }
-  .top { flex-wrap: nowrap; gap: 8px; }
+  .seg button { padding: 4px 8px; font-size: 12.5px; }
+  .seg { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .top { flex-wrap: nowrap; gap: 6px; }
+  .brand, .status { display: none; }
+  .top-right { margin-left: auto; flex: none; }
   .tier { white-space: nowrap; }
   .pill span { min-width: 0; white-space: nowrap; }
   .body { flex-direction: column; }
@@ -421,7 +438,10 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   .chat { order: 2; width: 100%; border-right: 0; border-top: 1px solid var(--border); }
   .inspector { order: 3; width: 100%; border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
   .view { flex: none; height: 62vh; min-height: 420px; }
-  #view-ladder, #view-skills, #view-robot { height: auto; min-height: 60vh; }
+  #view-ladder, #view-skills, #view-robot, #view-line { height: auto; min-height: 60vh; }
+  .app.immersive .chat, .app.immersive .inspector { display: none; }
+  .app.immersive .doc { padding: 22px 16px 40px; }
+  .doc-h h2 { font-size: 30px; }
   .doc { padding: 22px 16px 40px; }
   .tier-block { overflow-x: auto; }
   .tier-block table { min-width: 560px; }
@@ -445,11 +465,11 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .skill .meta .robot-tag { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: var(--bg-elevated); color: var(--text-muted); }
 
 /* ---------------------------------------------------------------- robot builder */
-.doc.build { max-width: 1240px; }
-.build-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.app.immersive .doc.build { max-width: none; }
+.build-grid { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 520px); gap: 18px; align-items: start; }
 .slots { display: flex; flex-direction: column; gap: 20px; }
 .slot-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; font-size: 12.5px; }
-.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .part { font: inherit; color: inherit; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 8px 10px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
 .part:hover { border-color: var(--accent-200); }
 .part.on { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-glow); }
@@ -466,8 +486,8 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .prov .lic { font-size: 10px; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 5px; background: var(--ok-soft); color: var(--ok); }
 .prov .src { font-size: 11.5px; color: var(--accent-700); text-decoration: none; }
 .prov .src:hover { text-decoration: underline; }
-.assembly { position: sticky; top: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.asm-view { position: relative; height: 290px; border-bottom: 1px solid var(--border); }
+.assembly { position: sticky; top: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.asm-view { position: relative; height: clamp(290px, 38vh, 420px); border-bottom: 1px solid var(--border); }
 #asm { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .asm-cap { position: absolute; top: 10px; left: 12px; right: 12px; display: flex; flex-direction: column; gap: 1px; font-size: 13px; pointer-events: none; }
 .asm-cap b { font-weight: 500; }
