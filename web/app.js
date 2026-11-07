@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
@@ -140,6 +141,9 @@ const postStage = makeStage(renderer, scene3, camera);
 
 const geomCache = new Map();
 const meshStore = {}; // robot id -> promise of its mesh buffers (fetched once per robot)
+// library models in a scene (the toolbox and its tools): each one's web file, loaded once and cloned per body
+const glbStore = { ready: {} };
+const glbFor = (id) => (glbStore[id] ||= new GLTFLoader().loadAsync(`/api/assets/${encodeURIComponent(id)}/glb`).then((g) => g.scene));
 const meshesFor = (rid) => (meshStore[rid] ||= fetch(`/api/meshes?robot=${encodeURIComponent(rid)}`).then((r) => r.json()));
 function meshGeometry(id, data) {
   if (geomCache.has(id)) return geomCache.get(id);
@@ -287,12 +291,23 @@ function populate(sc, root, rid, meshes, { shadows = true, belt: wantBelt = true
     g.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = shadows; } });
     bodies[p.body].add(g);
   }
+  for (const m of sc.models || []) { // glTF is Y-up, the simulation Z-up: stand the model on the body's own frame
+    const src = glbStore.ready[m.model];
+    if (!src) continue;
+    const g = new THREE.Group();
+    g.rotation.x = Math.PI / 2;
+    const obj = src.clone(true);
+    obj.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = shadows; } });
+    g.add(obj);
+    bodies[m.body].add(g);
+  }
   const belt = addLineParts(sc, root, bodies, { shadows, belt: wantBelt, halfLen: beltHalfLen });
   return { bodies, belt };
 }
 async function buildWorld(sc, quick = false) {
   const rid = sc.robot_id || "so101";
   const meshes = await meshesFor(rid);
+  await Promise.all((sc.models || []).map(async (m) => { glbStore.ready[m.model] = await glbFor(m.model); }));
   window.forgeArms?.exit(); // a single-arm scene replaces any multi-arm cell
   if (world) { scene3.remove(world.root); scene3.remove(world.mirror); }
   if (!world || world.rid !== rid) {

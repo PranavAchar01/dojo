@@ -63,10 +63,12 @@ def export_scene(layout: Layout, robot: str = "so101") -> dict:
     m = build_spec(layout, robot=robot_id).compile()
     bodies = [m.body(i).name for i in range(1, m.nbody)]
     robot = []
+    library = {*layout.tools, *(n for n, p in layout.props.items() if p[0] == "toolbox")}
     for g in range(m.ngeom):
         if (
             m.geom_group[g] != VISUAL_GROUP
             or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
+            or bodies[int(m.geom_bodyid[g]) - 1] in library  # library models draw from their own glb (below)
         ):
             continue
         mat = m.geom_matid[g]
@@ -121,8 +123,26 @@ def export_scene(layout: Layout, robot: str = "so101") -> dict:
             for n, (c, *_r) in layout.pads.items()
         ],
         "props": _props(layout, idx),
+        "models": _models(layout, idx),
         **_line_parts(layout, idx),
     }
+
+
+def _models(layout: Layout, idx: dict) -> list[dict]:
+    """Library models in the scene (the toolbox and the tools lying on the table): the viewer loads each one's
+    web file (/api/assets/<id>/glb, glTF Y-up) and hangs it on the body the engine simulates."""
+    from .sim.toolbox import TOOLBOX
+
+    out = [
+        {"body": idx[n], "name": n, "model": TOOLBOX}
+        for n, p in layout.props.items()
+        if p[0] == "toolbox"
+    ]
+    out += [
+        {"body": idx[n], "name": n, "model": tool}
+        for n, (tool, *_pose) in layout.tools.items()
+    ]
+    return out
 
 
 def _props(layout: Layout, idx: dict) -> list[dict]:
@@ -138,7 +158,7 @@ def _props(layout: Layout, idx: dict) -> list[dict]:
             "parts": prop_parts(kind),
         }
         for n, (kind, color, *_pose) in layout.props.items()
-        if kind != "marker"
+        if kind not in ("marker", "toolbox")
     ]
 
 
