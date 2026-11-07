@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from vla_forge import duck_render as r
+from vla_forge import hero_render as r
 
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,7 @@ import sys
 
 from PIL import Image
 
-from vla_forge import duck_sim as ds
+from vla_forge import hero_sim as ds
 
 t = ds.Table.new()
 t.reset()

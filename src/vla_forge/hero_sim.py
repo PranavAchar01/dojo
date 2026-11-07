@@ -1,6 +1,6 @@
-"""MuJoCo table for the duck: two SO-101 arms, the six loose bricks, and the snap-on-contact clutch.
+"""MuJoCo table for the bridge: two SO-101 arms, the loose bricks, and the snap-on-contact clutch.
 
-Clutch model (honest version, also in docs/duck-demo.md): a real stud connection holds a brick with a few newtons of
+Clutch model (honest version, also in docs/hero-demo.md): a real stud connection holds a brick with a few newtons of
 clamp. We do not simulate stud interference. Instead each brick has a weld equality to the world at its target pose
 that stays off until the brick is released near its slot. The weld switches on only if, at that moment, the brick is
 within the success tolerance (2 mm, 5 deg) of the target pose and its underside is at seating height; it never pulls
@@ -15,42 +15,66 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
-from . import duck_bricks as db
-from . import duck_render as dr
+from . import hero_bricks as db
+from . import hero_render as dr
 from .sim import scene as S
 
 TOL_POS = 0.002  # m, success tolerance
 TOL_YAW = np.radians(5.0)
 SEAT_Z = 0.0015  # underside may be this far above the seated height and still engages the studs
-MASS = {
-    "3001": 0.0024,
-    "3002": 0.0018,
-    "3003": 0.0012,
-    "3004": 0.0008,
-    "3021": 0.0015,
-    "3039": 0.0012,
-}
 ARMS = {"a_": ([0.20, -0.26, 0.0], 90.0), "b_": ([0.20, 0.26, 0.0], -90.0)}
-BUILD = np.array(
-    [0.20, -0.012]
-)  # table xy where the duck's low-x, low-y corner sits (set so the duck is centred)
 JAW_BODIES = ("gripper", "moving_jaw_so101_v1")
 
-# loose bricks on the table, (x, y, yaw deg), near the arm that serves them
-LOOSE = {
-    "foot": (0.145, -0.115, 20.0),
-    "leg": (0.255, -0.105, -30.0),
-    "body": (0.115, -0.060, 70.0),
-    "beak": (0.230, 0.115, -15.0),
-    "head": (0.150, 0.105, 40.0),
-    "tail": (0.280, 0.070, 100.0),
-}
-YELLOW = db.YELLOW
+# loose-brick slots on the table, (x, y, yaw deg), near the arm that serves them; bricks take them in build order
+SLOTS = (
+    (0.145, -0.115, 20.0),
+    (0.255, -0.105, -30.0),
+    (0.115, -0.060, 70.0),
+    (0.230, 0.115, -15.0),
+    (0.150, 0.105, 40.0),
+    (0.290, 0.110, 70.0),
+    (0.300, -0.060, 10.0),
+    (0.100, 0.050, -20.0),
+    (0.200, -0.140, 0.0),
+    (0.200, 0.140, 0.0),
+)
+
+
+def loose() -> dict[str, tuple[float, float, float]]:
+    return {b.name: SLOTS[i % len(SLOTS)] for i, b in enumerate(db.DUCK)}
+
+
+PAD_X = (-0.006, 0.004)  # pad span along the jaw about the gripper site: low on the jaw tip, sized for 9.6 mm bricks
+
+
+def pad_frames() -> dict:
+    """Pads for the jaw tips. The stock pads (sim/scene.py) sit 2 to 42 mm up the jaw for 30 mm cubes; a plain brick is
+    only 9.6 mm tall, so the same measurement is repeated with a pad span at the tip."""
+    keep = S.PAD_X
+    S._pad_frames.cache_clear()
+    S.PAD_X = PAD_X
+    try:
+        return S._pad_frames()
+    finally:
+        S.PAD_X = keep
+        S._pad_frames.cache_clear()
+
+
+def mass(b: db.Brick) -> float:
+    """About 0.3 g per stud of a 3-plate brick (a 2x2 brick weighs 1.2 g)."""
+    nx, ny = db.PART_FOOTPRINT[b.part]
+    return 0.0003 * nx * ny * db.PART_PLATES[b.part] / 3
+
+
+def build_xy() -> np.ndarray:
+    """Table xy of the assembly's low-x, low-y stud corner, set so the whole bridge is centred on (0.20, 0)."""
+    c = db.centre()
+    return np.array([0.20 - c[0], -c[1]])
 
 
 def target_pose(b: db.Brick) -> tuple[np.ndarray, np.ndarray]:
-    """World pose of the seated brick: the duck sits at BUILD on the table top."""
-    return b.target_pos() + np.array([BUILD[0], BUILD[1], 0.0]), b.target_quat()
+    """World pose of the seated brick: the bridge sits at build_xy() on the table top."""
+    return b.target_pos() + np.array([*build_xy(), 0.0]), b.target_quat()
 
 
 def build_model(size: int = 960) -> mujoco.MjModel:
@@ -129,7 +153,7 @@ def build_model(size: int = 960) -> mujoco.MjModel:
         else:
             g.conaffinity = S.MESH_BIT | S.CUBE_BIT
     for pre in ARMS:
-        for body, (pos, quat, psize) in S._pad_frames().items():
+        for body, (pos, quat, psize) in pad_frames().items():
             b = next(bb for bb in spec.bodies if bb.name == pre + body)
             b.add_geom(
                 name=f"{pre}pad_{'fixed' if body == 'gripper' else 'moving'}",
@@ -155,7 +179,7 @@ def build_model(size: int = 960) -> mujoco.MjModel:
             type=mujoco.mjtGeom.mjGEOM_BOX,
             size=[nx * db.STUD / 2 - 1e-4, ny * db.STUD / 2 - 1e-4, h / 2],
             pos=[0, 0, h / 2],
-            mass=MASS[b.part],
+            mass=mass(b),
             friction=[0.7, 0.005, 0.0001],
             condim=4,
             contype=S.CUBE_BIT,
@@ -166,8 +190,6 @@ def build_model(size: int = 960) -> mujoco.MjModel:
             group=3,
         )
         dr.add_brick_visual(spec, body, b, b.name)
-        if b.name == "head":
-            dr.add_eyes(body)
         pos, quat = target_pose(b)
         eq = spec.add_equality()
         eq.type = mujoco.mjtEq.mjEQ_WELD
@@ -211,7 +233,7 @@ class Table:
             for j, v in zip(S.JOINTS, q):
                 d.qpos[m.joint(pre + j).qposadr[0]] = v
                 d.ctrl[m.actuator(pre + j).id] = v
-        for name, (x, y, yaw) in LOOSE.items():
+        for name, (x, y, yaw) in loose().items():
             if rng is not None:
                 x, y = (
                     x + rng.uniform(-jitter, jitter),
@@ -238,7 +260,7 @@ class Table:
         dyaw = (
             yaw - ty + np.pi / 2
         ) % np.pi - np.pi / 2  # 2x4, 2x3, 2x2 and 1x2 bricks are 180 degree symmetric
-        if b.part in ("3003",):
+        if db.PART_FOOTPRINT[b.part][0] == db.PART_FOOTPRINT[b.part][1]:
             dyaw = (yaw - ty + np.pi / 4) % (np.pi / 2) - np.pi / 4
         return float(np.linalg.norm(p - tp)), float(abs(dyaw)), float(p[2] - tp[2])
 
