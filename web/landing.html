@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VLA Forge</title>
-<meta name="description" content="Turning a sentence into a trained robot skill takes a frontier model to plan, critique and optimize, and here that model is Llama. Describe a task in a sentence. VLA Forge trains and measures a vision-language-action policy for it on an SO-101, and for each arm when the task needs several, in simulation.">
+<title>Forge</title>
+<meta name="description" content="Turning a sentence into a trained robot skill takes a frontier model to plan, critique and optimize, and here that model is Llama. Describe a task in a sentence. Forge trains and measures a vision-language-action policy for it on an SO-101, and for each arm when the task needs several, in simulation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
 
 <header class="nav" id="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</a>
+    <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>Forge</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#agents">Agents</a>
@@ -39,7 +39,7 @@
         <div class="hero-copy">
           <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
           <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
-          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here it is Llama, orchestrated by Fetch.ai agents. Say what the arm should do, and VLA Forge trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
+          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here it is Llama, orchestrated by Fetch.ai agents. Say what the arm should do, and Forge trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
           <div class="hero-cta rv" style="--d:220ms">
             <a class="cta big" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
             <a class="cta ghost big" href="#watch">See several arms</a>
@@ -54,7 +54,7 @@
       <figure class="stage rv" id="watch" style="--d:200ms">
         <div class="stage-bar">
           <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="stage-t">vla-forge <span class="sep">/</span> app</span>
+          <span class="stage-t">Forge <span class="sep">/</span> app</span>
           <span class="stage-r">Screenshot of the app, in simulation</span>
         </div>
         <div class="stage-media">
@@ -98,7 +98,7 @@
     <div class="wrap">
       <p class="kicker rv">Fetch.ai and Llama</p>
       <h2 class="rv">Agents that talk to each other. <em>Llama</em> behind the three that think.</h2>
-      <p class="sub rv">The forge is a Bureau of Fetch.ai uAgents that pass typed messages. Three of them ask Llama 4 Maverick for a judgement; the rest are plain code, and the app says which is which. Open the Agents tab to watch the messages go by.</p>
+      <p class="sub rv">Forge is a Bureau of Fetch.ai uAgents that pass typed messages. Three of them ask Llama 4 Maverick for a judgement; the rest are plain code, and the app says which is which. Open the Agents tab to watch the messages go by.</p>
       <ul class="agt rv">
         <li class="llm"><b>task</b><span>Parses the sentence into a task and a success check.</span><i>uAgent · Llama 4 Maverick</i></li>
         <li class="llm"><b>critic</b><span>Reads the failed rollouts and picks what to train next.</span><i>uAgent · Llama 4 Maverick</i></li>
@@ -235,7 +235,7 @@
     <div class="wrap">
       <span class="mascot lg" data-follow aria-hidden="true"></span>
       <h2 class="rv">What should the arm <em>learn</em>?</h2>
-      <p class="sub rv">Type a task, or ask for more than one arm. The forge shows its work as it goes.</p>
+      <p class="sub rv">Type a task, or ask for more than one arm. Forge shows its work as it goes.</p>
       <a class="cta big rv" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
     </div>
   </section>
@@ -243,7 +243,7 @@
 
 <footer class="lp-foot">
   <div class="wrap">
-    <span>VLA Forge. Everything robotic on this page is in simulation.</span>
+    <span>Forge. Everything robotic on this page is in simulation.</span>
     <span class="fl"><span>Built with Llama</span><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a><a href="https://github.com/fetchai/uAgents" target="_blank" rel="noopener">uAgents</a></span>
   </div>
 </footer>

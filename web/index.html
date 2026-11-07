@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VLA Forge</title>
+<title>Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -22,7 +22,7 @@
   <header class="top">
     <div class="top-row">
       <div class="crumb">
-        <a class="brand" href="/" title="Back to the landing page"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</a>
+        <a class="brand" href="/" title="Back to the landing page"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>Forge</a>
         <span class="sep">/</span><span class="crumb-mid">skills</span><span class="sep">/</span>
         <b class="title" id="crumb-run">new task</b>
         <span class="sv"><span id="ready-dot" class="dot"></span><span id="ready-text">warming up</span></span>
@@ -78,7 +78,7 @@
         </div>
       </div>
       <form class="composer" id="prompt-form" autocomplete="off">
-        <textarea id="prompt" rows="2" maxlength="300" placeholder="Tell the forge what the arm should do..."></textarea>
+        <textarea id="prompt" rows="2" maxlength="300" placeholder="Tell Forge what the arm should do..."></textarea>
         <div class="composer-row">
           <button type="button" class="chip-mode" onclick="setView('robot')" title="Change the robot"><span class="sq"></span><span id="robot-chip">SO-101 &middot; sim</span></button>
           <button class="send" id="go" type="submit" aria-label="Train" disabled>
@@ -120,7 +120,7 @@
         <div class="doc build">
           <div class="doc-h">
             <h2>Build the <em>robot</em></h2>
-            <p>Pick an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. The forge assembles them into one MuJoCo file, checks it, and trains the next skill on it.</p>
+            <p>Pick an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. Forge assembles them into one MuJoCo file, checks it, and trains the next skill on it.</p>
           </div>
           <div class="build-grid">
             <div class="slots" id="slots"></div>
