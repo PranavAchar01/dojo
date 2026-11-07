@@ -298,7 +298,7 @@ const CAMS = {
 };
 // Orbit starts in front of the arm (+x, the side the gripper works toward), a little to the right, and only sways
 // about 25 degrees either way, so the camera never swings round behind it.
-const SWAY = { az: (-12 * Math.PI) / 180, amp: (25 * Math.PI) / 180, period: 28, r: 0.88, h: 0.30, resume: 4000 };
+const SWAY = { az: (-42 * Math.PI) / 180, amp: (12 * Math.PI) / 180, period: 30, r: 1.2, h: 0.4, resume: 4000 };
 let userUntil = 0; // sway pauses while the user drags and for a few seconds after
 function swayPose(now) {
   const k = camScale;
