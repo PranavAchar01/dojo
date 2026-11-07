@@ -53,7 +53,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .top-row { height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; }
 .crumb { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: var(--ink3); }
 .crumb-mid { color: var(--ink2); }
-.brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--ink); flex: none; }
+.brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--ink); flex: none; text-decoration: none; }
+a.brand:hover { color: var(--accent, #ff5a1f); }
 .logo-tile { width: 26px; height: 26px; border-radius: 8px; background: var(--ink); display: grid; place-items: center; }
 .logo-tile .mascot { color: #fff; --paper: var(--ink); }
 .sep { color: var(--line2); }

@@ -56,21 +56,21 @@
           <span class="stage-r">Recorded from the app, 4x</span>
         </div>
         <div class="stage-media">
-          <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/static/assets/line-run.jpg" width="1200" height="406" aria-label="Three stations on a conveyor in the simulator: two policy-driven SO-101 arms and a scripted ViperX sorting coloured parts into totes">
+          <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/static/assets/line-run.jpg" width="1200" height="406" aria-label="Three stations on a conveyor in the simulator: one SO-101 seats a housing in a pallet slot, a second SO-101 inserts the part into a socket, and a scripted ViperX crates the finished assembly">
             <source src="/static/assets/line-run.webm" type="video/webm">
             <source src="/static/assets/line-run.mp4" type="video/mp4">
           </video>
         </div>
-        <figcaption>Two trained SO-101 stations and one scripted ViperX at the end of the line, in simulation. The panel counts what the simulator measures.</figcaption>
+        <figcaption>Two trained SO-101 stations and one scripted ViperX at the end of the assembly line, in simulation. The panel counts what the simulator measures.</figcaption>
       </figure>
 
       <dl class="numbers rv">
-        <div><dt>Parts through the line</dt><dd class="num">30<span class="of"> / 30</span></dd></div>
-        <div><dt>Throughput</dt><dd class="num">7.2<span class="of"> parts / min</span></dd></div>
-        <div><dt>Station 1, held-out scenes</dt><dd class="num">19<span class="of"> / 20</span></dd></div>
-        <div><dt>Station 2, after one retrain</dt><dd class="num">15<span class="of"> / 20</span></dd></div>
+        <div><dt>Housings through the line</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
+        <div><dt>Throughput</dt><dd class="num">2.97<span class="of"> parts / min</span></dd></div>
+        <div><dt>Each VLA station, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
+        <div><dt>Crated by the scripted ViperX</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
       </dl>
-      <p class="fine rv">One recorded run, in simulation (demo/v5-results.json). Station success is measured on 20 layouts the policy never trained on. Training took 88.7 s and 167.7 s.</p>
+      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Station success is measured on 20 layouts the policy never trained on. Training took 94.5 s and 107.5 s. The line run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
     </div>
   </section>
 
@@ -103,33 +103,34 @@
 
       <blockquote class="prompt rv">
         <span class="q">Prompt</span>
-        Kitting line: red parts go to the blue tote, then yellow parts to the green tote, and a scripted ViperX at the end of the line catches everything else in the gray tote.
+        Assemble housings: an SO-101 seats each housing in a pallet slot, a second SO-101 inserts it into a socket, then a scripted ViperX moves the finished assembly into the crate.
       </blockquote>
 
       <div class="chain rv" id="chain">
         <div class="belt" aria-hidden="true"><i class="blk r"></i><i class="blk y"></i><i class="blk r"></i><i class="blk y"></i><i class="blk b"></i></div>
         <article class="st">
           <header><span class="idx">01</span><span class="kind vla">VLA</span></header>
-          <h3>Red to Blue</h3>
-          <p>SO-101, trained for this station in 88.7 s.</p>
-          <div class="meter"><b style="--w:95%"></b></div>
-          <p class="res"><b class="num">19 / 20</b> held-out scenes, in simulation</p>
+          <h3>Pallet seating</h3>
+          <p>SO-101 seats the housing in a pallet slot. Trained for this station in 94.5 s.</p>
+          <div class="meter"><b style="--w:80%"></b></div>
+          <p class="res"><b class="num">16 / 20</b> held-out scenes, 26 / 30 on the line, in simulation</p>
         </article>
         <article class="st">
           <header><span class="idx">02</span><span class="kind vla">VLA</span></header>
-          <h3>Yellow to Green</h3>
-          <p>SO-101, trained in 167.7 s with one retrain after the critic read the misses.</p>
-          <div class="meter"><b style="--w:75%"></b></div>
-          <p class="res"><b class="num">15 / 20</b> held-out scenes, in simulation</p>
+          <h3>Socket insertion</h3>
+          <p>SO-101 inserts the part into the socket. Trained in 107.5 s.</p>
+          <div class="meter"><b style="--w:80%"></b></div>
+          <p class="res"><b class="num">16 / 20</b> held-out scenes, 22 / 26 on the line, in simulation</p>
         </article>
         <article class="st">
           <header><span class="idx">03</span><span class="kind script">Scripted</span></header>
-          <h3>End-of-line catch-all</h3>
-          <p>A ViperX with a programmed cell takes whatever the policies left.</p>
+          <h3>Finished assembly crating</h3>
+          <p>A ViperX with a programmed cell moves the finished assembly into the crate.</p>
           <div class="meter off"><b></b></div>
-          <p class="res">No training. A script where a script is enough.</p>
+          <p class="res"><b class="num">22 / 22</b> crated on the line. No training: a script where a script is enough.</p>
         </article>
       </div>
+      <p class="fine rv">In simulation: 30 parts, 22 through all three stations in 444.6 s. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each station is its own simulated cell and the part is re-staged on each belt.</p>
     </div>
   </section>
 
@@ -141,13 +142,13 @@
       <p class="sub rv">Each published skill is saved with its measured score and starts the next prompt. The nearest skill is the starting point, so later skills train faster.</p>
       <ul class="tiles">
         <li class="tile rv"><img src="/static/assets/skill-touch.jpg" alt="Simulator view: the SO-101 arm reaching a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>touch the red block</h3><p class="res"><b class="num">20 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-lift.jpg" alt="Simulator view: the SO-101 arm holding a yellow block up" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>pick up the yellow block and hold it up</h3><p class="res"><b class="num">19 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
-        <li class="tile rv"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a block in a bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-stack.jpg" alt="Simulator view: the SO-101 arm stacking an orange block on a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>stack the orange block on the red block</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-sort.jpg" alt="Simulator view: bowls and coloured blocks for the sorting task" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>sort the blue and green blocks into the bowls of the same color</h3><p class="res"><b class="num">10 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block toward a blue square" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a blue block in a blue bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
+        <li class="tile rv"><img src="/static/assets/skill-kit.jpg" alt="Simulator view: the SO-101 arm placing a red block in a slot of the tray" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the red block in the back-right slot of the tray</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-insert.jpg" alt="Simulator view: the SO-101 arm inserting a red block into a square socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>insert the red block into the socket</h3><p class="res"><b class="num">13 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-rotate.jpg" alt="Simulator view: the SO-101 arm setting a rotated blue block in a diamond socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>pick up the blue block, rotate it and set it in the diamond socket</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
       </ul>
-      <p class="fine rv">Tier 3 composes tier 1 and 2 skills, so it is the hardest and scores lowest. Scores are the measured results in the README, on 20 held-out scenes each.</p>
+      <p class="fine rv">Kitting into a tray slot, insertion into a socket and rotate-and-place are the hardest skills and score lowest. Scores are measured on 20 held-out scenes each, trained inside the 3 minute budget.</p>
     </div>
   </section>
 
