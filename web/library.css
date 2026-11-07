@@ -151,3 +151,6 @@
 .lib-face button { flex: none; white-space: nowrap; width: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; font: 600 14px var(--ui); color: var(--ink2); transition: background-color .25s, color .25s; }
 .lib-face button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 32, .12); }
 #lib-3d[hidden], #lib-trained[hidden] { display: none; }
+
+/* the RSI-improved card leads the list */
+.tile-rsi { position: absolute; left: 8px; bottom: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 9px; border-radius: 999px; background: var(--accent-600, #0866ff); color: #fff; box-shadow: 0 1px 2px rgba(16, 24, 32, .18); }

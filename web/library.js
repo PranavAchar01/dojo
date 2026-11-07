@@ -434,6 +434,8 @@ function visible() {
   });
   const key = { new: (t) => -t.created, rate: (t) => -t.success_rate, fast: (t) => t.seconds || 1e9 }[filt.sort];
   out = out.sort((a, b) => key(a) - key(b));
+  const pin = out.findIndex((t) => t.id === window.forgeRSI?.tile); // the tile the RSI run improved always leads
+  if (pin > 0) out.unshift(...out.splice(pin, 1));
   return out;
 }
 function drawSkeleton() {
@@ -470,6 +472,7 @@ function tileEl(t, byId) {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
   const multi = t.origin === "arms";
+  if (t.id === window.forgeRSI?.tile) a.classList.add("is-rsi");
   th.append(el("span", "tile-tier mono", multi ? "ARMS" : t.origin === "scripted" ? "IN PROGRESS" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${multi || t.robot !== "so101" ? " custom" : ""}`, multi ? armsChip(t) : robotLabel(t.robot)));
   // one click on the tile plays its recorded rollout straight away; the buttons below keep their own jobs
   a.classList.add("tap");
@@ -484,6 +487,7 @@ function tileEl(t, byId) {
     ov.append(el("span", "spin"), document.createTextNode(`Testing ${T.done}/${T.n}`));
     th.append(ov);
   }
+  if (t.id === window.forgeRSI?.tile) th.append(el("span", "tile-rsi mono", "RSI"));
   const body = el("div", "tile-body");
   const name = el("div", "tile-name", t.origin === "scripted" ? t.name.replace(/\s*\(scripted\)$/i, "") : t.name);
   if (!multi) {
@@ -617,6 +621,12 @@ async function refresh(freshId) {
   if (freshId) flash(freshId);
   else draw();
 }
+
+// the finished optimizer run that improved a library tile: that tile leads the list and its Replay shows the run (replay.js)
+fetch("/api/optimizer/runs").then((r) => (r.ok ? r.json() : [])).then((rs) => {
+  const d = rs.find((x) => x.default);
+  if (d?.skill?.id) { window.forgeRSI = { run: d.id, tile: d.skill.id }; draw(); }
+}).catch(() => {});
 
 // ---------------------------------------------------------------- toolbar
 $("#lib-q").addEventListener("input", (e) => { filt.q = e.target.value; draw(); });
