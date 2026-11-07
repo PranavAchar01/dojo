@@ -19,6 +19,7 @@ export) only takes group 2, so scenery never inflates it.
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import xml.etree.ElementTree as ET
@@ -219,11 +220,13 @@ def dress(spec: mujoco.MjSpec, name: str) -> None:
 
 # ---------------------------------------------------------------- the workcell frame
 
-PITCH = 1.2  # metres between the two arms along the belt
+PITCH = 0.5  # metres between the two arms along the belt
 
 
-def _box(parent, pos, half, rgba, mat=None, group=VIS_GROUP):
+def _box(parent, pos, half, rgba, mat=None, group=VIS_GROUP, name=None):
     kw = {"material": mat} if mat else {"rgba": list(rgba)}
+    if name:
+        kw["name"] = name
     parent.add_geom(
         type=mujoco.mjtGeom.mjGEOM_BOX,
         pos=list(pos),
@@ -272,7 +275,7 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
     )
     spec.add_material(name="guard_glass", rgba=[0.78, 0.84, 0.9, 0.13], specular=0.4)
     spec.add_material(name="guard_frame", rgba=[0.08, 0.082, 0.094, 1])
-    spec.add_material(name="shelf_mat", rgba=[0.5, 0.51, 0.53, 1], specular=0.1)
+    spec.add_material(name="shelf_mat", rgba=[0.74, 0.75, 0.77, 1], specular=0.0, shininess=0.0, reflectance=0.0)
     spec.add_material(name="top_mat", rgba=list(CONCRETE), specular=0.15)
 
     # the table top runs on past the first cell
@@ -295,7 +298,7 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
         _box(world, [cx, y, -0.04 - ap], [(x1 - x0) / 2, 0.012, ap], STEEL, "alu")
     for x in (x0 + leg, x1 - leg):  # low cross rails and a solid shelf
         _box(world, [x, cy0, -0.52], [0.02, (y1 - y0) / 2, 0.02], STEEL, "alu")
-    _box(world, [cx, cy0, -0.54], [(x1 - x0) / 2 - 0.03, (y1 - y0) / 2 - 0.03, 0.01], STEEL, "shelf_mat")
+    _box(world, [cx, cy0, -0.53], [(x1 - x0) / 2 - 0.03, (y1 - y0) / 2 - 0.03, 0.025], STEEL, "shelf_mat")
 
     # the conveyor: side rails, end rollers, a roller bed, legs to the floor past the table
     bx, hw = 0.245, 0.035
@@ -371,14 +374,18 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
 def _guard(world, x0, x1, y0, y1, cfg: dict) -> None:
     """A rectangular guard around the line on the table: posts every `panel` metres, clear panels at one height,
     a top rail, an opening where the belt runs through each end, and one gate in the front."""
-    h, w = cfg.get("height", 0.28), cfg.get("panel", 0.3)
+    h, panel = cfg.get("height", 0.28), cfg.get("panel", 0.3)
     gx, gy = 0.0, 0.0
     spec_mat = {"rgba": [0.8, 0.84, 0.9, 0.12]}
     world_mat = "guard_glass"
     posts = []
+    uid = itertools.count()
 
     def run(ax: str, fixed: float, lo: float, hi: float, skip=(), gate=None) -> None:
-        n = round((hi - lo) / w)
+        n = round((hi - lo) / panel)
+        w = (hi - lo) / n  # whole panels: the width is stretched a little so the run closes cleanly
+        front = ax == "y" and fixed == x1
+        nm = (lambda k: f"gf_{k}_{next(uid)}") if front else (lambda k: None)
         for i in range(n):
             a, b = lo + i * w, lo + (i + 1) * w
             mid = (a + b) / 2
@@ -390,37 +397,38 @@ def _guard(world, x0, x1, y0, y1, cfg: dict) -> None:
             else:
                 pos, half = [mid, fixed, h / 2], [w / 2 - 0.008, 0.003, h / 2 - 0.012]
             if i == gate:
-                _box(world, pos, half, None, world_mat)
+                _box(world, pos, half, None, world_mat, name=nm(f"p{i}"))
                 t = 0.008  # dark gate frame: four bars round the glass, and a handle
                 if ax == "y":
                     ex, ez = [0.006, half[1], t], [0.006, t, half[2]]
                     for dz in (-half[2], half[2]):
-                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame")
+                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame", name=nm("g"))
                     for dy in (-half[1], half[1]):
-                        _box(world, [pos[0], pos[1] + dy, pos[2]], ez, None, "guard_frame")
-                    _box(world, [pos[0] - 0.012, pos[1] + half[1] - 0.04, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame")
+                        _box(world, [pos[0], pos[1] + dy, pos[2]], ez, None, "guard_frame", name=nm("g"))
+                    _box(world, [pos[0] - 0.012, pos[1] + half[1] - 0.04, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame", name=nm("g"))
                 else:
                     ex, ez = [half[0], 0.006, t], [t, 0.006, half[2]]
                     for dz in (-half[2], half[2]):
-                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame")
+                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame", name=nm("g"))
                     for dx in (-half[0], half[0]):
-                        _box(world, [pos[0] + dx, pos[1], pos[2]], ez, None, "guard_frame")
-                    _box(world, [pos[0] + half[0] - 0.04, pos[1] - 0.012, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame")
+                        _box(world, [pos[0] + dx, pos[1], pos[2]], ez, None, "guard_frame", name=nm("g"))
+                    _box(world, [pos[0] + half[0] - 0.04, pos[1] - 0.012, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame", name=nm("g"))
             else:
-                _box(world, pos, half, None, world_mat)
+                _box(world, pos, half, None, world_mat, name=nm(f"p{i}"))
         posts.append((fixed, hi) if ax == "y" else (hi, fixed))
         mid_e = (lo + hi) / 2
         rail = [fixed, mid_e, h] if ax == "y" else [mid_e, fixed, h]
+        rname = f"gf_rail{next(uid)}" if front else None
         rh = [0.008, (hi - lo) / 2, 0.008] if ax == "y" else [(hi - lo) / 2, 0.008, 0.008]
-        _box(world, rail, rh, STEEL, "alu")
+        _box(world, rail, rh, STEEL, "alu", name=rname)
 
     bx_open = (0, 1, 2)  # side panels: x 0.05..0.35 holds the belt, the one at index 1
     run("y", x0, y0, y1)  # back
-    run("y", x1, y0, y1, gate=3)  # front, with its gate
+    run("y", x1, y0, y1, gate=2)  # front, with its gate
     run("x", y0, x0, x1, skip=(1,))  # near end (belt opening)
     run("x", y1, x0, x1, skip=(1,))  # far end (belt opening)
     for px, py in set(posts):
-        _box(world, [px, py, h / 2], [0.01, 0.01, h / 2], STEEL, "alu")
+        _box(world, [px, py, h / 2], [0.01, 0.01, h / 2], STEEL, "alu", name=f"gf_post{next(uid)}" if px == x1 else None)
     del gx, gy, spec_mat, bx_open
 
 

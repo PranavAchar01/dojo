@@ -266,3 +266,4 @@ def delete_model(model_id: str):
         raise HTTPException(403, "library models are read-only")
     imp.trash_user_model(model_id)
     return {"ok": True}
+
