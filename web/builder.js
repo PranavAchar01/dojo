@@ -417,6 +417,7 @@ export async function initBuilder(activeId) {
 
 export async function showBuilder(on) {
   visible = on;
+  if (on && built && !glDone) startGL();
   if (!on || built) return;
   built = true;
   performance.mark("rv-tab");
@@ -447,7 +448,18 @@ export async function showBuilder(on) {
     no.append(li);
   }
   $("#use-robot").onclick = useRobot;
-  await new Promise((r) => requestAnimationFrame(() => setTimeout(r)));
-  initAssembly(); // the WebGL setup is the slow part on a weak GPU: after the cards are on screen
+  startGL();
+}
+let glDone = false, glPending = false;
+// the WebGL setup is the slow part on a weak GPU: it waits until the browser is idle, and only while the pane is
+// still open (closing the window before it runs cancels it; opening the pane again starts it)
+async function startGL() {
+  if (glPending) return;
+  glPending = true;
+  await new Promise((r) => requestAnimationFrame(() => (window.requestIdleCallback ? requestIdleCallback(r, { timeout: 400 }) : setTimeout(r, 50))));
+  glPending = false;
+  if (!visible || glDone) return;
+  glDone = true;
+  initAssembly();
   assemble();
 }

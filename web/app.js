@@ -1159,6 +1159,12 @@ function handle(e) {
         $("#vp-caption").textContent = `“${e.spec.instruction}”`;
       }
       if (e.parse && e.parse.note) forgeNote(e.parse.note);
+      if (e.spec && e.spec.routing && e.spec.routing.chosen && e.spec.routing.chosen.length) {
+        // the engine picked the arm(s) from the measured checks: the prompt bar's chip shows them
+        const names = e.spec.routing.chosen.map((id) => (e.spec.routing.ranked.find((r) => r.robot === id) || {}).label || id);
+        $("#robot-chip").textContent = `${names.join(" + ")} · sim`;
+        $("#nm-robot").textContent = $("#robot-chip").textContent;
+      }
       if (e.parse && e.parse.model) $("#plan-model").textContent = `Planner: ${modelTag(e.parse.model)}`;
       settle(e.run, "task");
       stage("task", "done");
