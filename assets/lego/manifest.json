@@ -117,20 +117,6 @@
       "vertices": 472,
       "triangles": 700
     },
-    "3002": {
-      "title": "Brick 2 x 3",
-      "source_url": "https://library.ldraw.org/library/official/parts/3002.dat",
-      "author": "James Jessiman",
-      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "footprint_studs": [
-        3,
-        2
-      ],
-      "mesh": "meshes/3002.npz",
-      "vertices": 342,
-      "triangles": 508
-    },
     "3003": {
       "title": "Brick 2 x 2",
       "source_url": "https://library.ldraw.org/library/official/parts/3003.dat",
