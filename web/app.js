@@ -1105,6 +1105,7 @@ window.forge = {
   setSingleVisible(v) { if (world) world.root.visible = world.mirror.visible = v; plate.visible = cellMarks.visible = v && staged; },
   stageIn() { setStaged(true); },
   hasWorld: () => !!world,
+  lastTask: () => { const t = skillsCache.find((x) => x.id === lastSkill); return t ? { instruction: t.instruction, success_rate: t.success_rate, n_eval: t.n_eval || 20 } : null; },
   setMulti(on) { $("#app").classList.toggle("multi", on); $("#view-sim").classList.toggle("multi", on); },
   THREE, scene3, camera, controls, renderer,
   meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage, applyFrame, buildWorld, populate, armScale: (rid) => ARM_SCALE[String(rid || "so101").split(".")[0]] || 1,

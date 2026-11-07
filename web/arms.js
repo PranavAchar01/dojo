@@ -18,7 +18,7 @@ const MAX_ARMS = 4;
 const SPEED = 4; // playback is sped up so a cell of recorded episodes plays in about a minute
 const N_PARTS = 12;
 const Y0 = 0.32;
-const GAP = 0.5; // arms stand close together around one work area // first arm's y; the arms stand along y, one pitch apart
+const GAP = 0.4; // arms stand close together around one work area; Y0 is the first arm's y, the arms stand along y, one pitch apart
 const ADD = /\b(add|bring in|put in|spawn|give me)\s+(another|a second|a third|an? extra|one more)\b[^.]{0,30}\b(so-?101|arms?|robots?)\b/i;
 const WANTS = new RegExp(
   [
@@ -35,6 +35,7 @@ const WANTS = new RegExp(
 let active = false;
 let line = null; // the planned cell as /api/line returns it
 let extra = 0; // arms that have no task yet (planned arms come from the line's stations)
+let prior = null; // the single-arm task on the canvas when another arm was added
 let prevN = 0; // arms already standing before the latest change, so only new ones build in
 let taskText = "";
 let grp = null;
@@ -75,6 +76,7 @@ async function addArm() {
   const n = total();
   if (n >= MAX_ARMS) { F().note(`The canvas holds up to ${MAX_ARMS} arms.`); return; }
   const first = !active;
+  if (first) prior = F().hasWorld() ? F().lastTask() : null;
   prevN = first ? (F().hasWorld() ? 1 : 0) : n;
   extra = first ? 2 : extra + 1;
   enter();
@@ -88,6 +90,7 @@ async function addArm() {
 async function setCell(l) {
   const same = line && line.id === l.id;
   line = l;
+  prior = null;
   if (!same) armRuns = {};
   if (!same) prevN = 0;
   enter();
@@ -122,7 +125,7 @@ function exit() {
   token++;
   const f = F();
   clear();
-  line = null; extra = 0; prevN = 0; armRuns = {};
+  line = null; extra = 0; prevN = 0; armRuns = {}; prior = null;
   f.setMulti(false);
   f.setSingleVisible(true);
   f.controls.maxDistance = saved.max;
@@ -322,13 +325,17 @@ function armRow(st, i) {
     <button type="button" class="arm-toggle" ${busy ? "disabled" : ""}>${isVla ? "Use a script" : "Use a VLA"}</button>
   </li>`;
 }
-const noTask = (from) => Array.from({ length: extra }, (_, i) => `<li class="arm bare"><div class="arm-h"><span class="arm-n">${from + i + 1}</span><b>SO-101</b><span class="arm-st">No task yet</span></div><div class="arm-meta">Say what it should do, or describe the task the arms do together.</div></li>`).join("");
+const noTask = (from, count = extra) => Array.from({ length: count }, (_, i) => `<li class="arm bare"><div class="arm-h"><span class="arm-n">${from + i + 1}</span><b>SO-101</b><span class="arm-st">No task yet</span></div><div class="arm-meta">Say what it should do, or describe the task the arms do together.</div></li>`).join("");
+function priorRow(t) { // the arm that was already on the canvas keeps its task and held-out score
+  const score = t.success_rate != null ? `${Math.round(t.success_rate * t.n_eval)}/${t.n_eval} on held-out scenes` : "held-out score after training";
+  return `<li class="arm vla st-ready"><div class="arm-h"><span class="arm-n">1</span><b>SO-101</b><span class="arm-st">Trained</span></div><div class="arm-task">${esc(t.instruction)}</div><div class="arm-meta">SO-101 · VLA policy</div><div class="arm-facts">${esc(score)}</div></li>`;
+}
 function renderPanel() {
   const list = $("#arms");
   const go = $("#arms-go");
   if (!active) { list.innerHTML = ""; $("#arms-result").innerHTML = ""; return; }
   if (!line) {
-    list.innerHTML = noTask(0);
+    list.innerHTML = prior ? priorRow(prior) + noTask(1, Math.max(0, extra - 1)) : noTask(0);
     $("#arms-note").textContent = `${extra} arms`;
     $("#arms-model").textContent = "";
     $("#arms-result").innerHTML = "";

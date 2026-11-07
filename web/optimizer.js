@@ -79,13 +79,15 @@ export function mount(root, ctx = {}) {
   const openBtn = el("button", "opt-btn opt-ghost", "Open the montage");
   const panel = el("div", "opt-panel");
   panel.append(head, badge, summary, openBtn);
-  const overlay = el("div", "opt-overlay");
+  const overlay = el("div", "opt opt-overlay"); // lives on <body>: the app panel is a containing block for fixed children
   overlay.hidden = true;
   const ovHead = el("div", "opt-ov-head");
   const closeBtn = el("button", "opt-btn opt-ghost", "Close");
   ovHead.append(el("h3", "", "Optimizer montage"), closeBtn);
   overlay.append(ovHead, badge2, main, replay, table);
-  root.append(panel, overlay);
+  root.append(panel);
+  document.querySelectorAll("body > .opt-overlay").forEach((n) => n.remove());
+  document.body.append(overlay);
   const setOpen = (v) => { overlay.hidden = !v; root.dataset.optOpen = v ? "1" : ""; };
   openBtn.onclick = () => setOpen(true);
   closeBtn.onclick = () => setOpen(false);
