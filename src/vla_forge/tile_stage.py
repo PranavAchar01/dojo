@@ -18,7 +18,7 @@ from .sim.robots import DEFAULT, parse_id
 from .viz import robot_meshes
 
 BUILD_PHASE = 0.9  # the bridge build: late enough that the bricks stand in their places
-PHASE = 0.55  # the stretch of the rollout where the arm is working on the objects
+PHASE = 0.999  # the end of a successful rollout: the task done, the object where it belongs
 
 
 def shoot(ids: list[str] | None = None) -> list[str]:
@@ -57,23 +57,8 @@ def shoot(ids: list[str] | None = None) -> list[str]:
 PITCH = 0.4  # arms stand this far apart along y, as the Sim's multi-arm view stands them
 
 
-def busiest(episodes: list[dict], n_arms: int) -> tuple[float, int]:
-    """The second of the recorded schedule with the most arms mid-motion (a second in from either end of an episode)."""
-    end = max(e["start"] + e["duration"] for e in episodes)
-    best, t = (0.0, 0), 0.0
-    while t < end:
-        n = sum(
-            any(e["station"] == k and e["start"] + 1 <= t < e["start"] + e["duration"] - 1 for e in episodes)
-            for k in range(n_arms)
-        )
-        if n > best[1]:
-            best = (t, n)
-        t += 0.5
-    return best
-
-
 def shoot_multi(card_ids: list[str] | None = None) -> list[str]:
-    """Shoot thumb.png of the multi-arm Library cards: every arm of the saved line run, at its busiest second."""
+    """Shoot thumb.png of the multi-arm Library cards: every arm of the saved line run at its last second, each with its last part placed."""
     from . import factory, multi
 
     colors = factory.block_colors()
@@ -84,7 +69,7 @@ def shoot_multi(card_ids: list[str] | None = None) -> list[str]:
         for rec in wanted:
             ln = lines[rec["line"]]
             pb = ln.result["playback"]
-            sec, _n = busiest(pb["episodes"], len(ln.stations))
+            sec = max(e["start"] + e["duration"] for e in pb["episodes"])
             cells = []
             for k, sc in enumerate(factory.cell_scenes(ln)):
                 eps = [e for e in pb["episodes"] if e["station"] == k]
