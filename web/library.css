@@ -144,7 +144,7 @@
 }
 
 /* Trained models | 3D models switch */
-.lib-mode { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 999px; background: #e9eef3; }
-.lib-mode button { flex: none; white-space: nowrap; width: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; font: 600 14px var(--ui); color: var(--ink2); transition: background-color .25s, color .25s; }
-.lib-mode button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 32, .12); }
+.lib-face { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 999px; background: #e9eef3; }
+.lib-face button { flex: none; white-space: nowrap; width: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; font: 600 14px var(--ui); color: var(--ink2); transition: background-color .25s, color .25s; }
+.lib-face button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 32, .12); }
 #lib-3d[hidden], #lib-trained[hidden] { display: none; }
