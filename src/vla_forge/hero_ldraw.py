@@ -5,7 +5,7 @@ the Y-down LDraw frame. Lines 2 and 5 (edges) are dropped."""
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -31,13 +31,15 @@ class Library:
 
     def triangles(self, name: str) -> np.ndarray:
         """All triangles of a part as an (n, 3, 3) array in LDraw units and frame, wound counter-clockwise."""
-        return np.array(self._tris(name, self.find(name)), dtype=float).reshape(-1, 3, 3)
+        return np.array(self._tris(name, self.find(name)), dtype=float).reshape(
+            -1, 3, 3
+        )
 
     def _tris(self, name: str, path: Path) -> list:
         return _parse(self, str(path))
 
 
-@lru_cache(maxsize=None)
+@cache
 def _parse_cached(libroot: str, path: str) -> tuple:
     lib = Library(Path(libroot))
     out: list = []
@@ -60,7 +62,9 @@ def _parse_cached(libroot: str, path: str) -> tuple:
         try:
             if t[0] == "1":
                 v = [float(x) for x in t[2:14]]
-                m = np.array([[v[3], v[4], v[5]], [v[6], v[7], v[8]], [v[9], v[10], v[11]]])
+                m = np.array(
+                    [[v[3], v[4], v[5]], [v[6], v[7], v[8]], [v[9], v[10], v[11]]]
+                )
                 off = np.array(v[0:3])
                 sub = lib.find(" ".join(t[14:]))
                 tris = np.array(_parse(lib, str(sub))).reshape(-1, 3, 3)
@@ -83,7 +87,7 @@ def _parse_cached(libroot: str, path: str) -> tuple:
                 invert_next = False
         except FileNotFoundError:
             continue
-    return tuple(map(lambda x: tuple(map(tuple, x)), out))
+    return tuple(tuple(map(tuple, x)) for x in out)
 
 
 def _parse(lib: Library, path: str):
@@ -96,7 +100,13 @@ def part_mesh(lib: Library, part: str) -> tuple[np.ndarray, np.ndarray]:
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
     origin = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
     tris = tris - origin
-    verts, inv = np.unique(np.round(tris.reshape(-1, 3), 7), axis=0, return_inverse=True)
+    verts, inv = np.unique(
+        np.round(tris.reshape(-1, 3), 7), axis=0, return_inverse=True
+    )
     faces = inv.reshape(-1, 3)
-    keep = (faces[:, 0] != faces[:, 1]) & (faces[:, 1] != faces[:, 2]) & (faces[:, 0] != faces[:, 2])
+    keep = (
+        (faces[:, 0] != faces[:, 1])
+        & (faces[:, 1] != faces[:, 2])
+        & (faces[:, 0] != faces[:, 2])
+    )
     return verts, faces[keep]

@@ -118,8 +118,13 @@ class Registry:
 
     def ordered(self) -> list[Skill]:
         """Shown skills, newest first. skills/hidden.json lists older renders and repeats kept on disk but not shown."""
-        hide = HIDDEN.exists() and set(json.loads(HIDDEN.read_text())["hidden"]) or set()
-        return sorted((s for s in self.skills.values() if s.id not in hide), key=lambda s: -s.created)
+        hide = (
+            HIDDEN.exists() and set(json.loads(HIDDEN.read_text())["hidden"]) or set()
+        )
+        return sorted(
+            (s for s in self.skills.values() if s.id not in hide),
+            key=lambda s: -s.created,
+        )
 
     def exact(self, instruction: str, robot: str = "so101") -> Skill | None:
         """The best published single skill for exactly this instruction on this robot (what a composed task reuses)."""

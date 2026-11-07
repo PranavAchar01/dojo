@@ -12,7 +12,7 @@ for part, name in hb.PART_NAME.items():
     head = {}
     for line in src.read_text(errors="ignore").splitlines()[:12]:
         for key in ("Name", "Author", "!LICENSE"):
-            if line.startswith(f"0 {key}:") or line.startswith(f"0 {key} "):
+            if line.startswith((f"0 {key}:", f"0 {key} ")):
                 head[key] = line.split(None, 2)[2].lstrip(": ").strip()
     v, f = hb.part_mesh_cached(part)
     parts[part] = {

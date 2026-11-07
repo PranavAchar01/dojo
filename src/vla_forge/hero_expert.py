@@ -39,7 +39,9 @@ class ArmIK:
         self.d.qpos[self.qadr] = q
         mujoco.mj_kinematics(self.m, self.d)
         mujoco.mj_comPos(self.m, self.d)
-        return self.d.site_xpos[self.site].copy(), self.d.site_xmat[self.site].reshape(3, 3).copy()
+        return self.d.site_xpos[self.site].copy(), self.d.site_xmat[self.site].reshape(
+            3, 3
+        ).copy()
 
     def solve(self, target, q0, iters=80, tol=5e-4):
         q = np.array(q0, float)
@@ -72,8 +74,16 @@ class Expert:
         self.ee = self.ik.fk(self.q)[0]
         self.g = self.g_goal = G_CLOSED
         self.max_ik_err = 0.0
-        base = t.m.body(pre + "base").id if any(t.m.body(i).name == pre + "base" for i in range(t.m.nbody)) else None
-        self.base_xy = t.d.xpos[base][:2].copy() if base is not None else np.array(ds.ARMS[pre][0][:2])
+        base = (
+            t.m.body(pre + "base").id
+            if any(t.m.body(i).name == pre + "base" for i in range(t.m.nbody))
+            else None
+        )
+        self.base_xy = (
+            t.d.xpos[base][:2].copy()
+            if base is not None
+            else np.array(ds.ARMS[pre][0][:2])
+        )
 
     def tick(self, goal, speed):
         delta = goal - self.ee
@@ -113,7 +123,10 @@ class Expert:
         part = db.brick_map()[name].part
         nx, ny = db.PART_FOOTPRINT[part]
         ax = yaw + (np.pi / 2 if nx >= ny else 0.0)  # direction of the short side
-        cands = [np.array([np.cos(ax + k * np.pi), np.sin(ax + k * np.pi), 0.0]) for k in range(2)]
+        cands = [
+            np.array([np.cos(ax + k * np.pi), np.sin(ax + k * np.pi), 0.0])
+            for k in range(2)
+        ]
         p = self.t.pose(name)[0][:2]
         radial = (p - self.base_xy) / max(np.linalg.norm(p - self.base_xy), 1e-9)
         return max(cands, key=lambda n: float(n[:2] @ radial))
@@ -121,7 +134,9 @@ class Expert:
     def pick(self, name: str) -> None:
         t = self.t
         c0 = t.pose(name)[0].copy()
-        c0[2] = 0.0016  # the pads sit low on the jaw: grip the bottom plate level of any brick
+        c0[2] = (
+            0.0016  # the pads sit low on the jaw: grip the bottom plate level of any brick
+        )
         self.ik.heading = self.heading_for(name)
         self.g_goal = G_OPEN
         above = self.site_for(c0, CENTRE_OPEN)
@@ -141,7 +156,9 @@ class Expert:
             n = max(1, int(np.ceil(abs(err) / 0.02)))
             for i in range(1, n + 1):
                 ca, sa = np.cos(err * i / n), np.sin(err * i / n)
-                self.ik.heading = np.array([ca * h0[0] - sa * h0[1], sa * h0[0] + ca * h0[1], 0.0])
+                self.ik.heading = np.array(
+                    [ca * h0[0] - sa * h0[1], sa * h0[0] + ca * h0[1], 0.0]
+                )
                 self.tick(self.site_for([*xy, CARRY_Z], CENTRE_GRASP), TRANSIT)
             self.hold(0.25)
 
