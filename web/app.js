@@ -289,7 +289,7 @@ function populate(sc, root, rid, meshes, { shadows = true, belt: wantBelt = true
   const belt = addLineParts(sc, root, bodies, { shadows, belt: wantBelt, halfLen: beltHalfLen });
   return { bodies, belt };
 }
-async function buildWorld(sc) {
+async function buildWorld(sc, quick = false) {
   const rid = sc.robot_id || "so101";
   const meshes = await meshesFor(rid);
   window.forgeArms?.exit(); // a single-arm scene replaces any multi-arm cell
@@ -310,11 +310,14 @@ async function buildWorld(sc) {
   const twin = populate(sc, mirror, rid, meshes, { shadows: false, belt: false });
   scene3.add(mirror);
   world = { root, mirror, bodies: lone.bodies, twin: twin.bodies, n: sc.bodies.length, rid, belt: null };
-  if (!staged) { // the scene builds in on the bare floor: the arm rises, the grid fades
+  if (!staged && !quick) { // the scene builds in on the bare floor: the arm rises, the grid fades
     world.root.scale.set(1, 1, 0.02);
     world.mirror.scale.set(1, 1, -0.02);
     plate.scale.set(1, 1, 0.02);
     setStaged(true);
+  } else if (!staged) { // a recorded rollout: the cell is simply there, no build-in
+    setStaged(true);
+    stageT = { t0: 0, from: 1, to: 1 };
   }
 }
 // back to the bare floor (new chat)
@@ -345,12 +348,56 @@ function applyFrame(frame) {
 
 // playback of the policy's own recorded rollout (body poses at 30 Hz)
 let play = null; // { frames, fps, t0 }
-async function startPlayback(payload) {
-  await buildWorld(payload.scene);
+async function startPlayback(payload, auto = false) {
+  const tok = ++playTok;
+  $("#view-sim").classList.toggle("auto", auto); // saved tiles play on their own: no replay pill
+  await buildWorld(payload.scene, true);
+  if (tok !== playTok) return;
   play = { frames: payload.frames, fps: payload.fps, t0: performance.now(), phases: payload.phase_frames || null, instructions: payload.instructions || [], step: -1 };
   $("#step-badge").classList.add("hidden");
   applyFrame(payload.frames[0]);
+  simLoading(null);
+  performance.mark("dojo-frame");
 }
+let playTok = 0;
+
+// ---------------------------------------------------------------- welcome: with nothing picked, the floor plays what Dojo has learned
+let welcome = null;
+const WELCOME = [/touch|reach/i, /bowl/i, /sort/i, /push/i, /stack|lift/i, /kit|insert|rotate/i];
+async function startWelcome() {
+  if (welcome || (current && !runDone) || selSkill || $("#app").dataset.view !== "sim") return;
+  const me = (welcome = { i: 0, timer: 0, list: null });
+  const lib = await (await fetch("/api/library")).json().catch(() => ({ tiles: [] }));
+  const have = lib.tiles.filter((t) => t.replay && !t.steps?.length);
+  const list = [];
+  for (const re of WELCOME) { const t = have.find((x) => re.test(x.instruction) && !list.includes(x)); if (t) list.push(t); }
+  if (welcome !== me) return;
+  if (!list.length) { welcome = null; return; }
+  me.list = list;
+  $("#welcome").hidden = false;
+  nextWelcome(me);
+}
+async function nextWelcome(me) {
+  const t = me.list[me.i++ % me.list.length];
+  replayData(me.list[me.i % me.list.length].id, 0, me.list[me.i % me.list.length].replay_source); // the next one, ahead of time
+  const p = await replayData(t.id, 0, t.replay_source);
+  if (welcome !== me) return;
+  if (!p) { me.timer = setTimeout(() => nextWelcome(me), 300); return; }
+  await startPlayback(p, true);
+  if (welcome !== me) return;
+  const held = `${Math.round(t.success_rate * (t.n_eval || 20))}/${t.n_eval || 20}`;
+  $("#vp-caption").textContent = `“${t.instruction}” · ${held} held-out, in simulation`;
+  $("#welcome-now").textContent = `Now playing: ${t.instruction}`;
+  $("#vp-badge").classList.add("hidden");
+  me.timer = setTimeout(() => nextWelcome(me), (1000 * p.frames.length) / p.fps + 900);
+}
+function stopWelcome() {
+  if (!welcome) return;
+  clearTimeout(welcome.timer);
+  welcome = null;
+  $("#welcome").hidden = true;
+}
+document.querySelectorAll(".wl-chip").forEach((b) => b.addEventListener("click", () => { $("#app").classList.remove("no-left"); $("#prompt").value = b.dataset.say; $("#prompt").focus(); }));
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
   if (!r.width || !r.height) return; // the sim view is hidden on the other tabs
@@ -455,7 +502,23 @@ let shown = { run: null, round: -1, index: -1 }; // rollout on screen
 let losses = []; // per round arrays of [t, loss] of the run being trained
 let planRows = [];
 let lastSkill = null;
-let selSkill = null; // the skill on screen: the run's own once it is saved, or the tile picked in the library
+let selSkill = null;
+// recorded rollouts, fetched once per tile recording and kept: a second look, a hover prefetch, the welcome loop
+const replays = new Map();
+function replayData(id, i = 0, src = "") {
+  const k = `${id}:${i}:${src}`;
+  if (!replays.has(k)) {
+    replays.set(k, fetch(`/api/skills/${id}/replay/${i}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+    if (replays.size > 24) replays.delete(replays.keys().next().value);
+  }
+  return replays.get(k);
+}
+// the loading card shows the moment a tile is picked and goes once its first frame is on the floor
+function simLoading(text) {
+  const n = $("#sim-load");
+  n.hidden = !text;
+  if (text) $("#sim-load-t").textContent = text;
+} // the skill on screen: the run's own once it is saved, or the tile picked in the library
 let skillsCache = [];
 
 // "16/20" from the evaluated round when we have it, else the rate on the standard 20 scenes
@@ -548,6 +611,8 @@ $("#new-chat").addEventListener("click", () => {
   current = null;
   $("#crumb-run").textContent = "new task";
   $("#vp-caption").textContent = "SO-101 · MuJoCo";
+  selSkill = null;
+  setTimeout(startWelcome, 0);
   $("#chips").innerHTML = "";
   $("#round-label").textContent = "Rollouts";
   $("#pb-label").textContent = "rollout ·";
@@ -755,6 +820,8 @@ function setView(v) {
     setTimeout(again, 240);
   }
   window.dispatchEvent(new CustomEvent("forge:view", { detail: v }));
+  if (v === "sim") startWelcome();
+  else stopWelcome(); // nothing builds worlds behind a hidden floor
 }
 window.setView = setView;
 $("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); setTimeout(resize, 240); };
@@ -883,6 +950,7 @@ es.onmessage = (m) => {
   handle(e);
 };
 function beginRun(rid) {
+  stopWelcome();
   current = rid;
   selSkill = null;
   composite = false;
@@ -1111,7 +1179,10 @@ window.forge = {
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
   // a finished tile picked in the library: the rail, the bubble and the bot show that skill as saved
+  replayData,
+  simLoading,
   selectSkill(t) {
+    stopWelcome();
     selSkill = t.id;
     if (current && !runDone) return;
     const held = `${Math.round(t.success_rate * (t.n_eval || 20))}/${t.n_eval || 20}`;
@@ -1199,6 +1270,7 @@ $("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
 
 idleScene();
 setView("skills"); // the library is the first thing after the landing page
+meshesFor("so101"); // warm the arm's meshes so the first tile or the welcome loop draws at once
 
 // ---------------------------------------------------------------- live tab capture (?capture=1, demo recording)
 window.setSpeed = (on) => { $("#speed").classList.toggle("hidden", !on); };
