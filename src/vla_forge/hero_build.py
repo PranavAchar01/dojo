@@ -63,7 +63,7 @@ def run(
     record: bool = True,
     bricks=None,
     rules: hb.Rules | None = None,
-    thumb_at: float = 0.55,
+    trace=None,
 ) -> dict:
     """Build the bridge once. Returns per-brick results, the rule results, and (if asked) the recorded frames."""
     if bricks is not None:
@@ -75,25 +75,17 @@ def run(
     frames: list[list[float]] = []
     marks: list[dict] = []
     tick = [0]
-    shot: list = []  # the thumbnail: an arm carrying a brick towards its seat, about `thumb_at` of the way through
     cur = [""]
     bm = hb.brick_map()
 
-    def want_shot() -> bool:
-        if shot or not cur[0] or order.index(cur[0]) < int(thumb_at * len(order)):
-            return False
-        p = t.pose(cur[0])[0]
-        goal = ds.target_pose(bm[cur[0]])[0]
-        return bool(p[2] > 0.03 and np.linalg.norm(p[:2] - goal[:2]) < 0.05)
-
     def on_tick(_t):
         tick[0] += 1
-        if want_shot():
-            shot.append(thumb_view(t))
         if record and tick[0] % KEEP_EVERY == 0:
             frames.append(pose_frame(t))
 
     arms = {p: he.Expert(t, p, on_tick) for p in ds.ARMS}
+    for a in arms.values():
+        a.trace = trace
     if record:
         frames.append(pose_frame(t))
     t0 = time.time()
@@ -136,6 +128,7 @@ def run(
                 "error": err,
             }
         )
+    end_view = thumb_view(t) if record else None  # the card's picture: the finished bridge, arms at home
     seated = [r["brick"] for r in per if r["seated"]]
     built = tuple(bm[n] for n in seated)
     rules = rules or hb.Rules()
@@ -153,6 +146,6 @@ def run(
         "wall_seconds": round(time.time() - t0, 1),
         "frames": frames,
         "marks": marks,
-        "thumb": shot[0] if shot else None,
+        "thumb": end_view,
         "table": t,
     }

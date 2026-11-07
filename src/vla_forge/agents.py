@@ -432,7 +432,7 @@ class Forge:
         rnd.successes = successes
         run.best_round = 0
         sid = f"build-the-brick-bridge-{run.id[-4:]}"
-        best = max(builds, key=lambda b: (b["thumb"] is not None, b["seated"]))
+        best = hero_flow.best(builds)
         FORGE.emit(run.id, "saving", "registry", skill=sid)
         skill = Skill(
             id=sid,

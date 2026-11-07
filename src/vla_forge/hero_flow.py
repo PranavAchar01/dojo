@@ -17,8 +17,8 @@ from . import hero_replay as hr_
 from . import hero_rules as hr
 
 INSTRUCTION = "Build the brick bridge from the plan"
-NAME = "Brick bridge (scripted)"
-SEEDS = (7101, 7102, 7103, 7104)  # placements nobody tuned the expert on
+NAME = "Brick bridge"
+SEEDS = tuple(range(7101, 7121))  # placements nobody tuned the expert on
 WORKERS = 2
 
 
@@ -87,6 +87,14 @@ def build_all(bricks, rules: hb.Rules, on_done=None) -> list[dict]:
 
 def success(b: dict) -> bool:
     return b["seated"] == b["total"] and b["rules_passed"] == b["rules_total"]
+
+
+def best(builds: list[dict]) -> dict:
+    """The build the card shows: a successful one (else the most bricks seated) with the smallest worst placement error."""
+    def miss(b: dict) -> float:
+        return max((x["pos_err_mm"] or 0.0) for x in b["bricks"])
+
+    return min(builds, key=lambda b: (not success(b), -b["seated"], miss(b)))
 
 
 def failures(builds: list[dict]) -> dict[str, int]:
