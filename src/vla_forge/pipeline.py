@@ -102,6 +102,8 @@ class Run:
     pinned: bool = False  # the user chose the robot; the router then only advises
     # factory line: the station this run trains (factory.py); its scenes are that station's conveyor cell
     station: dict = field(default_factory=dict)
+    # everything the page was sent for this run, kept for the Library replay (records.save_capture)
+    events: list = field(default_factory=list, repr=False)
 
     @property
     def composite(self) -> bool:
@@ -181,6 +183,10 @@ class Forge:
             "agent": agent,
             **data,
         }
+        run = self.runs.get(run_id)
+        if run is not None and len(run.events) < 8000:
+            # "t" can be overwritten by the event's own data (loss carries training seconds), so the clock is "ts"
+            run.events.append({**ev, "ts": ev["t"]})
         if self.loop is None:
             return
         self.loop.call_soon_threadsafe(self._fanout, ev)
@@ -393,6 +399,7 @@ class Forge:
         )
         self.registry.add(skill)
         records.save(sid, records.from_run(run))
+        records.save_capture(sid, run, self)
         self._save_tile(
             skill, run.rollouts[0], [st.instruction for st in run.steps], run_id=run.id
         )
@@ -668,6 +675,7 @@ class Forge:
         )
         self.registry.add(skill)
         records.save(sid, records.from_run(run))
+        records.save_capture(sid, run, self)
         self._save_tile(skill, run.rollouts[run.best_round], run_id=run.id)
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)
