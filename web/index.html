@@ -92,22 +92,22 @@
       <div class="view blank" id="view-sim">
         <canvas id="three"></canvas>
         <div class="boot" id="boot"><div class="rl-card"><span class="mascot xl" data-follow></span><div class="boot-bar"><i></i></div><span class="boot-t">Warming up the agents</span></div></div>
-        <div class="caption">
+        <div class="caption" data-keepclear>
           <span id="tier" class="tier hidden"></span>
           <span id="vp-caption">SO-101 &middot; MuJoCo</span>
         </div>
-        <div id="vp-badge" class="badge hidden"></div>
-        <div id="step-badge" class="step-badge hidden"></div>
+        <div id="vp-badge" class="badge hidden" data-keepclear></div>
+        <div id="step-badge" class="step-badge hidden" data-keepclear></div>
 
-        <div class="navc">
+        <div class="navc" data-keepclear>
           <button data-cam="orbit" class="vc-btn on" title="Orbit" aria-label="Orbit camera"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg></button>
           <button data-cam="front" class="vc-btn" title="Front" aria-label="Front camera"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="10" rx="1.5"/></svg></button>
           <button data-cam="top" class="vc-btn" title="Top" aria-label="Top camera"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="1.5"/><circle cx="10" cy="10" r="2"/></svg></button>
         </div>
 
-        <ol class="rail" id="rail"></ol>
+        <ol class="rail" id="rail" data-keepclear></ol>
 
-        <div class="pill" id="playbar">
+        <div class="pill" id="playbar" data-keepclear>
           <button id="pb-prev" aria-label="Previous rollout">&minus;</button>
           <span class="num" id="pb-label">rollout &middot;</span>
           <button id="pb-next" aria-label="Next rollout">+</button>
@@ -226,5 +226,6 @@
 <script type="module" src="/static/arms.js"></script>
 <script type="module" src="/static/agents.js"></script>
 <script type="module" src="/static/forge-agent.js"></script>
+<script type="module" src="/static/workflow.js"></script>
 </body>
 </html>

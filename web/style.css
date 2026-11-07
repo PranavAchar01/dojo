@@ -111,6 +111,10 @@ a.brand:hover { color: var(--accent); }
 .ag-eyes .ag-lens { fill: #04183f; fill-opacity: .55; }
 .ag-eyes .ag-frame { fill: none; stroke: #0a1d45; stroke-opacity: .85; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .ag-eyes .ag-cam { fill: #9fc9ff; }
+.ag-eyes .ag-hb { fill: #fff; stroke: #0a1d45; stroke-opacity: .35; stroke-width: 1; stroke-linejoin: round; }
+.ag-eyes .ag-hb-knot { fill: #fff; stroke: #0a1d45; stroke-opacity: .45; stroke-width: 1; }
+.ag-eyes .ag-hb-tail { fill: #f2f6ff; stroke: #0a1d45; stroke-opacity: .35; stroke-width: 1; stroke-linejoin: round; }
+.ag-eyes .ag-hb-tail.b { fill: #dfe9fb; }
 .ag-eyes .ag-ant-arm { fill: none; stroke: #0064e0; stroke-width: 3.2; stroke-linecap: round; }
 .ag-eyes .ag-ant-loop { fill: none; stroke: #0064e0; stroke-width: 3.2; stroke-linejoin: round; }
 
@@ -486,3 +490,14 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   .pb-progress { width: 40px; }
   .thread { max-height: 60vh; }
 }
+
+/* the run's workflow (workflow.js): Etch's timeline rows in a card at the bottom of the stage */
+.wf { position: absolute; left: 50%; bottom: 14px; z-index: 13; width: min(440px, calc(100% - 32px)); transform: translateX(-50%); padding: 8px 12px; background: var(--card, #fff);
+  border-radius: 16px; box-shadow: 0 8px 28px rgba(22, 28, 45, .12), 0 1px 2px rgba(22, 28, 45, .1); font-family: var(--ag-sans); color: var(--ag-ink);
+  transition: bottom .42s var(--bounce), opacity .25s, transform .25s; animation: pill-rise .45s var(--soft) both; }
+.wf.lift { bottom: 70px; }
+.wf.gone { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
+.wf[hidden] { display: none; }
+.wf .ag-tl-live:empty { display: none; }
+.wf .ag-tl.open .ag-tl-list { max-height: min(260px, 40vh); }
+@media (max-width: 760px) { .wf, .wf.lift { bottom: 176px; } }
