@@ -1,7 +1,8 @@
-"""The 6-brick duck: parts, colours, target poses, and the real LDraw meshes.
+"""The LEGO Serious Play duck, rebuilt from the real kit's six parts with the real LDraw meshes.
 
-Facing +x. Grid cells are 8 mm studs and 9.6 mm brick layers. The assembly follows the part list Pranav picked
-(2 x 3001, 3002, 3003, 3004, 3039); see docs/duck-demo.md for what is and is not checked against an official sheet."""
+The kit (set 2000416 "Duck": 2x4, 2x2, 1x2, a printed 2x2 and two red 2x3 plates) ships with no instructions, so the
+assembly here copies one duck from a published photo of builds from that kit (source in assets/lego/manifest.json).
+Facing +x. Grid: 8 mm studs, 3.2 mm plate levels (a brick is 3 levels)."""
 
 from __future__ import annotations
 
@@ -21,22 +22,26 @@ LIB = LEGO / "_dl" / "x" / "ldraw"  # raw library download (git-ignored); the co
 MESHES = LEGO / "meshes"
 
 STUD = ld.STUD  # 8 mm
+PLATE = 8 * ld.LDU  # 3.2 mm
 LAYER = ld.BRICK_H  # 9.6 mm
 YELLOW = (1.0, 0.80, 0.02, 1.0)
-ORANGE = (1.0, 0.38, 0.02, 1.0)
+RED = (0.80, 0.04, 0.05, 1.0)
 PART_FOOTPRINT = {  # studs along the part's own x, y
     "3001": (4, 2),
     "3002": (3, 2),
     "3003": (2, 2),
     "3004": (2, 1),
     "3039": (2, 2),
+    "3021": (3, 2),
 }
+PART_PLATES = {"3001": 3, "3002": 3, "3003": 3, "3004": 3, "3039": 3, "3021": 1}
 PART_NAME = {
     "3001": "Brick 2 x 4",
     "3002": "Brick 2 x 3",
     "3003": "Brick 2 x 2",
     "3004": "Brick 1 x 2",
     "3039": "Slope 45 2 x 2",
+    "3021": "Plate 2 x 3",
 }
 
 
@@ -47,7 +52,7 @@ class Brick:
     rgba: tuple
     col: int  # stud column of the footprint's low-x corner
     row: int
-    layer: int
+    lvl: int  # plate level of the bottom face (0 = table)
     yaw_deg: int  # 0 or 90
     role: str
 
@@ -59,52 +64,53 @@ class Brick:
     def target_pos(self) -> np.ndarray:
         """Bottom centre of the brick when seated (metres, table top at z = 0)."""
         nx, ny = self.footprint
-        return np.array([(self.col + nx / 2) * STUD, (self.row + ny / 2) * STUD, self.layer * LAYER])
+        return np.array([(self.col + nx / 2) * STUD, (self.row + ny / 2) * STUD, self.lvl * PLATE])
 
     def target_quat(self) -> np.ndarray:
         h = math.radians(self.yaw_deg) / 2
         return np.array([math.cos(h), 0.0, 0.0, math.sin(h)])
 
 
-# Build order is bottom-up. The head is the top brick, the beak rides the neck's front studs, the tail slope falls toward the head
-# (its low edge faces +x).
+# Bottom-up: red foot plate, a 2x2 leg on it, the 2x4 body across the leg (rear overhangs as the tail end), the red
+# beak plate on the body's front studs (one stud forward of the body), the head on the plate, a low 1x2 tail.
 DUCK: tuple[Brick, ...] = (
-    Brick("base", "3001", YELLOW, 0, 0, 0, 0, "body, bottom"),
-    Brick("body", "3001", YELLOW, -1, 0, 1, 0, "body, top (one stud back so the rear sticks out)"),
-    Brick("neck", "3002", YELLOW, 1, 0, 2, 0, "neck, front of the body"),
-    Brick("head", "3003", YELLOW, 1, 0, 3, 0, "head, the highest brick"),
-    Brick("beak", "3004", ORANGE, 3, 0, 3, 90, "beak, on the neck's front studs, one stud past the head"),
-    Brick("tail", "3039", YELLOW, -1, 0, 2, 90, "tail, slope rises to the rear"),
+    Brick("foot", "3021", RED, 1, 0, 0, 0, "red plate, the duck's foot"),
+    Brick("leg", "3003", YELLOW, 2, 0, 1, 0, "2x2 leg on the foot"),
+    Brick("body", "3001", YELLOW, 0, 0, 4, 0, "2x4 body across the leg, rear overhangs"),
+    Brick("beak", "3021", RED, 2, 0, 7, 0, "red plate on the front studs, one stud past the body"),
+    Brick("head", "3003", YELLOW, 2, 0, 8, 0, "2x2 head (printed eye) on the plate"),
+    Brick("tail", "3004", YELLOW, 0, 0, 7, 0, "1x2 tail, lying on the rear studs (not visible in the source photo)"),
 )
 
 # Duck centre in the camera and exploded views, metres.
-CENTRE = np.array([1.5 * STUD, STUD, 2.0 * LAYER])
+CENTRE = np.array([2.0 * STUD, STUD, 1.8 * LAYER])
 
 
 def brick_map() -> dict[str, Brick]:
     return {b.name: b for b in DUCK}
 
 
-def occupied(upto: int | None = None) -> set[tuple[int, int, int]]:
-    cells = set()
-    for b in DUCK[:upto]:
-        nx, ny = b.footprint
-        cells |= {(b.col + i, b.row + j, b.layer) for i in range(nx) for j in range(ny)}
-    return cells
+def cells(b: Brick) -> set[tuple[int, int, int]]:
+    nx, ny = b.footprint
+    return {
+        (b.col + i, b.row + j, b.lvl + k)
+        for i in range(nx)
+        for j in range(ny)
+        for k in range(PART_PLATES[b.part])
+    }
 
 
 def check_assembly() -> list[str]:
     """Structural problems of the target: overlaps, floating bricks, bricks that do not engage a stud below."""
     problems = []
     seen: set = set()
-    for k, b in enumerate(DUCK):
-        nx, ny = b.footprint
-        cells = {(b.col + i, b.row + j, b.layer) for i in range(nx) for j in range(ny)}
-        if cells & seen:
+    for b in DUCK:
+        c = cells(b)
+        if c & seen:
             problems.append(f"{b.name} overlaps an earlier brick")
-        if b.layer and not any((c, r, b.layer - 1) in seen for c, r, _ in cells):
+        if b.lvl and not any((x, y, b.lvl - 1) in seen for x, y, z in c if z == b.lvl):
             problems.append(f"{b.name} rests on nothing")
-        seen |= cells
+        seen |= c
     return problems
 
 
