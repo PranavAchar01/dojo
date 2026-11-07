@@ -84,3 +84,13 @@ tests/test_agentverse.py and tests/test_agentbus.py, docs/fetch-ai-plan.md.
 
 sam-3.1 on sim frames was considered for a frame check and left out: the sim already knows every contact and object
 pose exactly, so a segmentation model on its renders would only restate ground truth at $2.50 per 1000 images.
+
+## Measured (2026-11-07, live keys)
+
+- Task parse, "insert the green block into the socket": both lanes started at the same instant. Muse Spark
+  (`meta:muse-spark-1.3`) 1,241 tokens in, 606 out, 4.1 s; SubQ Snap read all 50 saved skills (8,316 tokens) in 0.69 s.
+- One optimizer proposal step on saved run opt-091548-bba5 (3 rounds, 249 KB of rounds, scenes and trajectories): both
+  started at the same instant. SubQ (`subq:subq-snap-1.1`) read 231,438 tokens in 2.8 s and picked "add 30
+  demonstrations at the failed starts" (p 0.41). Muse Wonder (`meta:muse-wonder-1.0`) 2,012 in, 1,293 out, 14.5 s,
+  proposed "learning rate 5e-05". Different changes, so both children would train. A full round (two children trained
+  and scored) did not fit the 8 GB test-server cap next to the live server, so the training half was not run here.
