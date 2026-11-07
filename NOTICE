@@ -23,11 +23,14 @@ Third-party material and design credits.
    not affiliated with this project.
 
 4a. Mascot
-   The robot mascot (web/mascot.js) is original art made for this project and drawn in code as one SVG:
-   a solid chamfered head, a forked gripper antenna and two cut-out eyes, in a single ink colour. Its four
-   moods (idle, think, ok, fail) change only the eyes and antenna. The general direction (monochrome,
-   minimal, geometric, bold) was the only reference; it does not trace, reproduce or adapt any existing
-   logo, character or company mark.
+   The bot (web/mascot.js, eyes.js, spring.js, goo.js) is the character from Etch, the author's own earlier project
+   (https://github.com/PranavAchar01/etch, deploy/etch-app at a0bb241d, live at https://etch-app-theta.vercel.app):
+   js/ui/eyes.js (the eyes rig: states, activities, emotes, springs, blink and glance timers, gaze maths),
+   js/ui/spring.js (spring physics), js/ui/goo.js (the gooey bubble) and the .ag-eyes rules of css/agent.css.
+   The logic is carried over unchanged. The edits are marked "Meta:" in eyes.js: Meta blues for the body, smart
+   glasses over the eyes and an infinity-loop antenna with a spring of its own. web/mascot.js plays the part of
+   Etch's dock (js/ui/dock.js): it maps the page's events to the bot's states, emotes and bubbles. The earlier
+   head-and-gripper bot drawn for this project was replaced by it.
 
 5. Fonts
    Figtree and Averia Serif Libre (SIL Open Font License 1.1), loaded from Google Fonts, the same pair

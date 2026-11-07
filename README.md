@@ -1,5 +1,10 @@
 # VLA Forge
 
+Turning one sentence into a trained robot skill takes a frontier model to plan the task, critique the failures and
+optimize the next round. In VLA Forge that model is Llama (Meta's Llama 4 Maverick, through the Llama API): it parses the
+task, plans the arms, reads the failures and proposes each optimizer change. Until a Llama API key works here, a stub
+backend answers instead; the Meta section below says exactly what ran live.
+
 Type "have a robot do X". A team of Fetch.ai uAgents turns the sentence into a task, builds the scene,
 collects expert demonstrations, fine-tunes a vision-language-action policy, measures it on held-out scenes,
 reads the failures, retrains if there is time, and publishes the result as a new callable skill agent.
