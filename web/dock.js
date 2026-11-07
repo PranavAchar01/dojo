@@ -37,8 +37,8 @@ const ACTS = [
   [/train|fine-tun|loss/i, "render", "Training the policy"],
   [/eval|held-out|measur|scor/i, "inspect", "Testing on held-out scenes"],
   [/critic|failure|fail/i, "read", "Reading the failures"],
-  [/optimi|round/i, "repair", "Optimizing the skill"],
-  [/publish|sav|regist/i, "export", "Saving the skill"],
+  [/optimi|round/i, "repair", "Optimizing the model"],
+  [/publish|sav|regist/i, "export", "Saving the model"],
   [/run|execut|compos/i, "route", "Running the plan"],
 ];
 function activityOf(d) {

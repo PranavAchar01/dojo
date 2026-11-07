@@ -451,7 +451,7 @@ async function rankUp() {
     const rank = RANK_AT.reduce((r, at, i) => (n >= at ? i : r), 0);
     if (rankNow >= 0 && rank > rankNow) { roamer.bow(); say("Level up", 2600); }
     rankNow = rank;
-    roamer.root.title = `${n} skill${n === 1 ? "" : "s"} passed`;
+    roamer.root.title = `${n} model${n === 1 ? "" : "s"} passed`;
   } catch { /* the server is still warming up */ }
 }
 setTimeout(rankUp, 1200);
