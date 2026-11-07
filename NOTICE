@@ -50,3 +50,13 @@ Third-party material and design credits.
    and UT Robot Perception and Learning Lab), kept unmodified with its LICENSE; bin1's collision boxes are
    scaled at run time (src/vla_forge/sim/line.py). The conveyor follows the construction given by MuJoCo's
    maintainers in google-deepmind/mujoco issue #547. Details in SOURCES.md.
+
+9. Studio rendering (web/vendor/three)
+   three.js r170 examples (MIT License, Copyright 2010-2024 three.js authors): RoomEnvironment, EffectComposer,
+   RenderPass, GTAOPass, OutputPass, SMAAPass and their shaders. The robot meshes are unchanged (items 7 and 8);
+   web/studio.js only assigns black and white materials and builds the lab floor, which is procedural
+   (generated noise texture, no photograph or downloaded image).
+
+10. Fixtures for the harder skills (src/vla_forge/sim/props.py)
+   The kitting tray and the insertion socket are built in code from boxes: no downloaded mesh, no third-party
+   asset, nothing to license. The parts are the forge's own 3 cm cubes.
