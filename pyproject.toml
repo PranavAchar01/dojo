@@ -29,6 +29,7 @@ build-backend = "uv_build"
 assets = [
     "coacd>=1.0.14",
     "fast-simplification>=0.2.0",
+    "httpx>=0.28.1",
     "pycollada>=0.9.3",
     "pygltflib>=1.16.5",
     "python-multipart>=0.0.33",

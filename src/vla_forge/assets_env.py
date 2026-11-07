@@ -37,16 +37,25 @@ def main() -> None:
     ENV.mkdir(parents=True, exist_ok=True)
     tex = json.loads(_get(f"{API}/files/{FLOOR}"))
     out = {}
-    for key, name in (("Diffuse", "floor_diff"), ("Rough", "floor_rough"), ("nor_gl", "floor_nor")):
+    for key, name in (
+        ("Diffuse", "floor_diff"),
+        ("Rough", "floor_rough"),
+        ("nor_gl", "floor_nor"),
+    ):
         data = _get(tex[key]["1k"]["jpg"]["url"])
         (ENV / f"{name}.jpg").write_bytes(data)
-        Image.open(io.BytesIO(data)).convert("RGB").resize((512, 512)).save(ENV / f"{name}.png")
+        Image.open(io.BytesIO(data)).convert("RGB").resize((512, 512)).save(
+            ENV / f"{name}.png"
+        )
     sky = json.loads(_get(f"{API}/files/{SKY}"))["hdri"]["1k"]["hdr"]["url"]
     (ENV / "sky.hdr").write_bytes(_get(sky))
     out["floor"] = {"id": FLOOR, "kind": "pbr texture", **_info(FLOOR)}
     out["sky"] = {"id": SKY, "kind": "hdri", **_info(SKY)}
     (ENV / "provenance.json").write_text(json.dumps(out, indent=1))
-    print({k: v["source_url"] for k, v in out.items()}, sorted(p.name for p in ENV.iterdir()))
+    print(
+        {k: v["source_url"] for k, v in out.items()},
+        sorted(p.name for p in ENV.iterdir()),
+    )
 
 
 if __name__ == "__main__":
