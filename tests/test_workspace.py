@@ -79,9 +79,9 @@ def test_so100_workspace_excludes_the_near_base_misses():
     for p in R.reachability(rid)["points"]:
         assert ws["r_lo"] - 1e-3 <= math.hypot(p["x"], p["y"]) <= ws["r_hi"] + 1e-3
     if ok:  # the tasks then sample inside that same sector
-        for skill in SPECS:
+        for spec in SPECS.values():
             for seed in range(10):
-                lay = sample_layout(SPECS[skill], np.random.default_rng(seed), robot=rid)
+                lay = sample_layout(spec, np.random.default_rng(seed), robot=rid)
                 for _c, x, y, *_ in lay.blocks.values():
                     assert ws["r_lo"] <= math.hypot(x, y) <= ws["r_hi"] + 0.02
 
@@ -89,9 +89,9 @@ def test_so100_workspace_excludes_the_near_base_misses():
 def test_sampler_follows_the_workspace_it_is_given(monkeypatch):
     ws = Workspace(0.17, 0.31, math.radians(30))
     monkeypatch.setattr("vla_forge.sim.robots.task_workspace", lambda rid: ws)
-    for skill in SPECS:
+    for spec in SPECS.values():
         for seed in range(15):
-            lay = sample_layout(SPECS[skill], np.random.default_rng(seed), robot="x")
+            lay = sample_layout(spec, np.random.default_rng(seed), robot="x")
             for _c, x, y, *_ in lay.blocks.values():
                 assert ws.r_lo - 0.01 <= math.hypot(x, y) <= ws.r_hi + 0.02
                 assert abs(math.atan2(y, x)) <= ws.ang + 0.05
