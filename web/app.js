@@ -1422,11 +1422,21 @@ window.forge = {
 // DOM contract: #optimizer-sec (hidden until the Optimize step is clicked) holds #optimizer-root, an empty div the
 // optimizer owns. If the files are absent the section opens with a one-line note and the app is otherwise unchanged.
 const optSec = $("#optimizer-sec"), optRoot = $("#optimizer-root");
+// the RSI result (rounds kept/reverted, the fresh-scene check) shows as soon as Optimize opens: the current skill's run, else the default
+async function showOptRSI() {
+  try {
+    let rs = await fetch("/api/optimizer/runs").then((r) => (r.ok ? r.json() : []));
+    const ok = rs.filter((x) => x.status === "done");
+    const d = ok.find((x) => selSkill && x.skill?.id === selSkill.id) || ok.find((x) => x.default) || ok[0];
+    if (d && !optSec.hidden) window.forgeRSIShow?.({ run: d.id, tile: d.skill?.id });
+  } catch { /* no runs: the optimizer view stands alone */ }
+}
 function optimizerOpen(on) {
   optSec.hidden = !on;
   rail.optimizer.classList.toggle("sel", on);
   if (on) { $("#app").classList.remove("no-right"); optSec.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
   optRoot.dataset.open = on ? "1" : "";
+  if (on) showOptRSI(); else window.forgeRSIHide?.();
   window.dispatchEvent(new CustomEvent("forge:optimizer", { detail: { open: on } }));
 }
 // the Plan and Run steps scroll to their inspector card; the others open the step card below
