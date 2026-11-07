@@ -62,3 +62,14 @@ if (!reduced && innerWidth >= 760) {
     roamer.host.addEventListener("click", () => say("Open the app and give it a task.", 4200));
   });
 }
+
+// the hero preview gets the height left on the first screen; mark it when the screenshot is taller than that, so the
+// bottom fades out instead of being cut by the fold
+const stageFig = document.querySelector(".hero .stage");
+const stageImg = stageFig && stageFig.querySelector(".stage-media img");
+if (stageFig && stageImg) {
+  const crop = () => { const box = stageImg.parentElement; stageFig.classList.toggle("cropped", stageImg.getBoundingClientRect().height > box.clientHeight + 2); };
+  new ResizeObserver(crop).observe(stageImg.parentElement);
+  stageImg.addEventListener("load", crop);
+  crop();
+}
