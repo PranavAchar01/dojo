@@ -603,6 +603,7 @@ let runStart = 0;
 let runDone = 0;
 const roundsBy = {}; // run id -> [{index, eval, successes, plan}]
 let shown = { run: null, round: -1, index: -1 }; // rollout on screen
+let savedModel = null; // a Library model open in Sim with no live run: its saved record fills the inspector
 let losses = []; // per round arrays of [t, loss] of the run being trained
 let planRows = [];
 let lastSkill = null;
@@ -743,7 +744,7 @@ function drawLoss() {
   // empty chart: a quiet placeholder, and a free patch the robot can work in while training warms up
   svg.closest(".sec").dataset.empty = all.length ? "" : "1";
   if (!all.length) {
-    svg.innerHTML = `<text class="ph" x="150" y="52" text-anchor="middle">No training yet</text>`;
+    svg.innerHTML = `<text class="ph" x="150" y="52" text-anchor="middle">${savedModel ? "loss curve not recorded for this model" : "No training yet"}</text>`;
     if (composite && planRows.length && planRows.every((p) => p.source === "reuse")) $("#loss-steps").textContent = "no training: every step reused a trained model";
     return;
   }
@@ -796,6 +797,7 @@ function drawRounds() {
   for (const r of roundsBy[current] || []) {
     if (r && r.eval) box.append(barRow(`Round ${r.index + 1}`, r.eval.succeeded, r.eval.n));
   }
+  if (!box.children.length && savedModel) box.append(barRow("Held-out", Math.round(savedModel.sk.success_rate * (savedModel.sk.n_eval || 20)), savedModel.sk.n_eval || 20));
   if (!box.children.length) box.append(el("span", "ph", "Not measured yet. Each round is scored on 20 scenes it never trained on."));
 }
 function renderPlan(plan, note) {
@@ -1116,6 +1118,7 @@ function handle(e) {
       break;
     }
     case "task":
+      savedModel = null;
       if (e.steps) {
         composite = true;
         resetStages(true);
@@ -1310,6 +1313,7 @@ window.forge = {
     resetStages(t.tier === 3);
     stage("eval", "done", held);
     stage("registry", "done", held);
+    showSavedModel(t);
     $("#crumb-run").textContent = t.name;
     window.dispatchEvent(new CustomEvent("dojo:skill", { detail: { id: t.id, name: t.name, held } }));
   },
@@ -1335,24 +1339,151 @@ function optimizerOpen(on) {
   optRoot.dataset.open = on ? "1" : "";
   window.dispatchEvent(new CustomEvent("forge:optimizer", { detail: { open: on } }));
 }
-// every step on the rail opens that step's detail for the skill on screen: its line in the chat, or its inspector card
-const DETAIL = { planner: "#plan-sec", trainer: "#loss-sec", eval: "#rounds-sec", critic: "#critic-sec", executor: "#arms-sec" };
+// the Plan and Run steps scroll to their inspector card; the others open the step card below
+const DETAIL = { planner: "#plan-sec", executor: "#arms-sec" };
 function pulse(n) { n.classList.remove("pulse"); void n.offsetWidth; n.classList.add("pulse"); setTimeout(() => n.classList.remove("pulse"), 1300); }
+// ---- the step card: one card beside the rail with that step's own data, from /api/state (skill and run records)
+const NOT_REC = "not recorded for this model";
+let railCard = null, railCardKey = "";
+function closeRailCard() {
+  railCard?.remove(); railCard = null; railCardKey = "";
+  for (const li of Object.values(rail)) if (li.dataset.stage !== "optimizer") li.classList.remove("sel");
+}
+const ruleText = (r) => `${String(r.op).replace(/_/g, " ")}: ${Object.entries(r).filter(([k]) => k !== "op").map(([k, v]) => `${k} ${v}`).join(", ")}`;
+const when = (t) => new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function stepRows(k, sk, run) {
+  const rows = []; // [label, text] or [label, null] for "not recorded"
+  const add = (l, v) => rows.push([l, v === undefined || v === null || v === "" ? null : String(v)]);
+  const spec = run?.spec || sk?.spec;
+  const rounds = run?.rounds || [];
+  const best = rounds[run?.best_round] || rounds[rounds.length - 1];
+  const btn = [];
+  if (k === "task") {
+    add("Instruction", spec?.instruction || run?.prompt || sk?.instruction);
+    if (spec) {
+      add("Skill", spec.skill); add("Object", spec.obj); add("Target", spec.target); add("Distractors", spec.distractors);
+      (spec.success || []).forEach((r, i) => add(i ? "" : "Success rule", ruleText(r)));
+    }
+    if (run?.parse?.model) add("Parsed by", modelTag(run.parse.model));
+    const fe = spec?.feasibility ?? sk?.feasibility;
+    if (fe != null) {
+      const flat = (v) => (typeof v === "object" && v ? (Array.isArray(v) ? v.map(flat).join("; ") : Object.entries(v).map(([a, b]) => `${a.replace(/_/g, " ")} ${flat(b)}`).join(", ")) : String(v));
+      if (typeof fe === "object" && !Array.isArray(fe)) Object.entries(fe).forEach(([a, b], i) => add(i ? a.replace(/_/g, " ") : `Feasibility: ${a.replace(/_/g, " ")}`, flat(b)));
+      else add("Feasibility", flat(fe));
+    }
+  } else if (k === "router") {
+    const r = run?.route;
+    if (r && r.decision) {
+      add("Route", r.decision.replace(/_/g, " ")); add("Why", r.reason);
+      if (r.expected != null) add("Expected success", `${Math.round(r.expected * 100)}%`);
+      if (r.estimate_s) add("Estimated time", `${Math.round(r.estimate_s)}s`);
+      if (r.skill_id) add("Starts from", `skill-${r.skill_id.slice(-4)}`);
+      (r.checks || []).forEach((c) => add(c.name, `${c.ok ? "ok" : "failed"}: ${c.detail}`));
+    } else {
+      add("Route", null);
+      if (sk) { add("Asked from", sk.origin); if (sk.parent) add("Started from", `skill-${sk.parent.slice(-4)}`); }
+    }
+  } else if (k === "scene") {
+    add("Robot", run?.robot || sk?.robot);
+    if (spec) { add("Block", spec.obj); add("Target", spec.target); add("Distractors", spec.distractors); }
+    add("Held-out scenes", sk?.n_eval || (best?.eval?.n));
+    add("Replays from", sk?.replay_source);
+    add("Layout seed", null);
+    btn.push(["Set orbit camera", () => setCam("orbit")]);
+  } else if (k === "data") {
+    const n = rounds.reduce((a, r) => a + (r.demos || 0), 0);
+    add("Demonstrations", n || null);
+    if (rounds.length) add("Collected", "scripted expert in randomized scenes");
+    if (rounds.length > 1) add("Rounds", `${rounds.length} (${rounds.map((r) => r.demos).join(" + ")})`);
+    add("Expert success", null);
+  } else if (k === "trainer") {
+    const secs = rounds.reduce((a, r) => a + (r.train?.seconds || 0), 0) || sk?.train_seconds;
+    add("Train time", secs ? `${(+secs).toFixed(1)}s` : null);
+    if (rounds.length) add("Rounds", rounds.length);
+    const steps = rounds.reduce((a, r) => a + (r.train?.steps || 0), 0);
+    add("Steps", steps || null);
+    const lastLoss = [...rounds].reverse().find((r) => r.loss?.length)?.loss.at(-1);
+    add("Final loss", lastLoss ? lastLoss[1].toFixed(3) : null);
+    if (sk?.seconds) add("Prompt to model", `${fmt(sk.seconds)}`);
+  } else if (k === "eval") {
+    const n = sk?.n_eval || best?.eval?.n || 0;
+    const ok = sk ? Math.round(sk.success_rate * n) : best?.eval?.succeeded;
+    add("Succeeded", n && ok != null ? `${ok}/${n} on held-out scenes` : null);
+    if (best?.successes?.length) add("Per scene", best.successes.map((x) => (x ? "\u25CF" : "\u25CB")).join(" "));
+    else add("Per scene", null);
+    if (sk?.tests?.length) add("Test runs", `${sk.tests.length} on fresh scenes`);
+  } else if (k === "critic") {
+    const ps = rounds.filter((r) => r.plan && r.plan.action);
+    if (ps.length) ps.forEach((r) => add(`Round ${r.index + 1}: ${r.plan.action}`, r.plan.rationale));
+    else add("Verdict", null);
+  } else if (k === "registry") {
+    if (sk) {
+      add("Model", sk.name || `skill-${sk.id.slice(-4)}`); add("Id", sk.id);
+      add("Success", `${Math.round(sk.success_rate * (sk.n_eval || 20))}/${sk.n_eval || 20} held-out`);
+      if (sk.created) add("Published", when(sk.created));
+      if (sk.agent_address) add("Agent", `${sk.agent_address.slice(0, 14)}...`);
+      btn.push(["Open the Library card", () => { closeRailCard(); window.forgeLib?.openTile(sk.id); }]);
+    } else add("Model", null);
+  }
+  return { rows, btn };
+}
+async function openRailCard(k) {
+  if (railCard && railCardKey === k) return closeRailCard();
+  closeRailCard();
+  railCardKey = k;
+  rail[k].classList.add("sel");
+  let st = { skills: [], runs: [] };
+  try { st = await (await fetch("/api/state")).json(); } catch { /* the card still opens with what the page holds */ }
+  if (railCardKey !== k) return; // closed or switched while loading
+  const sid = selSkill || lastSkill;
+  const run = st.runs.find((r) => r.id === current && !runDone) || st.runs.find((r) => sid && r.skill_id === sid) || st.runs.find((r) => r.id === current);
+  const sk = st.skills.find((x) => x.id === (sid || run?.skill_id));
+  const { rows, btn } = stepRows(k, sk, run);
+  const c = el("div", "rail-card");
+  c.setAttribute("role", "dialog"); c.setAttribute("aria-label", NAMES[k]);
+  const x = el("button", "wf-x", "\u00D7"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.onclick = closeRailCard;
+  c.append(x, el("div", "rc-t", NAMES[k]));
+  const body = el("dl", "rc-rows");
+  for (const [l, v] of rows) { body.append(el("dt", "", l)); body.append(el("dd", v === null ? "none" : "", v === null ? NOT_REC : v)); }
+  c.append(body);
+  for (const [t, fn] of btn) { const b = el("button", "rc-btn", t); b.type = "button"; b.onclick = fn; c.append(b); }
+  const host = $("#view-sim"), li = rail[k];
+  host.append(c);
+  const hr = host.getBoundingClientRect(), lr = li.getBoundingClientRect(), rr = $("#rail").getBoundingClientRect();
+  c.style.right = `${hr.right - rr.left + 10}px`;
+  c.style.top = `${Math.max(8, Math.min(lr.top - hr.top - 6, hr.height - c.offsetHeight - 80))}px`;
+  railCard = c;
+}
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && railCard) closeRailCard(); });
+async function showSavedModel(sk) {
+  savedModel = { sk };
+  let run = null;
+  try { run = (await (await fetch("/api/state")).json()).runs.find((r) => r.skill_id === sk.id) || null; } catch { /* the saved skill record still fills the cards */ }
+  if (!savedModel || savedModel.sk !== sk) return;
+  savedModel.run = run;
+  losses = (run?.rounds || []).map((r) => r.loss || []).filter((l) => l.length);
+  drawLoss(); drawRounds();
+  const last = losses.at(-1)?.at(-1);
+  $("#loss-now").textContent = last ? last[1].toFixed(3) : "";
+  $("#loss-steps").textContent = sk.train_seconds != null ? `trained ${(+sk.train_seconds).toFixed(1)}s` : "";
+  $("#loss-init").textContent = "";
+  const box = $("#critic");
+  box.innerHTML = "";
+  const ps = (run?.rounds || []).filter((r) => r.plan && r.plan.action);
+  if (!ps.length) box.append(el("span", "dim", "critic verdict not recorded for this model"));
+  for (const r of ps) { const d = el("div"); d.append(el("b", "", `Round ${r.index + 1}: ${r.plan.action}. `), document.createTextNode(r.plan.rationale || "")); box.append(d); }
+}
 function openStage(k) {
-  if (k === "optimizer") return optimizerOpen(optSec.hidden);
-  if (k === "registry") return selSkill || lastSkill ? window.forgeLib?.openTile(selSkill || lastSkill) : setView("skills");
+  if (k === "optimizer") { closeRailCard(); return optimizerOpen(optSec.hidden); }
   setView("sim");
   if (DETAIL[k]) {
+    closeRailCard();
     $("#app").classList.remove("no-right");
     const sec = $(DETAIL[k]);
     sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
     return pulse(sec);
   }
-  if (k === "scene") setCam("orbit");
-  const line = current && toolEls[`${current}:${k}`];
-  if (line) { line.scrollIntoView({ block: "center", behavior: "smooth" }); return pulse(line); }
-  if (k === "task") $("#prompt").focus();
-  pulse($("#dock"));
+  openRailCard(k);
 }
 for (const [k, li] of Object.entries(rail)) {
   li.addEventListener("click", () => openStage(k));
@@ -1429,3 +1560,16 @@ if (new URLSearchParams(location.search).has("capture")) {
 // empty inspector cards start with their quiet placeholders
 drawLoss();
 drawRounds();
+
+// the bottom-right voice pill and the docked prompt bar float over scrolling pages: reserve their height so the last row stays readable
+function reserveBottom() {
+  const root = document.documentElement, vh = window.innerHeight;
+  const top = (sel) => { const n = document.querySelector(sel); if (!n || !n.offsetParent && getComputedStyle(n).position !== "fixed") return vh; return n.getBoundingClientRect().top; };
+  const pill = vh - top(".ag-pill");
+  const bar = $("#app").classList.contains("immersive") ? 0 : vh - top("#prompt-form");
+  root.style.setProperty("--pill-pad", `${Math.max(0, pill) + 16}px`);
+  root.style.setProperty("--clear", `${Math.max(pill, bar, 0) + 16}px`);
+}
+addEventListener("resize", reserveBottom);
+new MutationObserver(reserveBottom).observe($("#app"), { attributes: true, attributeFilter: ["data-view", "class"] });
+const pillWatch = setInterval(() => { const p = document.querySelector(".ag-pill"); if (!p) return; clearInterval(pillWatch); new ResizeObserver(reserveBottom).observe(p); reserveBottom(); }, 400);
