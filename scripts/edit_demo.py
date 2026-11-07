@@ -30,7 +30,7 @@ CUES = [
     ("armsresult", "armsresult", 0.3),
     ("optimize", "optimize", 0.3),
     ("montage", "montage", 2.3),
-    ("ticker", "ticker", 5.0),
+    ("ticker", "ticker", 8.8),
     ("replay", "replay", 0.3),
     ("close", "close", 0.5),
 ]

@@ -115,12 +115,18 @@ class Stub:
             from .llm import _rule_critic
 
             d = json.loads(user)
-            return _rule_critic(
+            out = _rule_critic(
                 d["evaluation"],
                 d["settings"],
                 d["seconds_left"],
                 d["target_success_rate"],
             )
+            out["rationale"] = (
+                "Add demonstrations at the failed starts and keep training."
+                if out["action"] == "retrain"
+                else "The success rate is at the bar, so publish."
+            )
+            return out
         if kind == "optimizer":
             return self._optimizer(json.loads(user))
         raise ValueError(f"unknown call {kind!r}")
