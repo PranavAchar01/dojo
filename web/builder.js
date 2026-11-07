@@ -121,10 +121,16 @@ function partGroup(view) {
 const views = new Map();
 const fetchJSON = (url) => {
   if (!views.has(url)) {
-    views.set(url, fetch(url).then((r) => {
+    // a failed fetch (server restarting, network blip) is forgotten so the next look retries it
+    // network errors (server restarting) retry a few times; anything that still fails is forgotten so the next look retries
+    const get = (tries) => fetch(url).catch((e) => {
+      if (tries <= 0) throw e;
+      return new Promise((ok) => setTimeout(ok, 1500)).then(() => get(tries - 1));
+    });
+    views.set(url, get(4).then((r) => {
       if (!r.ok) throw new Error(`${r.status}`);
       return r.json();
-    }));
+    }).catch((e) => { views.delete(url); throw e; }));
   }
   return views.get(url);
 };
@@ -320,7 +326,7 @@ async function assemble() {
   if (view.status === "fulfilled") showAssembly(rid, view.value);
   performance.mark(`rv-shown-${rid}`);
   if (rep.status !== "fulfilled") {
-    failCard("The server could not assemble these parts.", String(rep.reason));
+    failCard(rep.reason instanceof TypeError ? "Could not reach the server." : "The server could not assemble these parts.", rep.reason instanceof TypeError ? "It may be restarting. Pick the part again in a few seconds." : String(rep.reason));
     $("#asm-sum").textContent = "";
     return;
   }
@@ -339,7 +345,7 @@ function failCard(title, detail, partial = false) {
   const f = $("#asm-fail");
   f.innerHTML = "";
   f.classList.toggle("partial", partial);
-  f.append(el("div", "lbl", partial ? "Some skills are off on this robot" : "Cannot train on this robot"), el("b", "", title), el("div", "d", detail));
+  f.append(el("div", "lbl", partial ? "Some models are off on this robot" : "Cannot train on this robot"), el("b", "", title), el("div", "d", detail));
   f.classList.remove("hidden");
 }
 function renderReport(rid, rep) {
@@ -360,10 +366,10 @@ function renderReport(rid, rep) {
   $("#asm-facts").textContent = facts.join(" · ");
   const usable = rep.usable ?? (rep.ok && any);
   if (!rep.ok) failCard(rep.failure ? rep.failure.split(":")[0] : "A check failed", rep.failure ? rep.failure.split(": ").slice(1).join(": ") : "", usable);
-  else if (!any) failCard("No skill fits this robot", "Every skill fails a reach or grip check; see the list below.");
+  else if (!any) failCard("No model fits this robot", "Every model fails a reach or grip check; see the list below.");
   const ub = $("#use-robot");
   ub.disabled = !usable || rid === active;
-  ub.textContent = rid === active ? "Skills train on this robot" : "Train the next skill on this robot";
+  ub.textContent = rid === active ? "Models train on this robot" : "Train a model on this robot";
   const note = $("#use-note");
   const limits = usable && rep.usable_reason && rep.usable_reason !== "every skill fits" ? `It ${rep.usable_reason}. ` : "";
   note.textContent = limits + (usable && rep.act_dim && rep.act_dim !== 6
@@ -387,7 +393,7 @@ async function useRobot() {
     return;
   }
   setActive(rid);
-  b.textContent = "Skills train on this robot";
+  b.textContent = "Models train on this robot";
 }
 
 function setActive(rid) {
