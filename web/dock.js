@@ -66,14 +66,14 @@ export function createDock(hostEl, opts = {}) {
   const header = el("div", "ag-ph", phLine, phLoader.el);
   const headWrap = el("div", "ag-phw", header);
   const turnsEl = el("div", "ag-turns");
-  const empty = el("div", "ag-empty", el("div", "ag-empty-t", "What are you doing?"), el("div", "ag-empty-d", "Ask Reps about the step it is on, or about any agent. Click the mic or hold Space to talk."));
+  const empty = el("div", "ag-empty", el("div", "ag-empty-t", "What are you doing?"), el("div", "ag-empty-d", "Ask Dojo about the step it is on, or about any agent. Click the mic or hold Space to talk."));
   const scroll = el("div", "ag-scroll", empty, turnsEl);
   const newPill = el("button", "ag-newpill lq-btn");
   newPill.type = "button"; newPill.hidden = true;
   const inner = el("div", "ag-panel-in", headWrap, scroll, newPill);
   const panel = el("div", "ag-panel", inner);
   panel.setAttribute("role", "region");
-  panel.setAttribute("aria-label", "Reps agent");
+  panel.setAttribute("aria-label", "Dojo agent");
   panel.inert = true;
 
   const bubbles = el("div", "ag-bubbles");
@@ -101,13 +101,13 @@ export function createDock(hostEl, opts = {}) {
   const status = el("div", "ag-status", pillLoader.el, wave, statusText);
   status.setAttribute("aria-live", "polite");
   const input = el("input", "ag-input");
-  input.type = "text"; input.placeholder = PLACEHOLDER; input.setAttribute("aria-label", "Ask Reps"); input.maxLength = 400;
+  input.type = "text"; input.placeholder = PLACEHOLDER; input.setAttribute("aria-label", "Ask Dojo"); input.maxLength = 400;
   input.autocomplete = "off";
   const send = el("button", "ag-send lq-btn", icon("send"));
   send.type = "submit"; send.setAttribute("aria-label", "Send");
   const form = el("form", "ag-compose", input, send);
   const mic = el("button", "ag-mic lq-btn", icon("mic"));
-  mic.type = "button"; mic.setAttribute("aria-label", "Talk to Reps (or hold Space)");
+  mic.type = "button"; mic.setAttribute("aria-label", "Talk to Dojo (or hold Space)");
   const badge = el("span", "ag-badge");
   badge.hidden = true;
   const pill = el("div", "ag-pill", eyesWrap, status, mic, form);

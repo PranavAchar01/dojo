@@ -1,4 +1,4 @@
-# Reps
+# Dojo
 
 Turning one sentence into a trained robot skill takes models that plan the task, critique the failures and
 optimize the next round. Here two models do it side by side, each on what it is built for: Meta's Muse models

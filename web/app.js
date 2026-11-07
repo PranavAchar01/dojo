@@ -558,8 +558,10 @@ $("#new-chat").addEventListener("click", () => {
 function drawLoss() {
   const svg = $("#loss");
   const all = losses.flat();
+  // empty chart: a quiet placeholder, and a free patch the robot can work in while training warms up
+  svg.closest(".sec").dataset.empty = all.length ? "" : "1";
   if (!all.length) {
-    svg.innerHTML = "";
+    svg.innerHTML = `<text class="ph" x="150" y="52" text-anchor="middle">No training yet</text>`;
     if (composite && planRows.length && planRows.every((p) => p.source === "reuse")) $("#loss-steps").textContent = "no training: every step reused a skill agent";
     return;
   }
@@ -612,6 +614,7 @@ function drawRounds() {
   for (const r of roundsBy[current] || []) {
     if (r && r.eval) box.append(barRow(`Round ${r.index + 1}`, r.eval.succeeded, r.eval.n));
   }
+  if (!box.children.length) box.append(el("span", "ph", "Not measured yet. Each round is scored on 20 scenes it never trained on."));
 }
 function renderPlan(plan, note) {
   planRows = plan || [];
@@ -1179,3 +1182,7 @@ if (new URLSearchParams(location.search).has("capture")) {
       rec.stop();
     });
 }
+
+// empty inspector cards start with their quiet placeholders
+drawLoss();
+drawRounds();
