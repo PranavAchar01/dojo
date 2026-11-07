@@ -458,11 +458,49 @@ function drawSkeleton() {
   sk.querySelector(".sk-phase").textContent = `${prog.label}${prog.detail ? ` · ${prog.detail}` : ""}`;
   sk.querySelector(".pc-bar i").style.width = `${Math.round(100 * prog.frac)}%`;
 }
+// the RSI card's thumbnail: the optimizer's grid of 100 MuJoCo scenes at its best round, moving together
+const RSI_M = 8;
+const rsiSheets = new Map();
+function rsiSheet(run, round, k) {
+  const key = `${round}/${k}`;
+  if (!rsiSheets.has(key)) { const im = new Image(); im.src = `/api/optimizer/runs/${run}/img/r${round}/m${k}.jpg`; rsiSheets.set(key, im); }
+  return rsiSheets.get(key);
+}
+function rsiThumb(rsi) {
+  const c = el("canvas", "rsi-thumb");
+  c.width = 480; c.height = 360;
+  c.setAttribute("role", "img");
+  c.setAttribute("aria-label", "100 simulations of the skill running together");
+  rsiPaint(c, rsi, 0);
+  return c;
+}
+function rsiPaint(c, rsi, tick) {
+  const rd = rsi.data.best_round, rw = rsi.data.rounds[rd];
+  const t = tick % (RSI_M + 4), im = rsiSheet(rsi.run, rd, Math.min(t, RSI_M - 1));
+  const g = c.getContext("2d"), w = c.width / 10, h = c.height / 10;
+  g.fillStyle = "#eef1f4"; g.fillRect(0, 0, c.width, c.height);
+  if (im.complete && im.naturalWidth) g.drawImage(im, 0, 0, c.width, c.height);
+  rw.outcomes.forEach((ok, i) => {
+    const x = (i % 10) * w, y = Math.floor(i / 10) * h;
+    if (t >= RSI_M - 2) { g.fillStyle = ok ? "rgba(8,102,255,.14)" : "rgba(217,48,37,.24)"; g.fillRect(x, y, w, h); }
+    g.lineWidth = 3; g.strokeStyle = ok ? "#0866ff" : "#d93025"; g.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+  });
+}
+let rsiTick = 0;
+setInterval(() => {
+  const rsi = window.forgeRSI;
+  if (!rsi?.data || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  rsiTick++;
+  document.querySelectorAll("canvas.rsi-thumb").forEach((c) => rsiPaint(c, rsi, rsiTick));
+}, 320);
+
 function tileEl(t, byId) {
   const a = el("article", `tile${t.id === fresh ? " is-saved" : ""}${testing[t.id] ? " is-testing" : ""}`);
   a.dataset.id = t.id;
   const th = el("div", "tile-thumb");
-  if (t.thumb) {
+  if (t.id === window.forgeRSI?.tile && window.forgeRSI.data) {
+    th.append(rsiThumb(window.forgeRSI)); // the optimizer's 100 simulations playing together, not a single frame
+  } else if (t.thumb) {
     const img = el("img");
     img.alt = t.name;
     img.loading = "lazy";
@@ -625,7 +663,9 @@ async function refresh(freshId) {
 // the finished optimizer run that improved a library tile: that tile leads the list and its Replay shows the run (replay.js)
 fetch("/api/optimizer/runs").then((r) => (r.ok ? r.json() : [])).then((rs) => {
   const d = rs.find((x) => x.default);
-  if (d?.skill?.id) { window.forgeRSI = { run: d.id, tile: d.skill.id }; draw(); }
+  if (!d?.skill?.id) return;
+  window.forgeRSI = { run: d.id, tile: d.skill.id };
+  fetch(`/api/optimizer/runs/${d.id}`).then((r) => r.json()).then((run) => { window.forgeRSI.data = run; draw(); }).catch(() => draw());
 }).catch(() => {});
 
 // ---------------------------------------------------------------- toolbar
