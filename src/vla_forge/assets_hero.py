@@ -265,7 +265,7 @@ def _remap(scn, n0: int, src: mujoco.MjModel, dst: mujoco.MjModel) -> None:
 
 CAMERA = {
     "lookat": [0.2, 0.62, 0.02],
-    "distance": 1.5,
+    "distance": 1.7,
     "azimuth": 150.0,
     "elevation": -26.0,
 }
@@ -320,6 +320,7 @@ def shots(out_dir: Path, prefix: str = "2026-11-07-dojo-assets") -> None:
         "azimuth": 150.0,
         "elevation": -30.0,
     }
+    cell = {"lookat": [0.3, 0.6, 0.08], "distance": 1.15, "azimuth": 180, "elevation": -34}
     wide = {
         "lookat": [0.2, 0.6, 0.03],
         "distance": 1.9,
@@ -336,7 +337,7 @@ def shots(out_dir: Path, prefix: str = "2026-11-07-dojo-assets") -> None:
         return (live, rest) if live_first else (rest, live)
 
     a, b = pair(True, KIT)
-    render_line(out_dir / f"{prefix}-factory-mujoco.png", a, b, size, close1)
+    render_line(out_dir / f"{prefix}-factory-mujoco.png", a, b, size, cell)
     render_line(out_dir / f"{prefix}-factory-mujoco-wide.png", a, b, size, wide)
     a.close(), b.close()
 

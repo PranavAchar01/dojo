@@ -257,6 +257,9 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
     spec.add_material(
         name="wall_mat", rgba=[0.86, 0.87, 0.885, 1], specular=0.05, emission=0.55
     )
+    spec.add_material(name="guard_glass", rgba=[0.78, 0.84, 0.9, 0.13], specular=0.4)
+    spec.add_material(name="guard_frame", rgba=[0.08, 0.082, 0.094, 1])
+    spec.add_material(name="shelf_mat", rgba=[0.5, 0.51, 0.53, 1], specular=0.1)
     spec.add_material(name="top_mat", rgba=list(CONCRETE), specular=0.15)
 
     # the table top runs on past the first cell
@@ -267,15 +270,19 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
         CONCRETE,
         "top_mat",
     )
-    # extrusion frame: legs, a skirt just under the top, a low shelf
-    leg = 0.022
+    # extrusion frame: square legs, a solid apron under the top on all four sides, cross rails and a low shelf
+    leg, ap = 0.03, 0.05
+    cx, cy0 = (x0 + x1) / 2, (y0 + y1) / 2
     for x in (x0 + leg, x1 - leg):
-        for y in (y0 + leg, (y0 + y1) / 2, y1 - leg):
+        for y in (y0 + leg, cy0, y1 - leg):
             _box(world, [x, y, -0.40], [leg, leg, 0.35], STEEL, "alu")
-    for x in (x0 + leg, x1 - leg):
-        _box(world, [x, (y0 + y1) / 2, -0.062], [leg, (y1 - y0) / 2, leg], STEEL, "alu")
-    for y in (y0 + leg, y1 - leg):
-        _box(world, [(x0 + x1) / 2, y, -0.062], [(x1 - x0) / 2, leg, leg], STEEL, "alu")
+    for x in (x0 + 0.012, x1 - 0.012):  # apron: opaque aluminium plates
+        _box(world, [x, cy0, -0.04 - ap], [0.012, (y1 - y0) / 2, ap], STEEL, "alu")
+    for y in (y0 + 0.012, y1 - 0.012):
+        _box(world, [cx, y, -0.04 - ap], [(x1 - x0) / 2, 0.012, ap], STEEL, "alu")
+    for x in (x0 + leg, x1 - leg):  # low cross rails and a solid shelf
+        _box(world, [x, cy0, -0.52], [0.02, (y1 - y0) / 2, 0.02], STEEL, "alu")
+    _box(world, [cx, cy0, -0.54], [(x1 - x0) / 2 - 0.03, (y1 - y0) / 2 - 0.03, 0.01], STEEL, "shelf_mat")
 
     # the conveyor: side rails, end rollers, a roller bed, legs to the floor past the table
     bx, hw = 0.245, 0.035
@@ -318,15 +325,7 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
     )
     _box(world, [bx, cy, -0.0008], [hw, hl, 0.0012], None, "belt_vis")
 
-    # guard panels along the back and the far end (real library fence, scaled to the tabletop)
-    for i, p in enumerate(fr.get("guards", [])):
-        body = world.add_body(name=f"guard{i}", pos=p["pos"])
-        assets.attach(
-            body,
-            "chainlink_fence",
-            p.get("scale", 0.12),
-            yaw=math.radians(p.get("yaw", 0.0)),
-        )
+    _guard(world, x0, x1, y0, y1, fr.get("guard", {}))
     # the same key and fill lights as sim/scene.py gives the first cell, repeated over each further arm
     for k in range(1, fr.get("cells", 2)):
         dy = PITCH * k
@@ -354,6 +353,62 @@ def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
         ([0.9, 4.2, wz], [4.5, 0.05, 2.0]),
     ):
         _box(world, pos, half, None, "wall_mat")
+
+
+def _guard(world, x0, x1, y0, y1, cfg: dict) -> None:
+    """A rectangular guard around the line on the table: posts every `panel` metres, clear panels at one height,
+    a top rail, an opening where the belt runs through each end, and one gate in the front."""
+    h, w = cfg.get("height", 0.28), cfg.get("panel", 0.3)
+    gx, gy = 0.0, 0.0
+    spec_mat = {"rgba": [0.8, 0.84, 0.9, 0.12]}
+    world_mat = "guard_glass"
+    posts = []
+
+    def run(ax: str, fixed: float, lo: float, hi: float, skip=(), gate=None) -> None:
+        n = round((hi - lo) / w)
+        for i in range(n):
+            a, b = lo + i * w, lo + (i + 1) * w
+            mid = (a + b) / 2
+            posts.append((fixed, a) if ax == "y" else (a, fixed))
+            if i in skip:
+                continue
+            if ax == "y":
+                pos, half = [fixed, mid, h / 2], [0.003, w / 2 - 0.008, h / 2 - 0.012]
+            else:
+                pos, half = [mid, fixed, h / 2], [w / 2 - 0.008, 0.003, h / 2 - 0.012]
+            if i == gate:
+                _box(world, pos, half, None, world_mat)
+                t = 0.008  # dark gate frame: four bars round the glass, and a handle
+                if ax == "y":
+                    ex, ez = [0.006, half[1], t], [0.006, t, half[2]]
+                    for dz in (-half[2], half[2]):
+                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame")
+                    for dy in (-half[1], half[1]):
+                        _box(world, [pos[0], pos[1] + dy, pos[2]], ez, None, "guard_frame")
+                    _box(world, [pos[0] - 0.012, pos[1] + half[1] - 0.04, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame")
+                else:
+                    ex, ez = [half[0], 0.006, t], [t, 0.006, half[2]]
+                    for dz in (-half[2], half[2]):
+                        _box(world, [pos[0], pos[1], pos[2] + dz], ex, None, "guard_frame")
+                    for dx in (-half[0], half[0]):
+                        _box(world, [pos[0] + dx, pos[1], pos[2]], ez, None, "guard_frame")
+                    _box(world, [pos[0] + half[0] - 0.04, pos[1] - 0.012, pos[2]], [0.006, 0.006, 0.03], None, "guard_frame")
+            else:
+                _box(world, pos, half, None, world_mat)
+        posts.append((fixed, hi) if ax == "y" else (hi, fixed))
+        mid_e = (lo + hi) / 2
+        rail = [fixed, mid_e, h] if ax == "y" else [mid_e, fixed, h]
+        rh = [0.008, (hi - lo) / 2, 0.008] if ax == "y" else [(hi - lo) / 2, 0.008, 0.008]
+        _box(world, rail, rh, STEEL, "alu")
+
+    bx_open = (0, 1, 2)  # side panels: x 0.05..0.35 holds the belt, the one at index 1
+    run("y", x0, y0, y1)  # back
+    run("y", x1, y0, y1, gate=3)  # front, with its gate
+    run("x", y0, x0, x1, skip=(1,))  # near end (belt opening)
+    run("x", y1, x0, x1, skip=(1,))  # far end (belt opening)
+    for px, py in set(posts):
+        _box(world, [px, py, h / 2], [0.01, 0.01, h / 2], STEEL, "alu")
+    del gx, gy, spec_mat, bx_open
 
 
 def _add_belt_items(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
