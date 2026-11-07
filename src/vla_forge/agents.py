@@ -616,7 +616,9 @@ def run_once(skill: Skill) -> dict:
             )
             for s in subs
         ]
-        lay = compose_layout(steps, np.random.default_rng(seed)).to_json()
+        lay = compose_layout(
+            steps, np.random.default_rng(seed), robot=skill.robot
+        ).to_json()
         models = [VLA.load(ROOT / s.model, device())[0] for s in subs]
         with FORGE.compute:
             r = evaluate_composed(

@@ -36,7 +36,7 @@ def test_failures_explain_themselves():
     ok, reason = R.robot_feasibility("wx250s.native.native", "pick_place")
     assert not ok and "open only" in reason
     ok, reason = R.robot_feasibility("koch.native.native", {"skill": "lift"})
-    assert not ok and "reaches only" in reason
+    assert not ok and "too shallow" in reason
     # pushing needs no grip, so a jaw too small for a block is fine for it
     assert R.robot_feasibility("wx250s.native.native", "push")[0]
 
