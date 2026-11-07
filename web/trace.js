@@ -96,7 +96,7 @@ export function plainError(msg) {
     [/clearance|\bDRC\b/i, "The layout broke a spacing rule"],
     [/unconnected|\bERC\b/i, "Some pins aren't connected"],
     [/timed? ?out/i, "It took too long"],
-    [/\b429\b|too many requests/i, "The forge is busy right now"],
+    [/\b429\b|too many requests/i, "Forge is busy right now"],
     [/licen[cs]e/i, "The board's licence doesn't allow this"],
     [/spec error|invalid spec|schema/i, "The design spec had a mistake"],
   ];
@@ -686,7 +686,7 @@ export function recommendCard({ title = "", detail = "", confidence = null, acti
   if (conf != null) {
     const pill = el("span", "ag-rec-pct", Math.round(conf * 100) + "%");
     pill.dataset.level = conf >= 0.75 ? "high" : conf >= 0.45 ? "mid" : "low";
-    pill.title = "How sure the forge is that this works";
+    pill.title = "How sure Forge is that this works";
     pill.setAttribute("aria-label", `Confidence ${Math.round(conf * 100)}%`);
     head.append(pill);
   }

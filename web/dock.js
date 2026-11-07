@@ -66,7 +66,7 @@ export function createDock(hostEl, opts = {}) {
   const header = el("div", "ag-ph", phLine, phLoader.el);
   const headWrap = el("div", "ag-phw", header);
   const turnsEl = el("div", "ag-turns");
-  const empty = el("div", "ag-empty", el("div", "ag-empty-t", "What are you doing?"), el("div", "ag-empty-d", "Ask the forge about the step it is on, or about any agent. Click the mic or hold Space to talk."));
+  const empty = el("div", "ag-empty", el("div", "ag-empty-t", "What are you doing?"), el("div", "ag-empty-d", "Ask Forge about the step it is on, or about any agent. Click the mic or hold Space to talk."));
   const scroll = el("div", "ag-scroll", empty, turnsEl);
   const newPill = el("button", "ag-newpill lq-btn");
   newPill.type = "button"; newPill.hidden = true;
@@ -101,13 +101,13 @@ export function createDock(hostEl, opts = {}) {
   const status = el("div", "ag-status", pillLoader.el, wave, statusText);
   status.setAttribute("aria-live", "polite");
   const input = el("input", "ag-input");
-  input.type = "text"; input.placeholder = PLACEHOLDER; input.setAttribute("aria-label", "Ask the forge"); input.maxLength = 400;
+  input.type = "text"; input.placeholder = PLACEHOLDER; input.setAttribute("aria-label", "Ask Forge"); input.maxLength = 400;
   input.autocomplete = "off";
   const send = el("button", "ag-send lq-btn", icon("send"));
   send.type = "submit"; send.setAttribute("aria-label", "Send");
   const form = el("form", "ag-compose", input, send);
   const mic = el("button", "ag-mic lq-btn", icon("mic"));
-  mic.type = "button"; mic.setAttribute("aria-label", "Talk to the forge (or hold Space)");
+  mic.type = "button"; mic.setAttribute("aria-label", "Talk to Forge (or hold Space)");
   const badge = el("span", "ag-badge");
   badge.hidden = true;
   const pill = el("div", "ag-pill", eyesWrap, status, mic, form);

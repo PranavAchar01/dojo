@@ -72,7 +72,7 @@ function renderAll() {
 function paintFoot() {
   const b = st.graph ? (st.graph.backends || []).join(", ") || "stub" : "";
   const av = st.graph && st.graph.agentverse;
-  const where = av && av.registered.length ? "VLA Forge and VLA Forge Optimizer are registered on Agentverse" : "not registered on Agentverse";
+  const where = av && av.registered.length ? "Forge and its optimizer are registered on Agentverse" : "not registered on Agentverse";
   foot.textContent = st.graph ? `Agents run as uAgents in one local Bureau, ${where}. Model backend answering here: ${b}.` : "";
 }
 function pushThought(t) {

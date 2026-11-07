@@ -89,7 +89,7 @@ export function createEyes(host, opts = {}) {
   svg.setAttribute("class", "ag-eyes");
   svg.setAttribute("overflow", "visible");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", opts.label || "VLA Forge");
+  svg.setAttribute("aria-label", opts.label || "Forge");
   svg.innerHTML = `<defs><linearGradient id="${id}-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a82ff"/><stop offset="1" stop-color="#0050c0"/></linearGradient></defs>`
     // Meta: the antenna sits behind the body, the glasses' lenses behind the eyes and their frame in front of them
     + `<g class="ag-eyes-body"><g class="ag-eyes-ant"><path class="ag-ant-arm" d="M27 -26 L27 -38"/><g class="ag-ant-bulb"><path class="ag-ant-loop" d="M27 -43 C24.4 -48.4 16.6 -48.4 16.6 -43 C16.6 -37.6 24.4 -37.6 27 -43 C29.6 -48.4 37.4 -48.4 37.4 -43 C37.4 -37.6 29.6 -37.6 27 -43 Z"/></g></g>`
