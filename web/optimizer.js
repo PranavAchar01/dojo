@@ -202,9 +202,17 @@ export function mount(root, ctx = {}) {
         ctx.fillStyle = ok ? "rgba(8,102,255,0.16)" : "rgba(217,48,37,0.22)";
         ctx.fillRect(x, y, TILE_W, TILE_H);
       }
-      ctx.lineWidth = show ? 3 : 1;
-      ctx.strokeStyle = show ? (ok ? "#0866FF" : "#D93025") : "rgba(28,43,51,0.12)";
-      ctx.strokeRect(x + 1.5, y + 1.5, TILE_W - 3, TILE_H - 3);
+      const col = ok ? "#0866FF" : "#D93025";
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = col;
+      ctx.strokeRect(x + 4, y + 4, TILE_W - 8, TILE_H - 8);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(x + TILE_W - 14, y + 14, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
     }
     veil.classList.toggle("on", !ready);
     veil.textContent = ready ? "" : `Round ${S.sel}: ${phaseText(r)}`;
