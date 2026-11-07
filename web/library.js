@@ -336,13 +336,15 @@ function onTest(e) {
 // ---------------------------------------------------------------- replay a tile's recorded rollouts
 async function replay(id, i = 0) {
   const t = tiles.find((x) => x.id === id);
-  if (t) F().selectSkill(t);
-  const r = await fetch(`/api/skills/${id}/replay/${i}`);
-  if (!r.ok) return toast("No recording yet", "Run Test to record this tile on fresh scenes");
-  const p = await r.json();
+  performance.mark("dojo-click");
+  const want = F().replayData(id, i, t?.replay_source || ""); // the request goes out before any UI work
+  F().simLoading(`Loading “${t?.name || "the skill"}”`);
   F().setView("sim");
+  if (t) F().selectSkill(t);
+  const p = await want;
+  if (!p) { F().simLoading(null); return toast("No recording yet", "Run Test to record this tile on fresh scenes"); }
   F().setShown({ run: null, round: -1, index: -1 });
-  F().startPlayback(p);
+  F().startPlayback(p, true);
   F().setCaption(`“${t?.name || id}” · recorded rollout`);
   F().setBadge(p.success ? `Rollout ${i + 1} · success` : `Rollout ${i + 1} · ${p.failure}`, p.success);
   const chips = $("#chips");
@@ -449,6 +451,7 @@ function tileEl(t, byId) {
   a.setAttribute("aria-label", `${t.name}: play its recorded rollout`);
   a.addEventListener("click", (ev) => { if (!ev.target.closest("button, a, input, .tile-name")) replay(t.id); });
   a.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target === a) replay(t.id); });
+  if (t.replay) a.addEventListener("pointerenter", () => F().replayData(t.id, 0, t.replay_source), { once: true });
   if (testing[t.id]) {
     const T = tests[testing[t.id]];
     const ov = el("div", "tile-testing");

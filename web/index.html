@@ -99,6 +99,18 @@
         <div id="vp-badge" class="badge hidden" data-keepclear></div>
         <div id="step-badge" class="step-badge hidden" data-keepclear></div>
 
+        <div class="welcome" id="welcome" hidden data-keepclear>
+          <p class="wl-h">Hi, I'm Dojo. Here's what I've learned so far.</p>
+          <p class="wl-now" id="welcome-now"></p>
+          <div class="wl-chips">
+            <button class="wl-chip" data-say="touch the red block">touch the red block</button>
+            <button class="wl-chip" data-say="put the blue block in the blue bowl">blue block in the bowl</button>
+            <button class="wl-chip" data-say="sort the blue and green blocks into the bowls of the same color">sort by colour</button>
+            <button class="wl-chip" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket">two arms, one housing</button>
+          </div>
+        </div>
+        <div class="sim-load" id="sim-load" hidden><span class="spin"></span><span id="sim-load-t">Loading the rollout</span></div>
+
         <div class="navc" data-keepclear>
           <button data-cam="orbit" class="vc-btn on" title="Orbit" aria-label="Orbit camera"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg></button>
           <button data-cam="front" class="vc-btn" title="Front" aria-label="Front camera"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="10" rx="1.5"/></svg></button>

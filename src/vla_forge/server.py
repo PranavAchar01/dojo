@@ -145,12 +145,20 @@ def thumb(sid: str):
     )
 
 
+_REPLAYS: dict[tuple, list[dict]] = {}
+
+
 @app.get("/api/skills/{sid}/replay/{index}")
 def replay(sid: str, index: int):
     sk = _skill(sid)
     if not sk.replay:
         _404()
-    rolls = tiles.load_replay(sk)
+    key = (sid, sk.replay, sk.replay_source)
+    rolls = _REPLAYS.pop(key, None) or tiles.load_replay(sk)
+    # most recent last; a few tiles stay parsed so a second look is instant
+    _REPLAYS[key] = rolls
+    while len(_REPLAYS) > 12:
+        _REPLAYS.pop(next(iter(_REPLAYS)))
     if not 0 <= index < len(rolls):
         _404()
     summary = [{"success": r["success"], "failure": r["failure"]} for r in rolls]
