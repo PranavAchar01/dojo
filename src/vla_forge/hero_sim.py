@@ -26,13 +26,14 @@ ARMS = {"a_": ([0.20, -0.26, 0.0], 90.0), "b_": ([0.20, 0.26, 0.0], -90.0)}
 JAW_BODIES = ("gripper", "moving_jaw_so101_v1")
 
 # loose-brick slots on the table, (x, y, yaw deg), near the arm that serves them; bricks take them in build order
-SLOTS = (  # the b_ slots are the a_ slots turned half a turn about the table centre, as the arms are
-    (0.145, -0.115, 20.0),
-    (0.255, -0.105, -30.0),
-    (0.115, -0.060, 70.0),
-    (0.255, 0.115, 20.0),
-    (0.145, 0.105, -30.0),
-    (0.285, 0.060, 70.0),
+SLOTS = (  # the b_ slots are the a_ slots turned half a turn about the table centre, as the arms are; each arm's
+    # three are about 9 cm apart, and no nearer than 14 cm to their base (nearer is out of reach), because a jaw at the table also swings its wrist and knocks over a brick 4 cm away
+    (0.130, -0.120, 20.0),
+    (0.270, -0.120, -30.0),
+    (0.200, -0.055, 70.0),
+    (0.270, 0.120, 20.0),
+    (0.130, 0.120, -30.0),
+    (0.200, 0.055, 70.0),
     (0.300, -0.060, 10.0),
     (0.100, 0.060, 10.0),
     (0.200, -0.140, 0.0),
