@@ -17,6 +17,7 @@ from .registry import ROOT, TILES_DIR
 from .sim.robots import DEFAULT, parse_id
 from .viz import robot_meshes
 
+BUILD_PHASE = 0.9  # the bridge build: late enough that the bricks stand in their places
 PHASE = 0.55  # the stretch of the rollout where the arm is working on the objects
 
 
@@ -41,7 +42,7 @@ def shoot(ids: list[str] | None = None) -> list[str]:
                 "id": tid,
                 "robot": robot,
                 "scene": r["scene"],
-                "frame": r["frames"][int(len(r["frames"]) * PHASE)],
+                "frame": r["frames"][int(len(r["frames"]) * (BUILD_PHASE if robot == hero_replay.ROBOT_ID else PHASE))],
                 "out": str(TILES_DIR / tid / "thumb.png"),
             }
             Path(tmp, f"{tid}.json").write_text(json.dumps(job))

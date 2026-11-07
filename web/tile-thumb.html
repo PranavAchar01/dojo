@@ -100,7 +100,7 @@ async function addCell(root, { scene: sc, frame, meshes, robot }) {
   root.add(basePlate(0.17));
   return bodies;
 }
-async function show(root, cells, origins) {
+async function show(root, cells, origins, dir = [0.55, -0.75, 0.6], fill = 0.92) {
   if (current) st.scene.remove(current);
   const box = new THREE.Box3();
   current = root;
@@ -114,14 +114,14 @@ async function show(root, cells, origins) {
     for (const o of bodies) box.expandByObject(o);
     box.expandByPoint(new THREE.Vector3(0, origins[i], 0));
   }
-  frameBox(st, box, [0.55, -0.75, 0.6], 0.92);
+  frameBox(st, box, dir, fill);
   st.render();
   return { size: box.getSize(new THREE.Vector3()).toArray() };
 }
 // a trained-model tile: one cell
 window.shoot = (job) => show(new THREE.Group(), [job], [0]);
 // a multi-arm card: every arm's cell side by side along y, as the Sim's multi-arm view stands them
-window.shootCells = ({ cells, pitch }) => show(new THREE.Group(), cells, cells.map((_, i) => i * pitch));
+window.shootCells = ({ cells, pitch }) => show(new THREE.Group(), cells, cells.map((_, i) => i * pitch), [0.95, -0.12, 0.5], 0.68); // seen from the front, so the arms stand side by side
 window.draw = () => { st.render(); st.render(); }; // the canvas keeps its buffer: the PNG is read from it, not screenshotted
 window.ready = true;
 </script>
