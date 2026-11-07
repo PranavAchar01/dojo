@@ -7,7 +7,7 @@
 //
 // The tour (v9): the landing page at /, where the roaming robot greets and flies to each section as it scrolls in,
 // then into the editor at /app, which opens on a blank canvas. A new pushing skill for the SO-101 is forged live
-// from a typed task: the Agents view shows the Fetch.ai uAgents messages pulse while the task is parsed and planned,
+// from a typed task: the Agents view showed the pipeline messages pulse (this script predates the Muse + SubQ view) while the task is parsed and planned,
 // back on the canvas the robot flies to the stage being worked on and points at it, and once training starts the
 // Thinking panel (T) opens and the dock is asked "What are you doing?". The waits (demos, training, 20 held-out
 // scenes) are sped up. Then "add another SO-101" grows the scene in place, a two-arm task fills the Arms list and
@@ -159,7 +159,7 @@ const J = (u) => page.evaluate((x) => fetch(x).then((r) => r.json()), u);
 await mark("intro");
 await sleep(3000);
 
-// 2. type a task; the Agents view shows the uAgents messages while it is parsed, routed and planned
+// 2. type a task; the Agents view shows the pipeline messages while it is parsed, routed and planned
 await mark("describe");
 await page.waitForSelector("#go:not([disabled])", { timeout: 120000 });
 await page.click("#prompt", { clickCount: 3 });

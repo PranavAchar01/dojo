@@ -1,13 +1,15 @@
 # VLA Forge
 
-Turning one sentence into a trained robot skill takes a frontier model to plan the task, critique the failures and
-optimize the next round. In VLA Forge that model is Llama (Meta's Llama 4 Maverick, through the Llama API): it parses the
-task, plans the arms, reads the failures and proposes each optimizer change. Until a Llama API key works here, a stub
-backend answers instead; the Meta section below says exactly what ran live.
+Turning one sentence into a trained robot skill takes models that plan the task, critique the failures and
+optimize the next round. Here two models do it side by side, each on what it is built for: Meta's Muse models
+(Muse Spark for the task, the line plan and the critic; Muse Wonder for optimizer proposals) write, and Subquadratic's
+SubQ Snap reads everything at once (every trajectory, every past round, the whole skill library, up to 384K tokens) and
+picks. In each optimizer round both propose a change at the same moment and both are trained and scored in simulation;
+the round records whose change won. `docs/meta-subq.md` has the split and the measurements.
 
-Type "have a robot do X". A team of Fetch.ai uAgents turns the sentence into a task, builds the scene,
+Type "have a robot do X". A plain in-process pipeline turns the sentence into a task, builds the scene,
 collects expert demonstrations, fine-tunes a vision-language-action policy, measures it on held-out scenes,
-reads the failures, retrains if there is time, and publishes the result as a new callable skill agent.
+reads the failures, retrains if there is time, and saves the result as a new skill tile.
 All of it runs locally on one Mac (M5 Pro, 64 GB), inside a 3 minute budget per prompt.
 
 ```
@@ -22,27 +24,22 @@ read from the environment or the macOS Keychain (`OPENAI_API_KEY`); it is never 
 ## What happens to one prompt
 
 ```
-browser ── POST /api/prompt ──> gateway agent
-                                   │ ChatMessage (uAgents chat protocol)
-                                   v
- task agent ── TaskReady ──> scene agent ── SceneReady ──> data agent ── DemosReady ──> trainer agent
-   ^  (LLM: sentence -> task spec       (MuJoCo SO-101,      (scripted expert,          (fine-tune the VLA
-   |   + success predicates)             20 held-out layouts)  domain randomization,     from the nearest
-   |                                                           DART noise)               skill or the base)
-   |                                                                                          │ PolicyTrained
-   |                                                                                          v
-   |  SkillPublished      registry agent <── Publish ── critic agent <── EvalReport ── eval agent
-   └──────────────────── (saves the skill,              (LLM reads failures:         (20 rollouts of the
-                          starts skill-<id> agent)       retrain near failure         trained policy,
-                                                         spots, or publish)           success measured)
+browser ── POST /api/prompt ──> task ── router ── scene ── data ── trainer ── eval ── critic ──┐
+                                 │       (reuse a tile,  (MuJoCo  (scripted   (fine-tune  (20     │ retrain near
+                                 │        train, chain   SO-101,  expert,     the VLA)    held-   │ failures: back
+                                 │        or refuse)     layouts) DART noise)             out)    │ to data
+                                 │                                                                v
+                                 │                                                 registry (saves the tile)
+   task: Muse Spark parses the sentence  ║  SubQ reads the whole library and picks the tile that already does it
+   critic: Muse Spark writes the plan    ║  SubQ reads every rollout of the run: P(another round helps)
 ```
 
-Every arrow is a real uAgents message between agents in one `Bureau` (`src/vla_forge/agents.py`). The heavy
-work behind each agent lives in `src/vla_forge/pipeline.py` and runs in worker threads, so the agents' event
-loop stays responsive. Each stage streams its logs, demo counts, loss and evaluation to the page over SSE.
+Each stage is a function call in `src/vla_forge/agents.py`; the heavy work lives in `src/vla_forge/pipeline.py` and
+runs in worker threads. The two model calls at the task and critic stages run concurrently (`lanes.both`). Each stage
+streams its logs, demo counts, loss and evaluation to the page over SSE, and every model call streams as an `llm_call`
+event (lane, purpose, backend that really answered, tokens, latency) for the Muse + SubQ view.
 
-**The recursion.** Every published skill becomes its own chat-protocol agent (`skill-<id>`), callable from the
-page ("Call skill agent") or by any other agent. The next prompt starts from the nearest existing skill (SigLIP text
+**The recursion.** Every saved skill is a tile that can be run on a fresh scene from the page. The next prompt starts from the nearest existing skill (SigLIP text
 similarity of the instructions plus a same-motion bonus) and falls back to the multi-task base policy, so the
 library grows from itself. Every fine-tune mixes in replay of the base data so older skills are not forgotten.
 
@@ -80,20 +77,18 @@ Prompts come in three tiers, and the page tags each one.
 - Tier 3, composed tasks: several tier 1-2 steps in one scene ("sort the blue and green blocks into the bowls
   of the same color").
 
-A tier 3 prompt goes to the planner agent instead of the single-skill chain:
+A tier 3 prompt goes to the planner instead of the single-skill chain:
 
 ```
-task agent ── ComposeTask ──> planner agent ── SkillQuery ──> skill-<id> agents (one per step that exists)
-                                 │    <── SkillOffer (measured success rate) ──┘
-                                 │ step with no skill: a child run through the normal one-prompt pipeline
-                                 │    <── StepTrained (from the task agent when the child publishes)
-                                 v
-                              executor agent: runs every step's own policy back to back in 20 held-out
-                                 composed scenes, then Publish -> registry (the composite becomes a skill too)
+task ── router ── planner: one saved skill per step that exists
+                     │ step with no skill: a child run through the normal one-prompt pipeline
+                     v
+                  executor: runs every step's own policy back to back in 20 held-out composed scenes,
+                     then registry (the composite becomes a skill too)
 ```
 
-The planner (OpenAI) splits the sentence into steps (`compose.py` checks that the scene can hold them). Each
-step either reuses a published skill agent or is trained on the fly in under 3 minutes, starting from the
+The task parser (Muse Spark) splits the sentence into steps (`compose.py` checks that the scene can hold them). Each
+step either reuses a saved skill or is trained on the fly in under 3 minutes, starting from the
 nearest skill. A step trained for a composed task collects its demos and held-out checks in that task's own
 scenes (`compose.step_layout`): the other bowls and squares are on the table, and half the time the earlier
 steps are already done. Without that, the green bowl skill below scored 18/20 on single-skill tables and 5/20
@@ -104,7 +99,7 @@ step's policy takes over. A rollout counts as a success only if every step's che
 
 ## Measured results
 
-Mac mini (M5 Pro, 64 GB), timed from the click to the published skill agent, success on 20 held-out scenes.
+Mac mini (M5 Pro, 64 GB), timed from the click to the saved skill, success on 20 held-out scenes.
 Runs in order, so later prompts can start from earlier skills (`runs/ladder.jsonl`, `scripts/ladder.py`).
 
 | tier | prompt | started from | rounds | time | success |
@@ -114,7 +109,7 @@ Runs in order, so later prompts can start from earlier skills (`runs/ladder.json
 | 2 | put the blue block in the blue bowl | base | 15/20, retrain, 17/20 | 165.5 s | 17/20 |
 | 2 | put the red block in the white bowl | skill "put the blue block in the blue bowl" | 14/20, retrain, 16/20 | 166.4 s | 16/20 |
 | 2 | stack the orange block on the red block | base | 12/20, retrain, 14/20 | 171.6 s | 14/20 |
-| 3 | put the red block in the white bowl and push the green block onto the blue square | reused 2 skill agents | step 1 17/20, step 2 11/20 | 26.4 s | 9/20 |
+| 3 | put the red block in the white bowl and push the green block onto the blue square | reused 2 saved skills | step 1 17/20, step 2 11/20 | 26.4 s | 9/20 |
 | 3 | sort the blue and green blocks into the bowls of the same color | reused blue, trained green (88.8 s) | step 1 13/20, step 2 14/20 | 114.3 s | 10/20 |
 | 3 | push the red block onto the orange square and stack the yellow block on it | trained both (166.1 s, 168.1 s) | step 1 14/20, step 2 3/20 | 360.0 s | 2/20 |
 
@@ -258,9 +253,8 @@ Real:
   generated from the Onshape CAD); the browser draws its actual STL meshes at the poses MuJoCo computed.
 - Every rollout on the page is the trained policy's own closed-loop rollout from that round, recorded body pose
   by body pose; success is checked by the task's predicates on the simulator state.
-- The agents are real uAgents exchanging real messages; skill agents answer the chat protocol.
-- Task parsing and the critic call OpenAI (falls back to a keyword parser / rule critic offline; the log shows
-  which one ran).
+- Task parsing and the critic call Muse Spark, with SubQ answering alongside (falls back to OpenAI, then to a keyword
+  parser / rule critic; the log and the Muse + SubQ view show which one ran).
 
 Scaffolded or limited:
 - Simulation only. No real robot was driven.
@@ -269,20 +263,22 @@ Scaffolded or limited:
   simulation of the whole belt; parts are the same 3 cm cubes; the arm's return home after a VLA pick is scripted.
 - The per-prompt 3 minute run is a fine-tune of a base policy pretrained ahead of time on the same five
   motion primitives; it does not learn a new motion family from nothing in 3 minutes.
-- Agentverse: registration code is in `agents.register_on_agentverse`. It runs only when
-  `AGENTVERSE_API_KEY` and a public `VLA_FORGE_PUBLIC_URL` (tunnel to the bureau on port 8102) are set; no
-  account or key was created, so the agents are local only right now.
-- Meta: all language-model calls (task parsing, line planner, critic, optimizer) go through `src/vla_forge/llama.py`,
-  a client for the Llama API's OpenAI-compatible endpoint (`https://api.llama.com/compat/v1/chat/completions`, Bearer
-  `META_API_KEY`, `response_format` json_schema, model `Llama-4-Maverick-17B-128E-Instruct-FP8` unless
-  `VLA_FORGE_META_LLM` says otherwise). **The Meta key currently fails (HTTP 401, tested once per process), so the same
-  schema-constrained call is routed to OpenAI (`gpt-5.5`, `OPENAI_API_KEY`) behind the same interface.** The UI still
-  says Llama 4 Maverick (a choice for internal review videos); what really answered is recorded in each optimizer
-  round's `backend` field in `runs/opt-<id>/run.json` (`openai:gpt-5.5`, `meta:<model>`, `rules` or `stub`). The stub
-  (keyword rules; replay of `runs/opt-234442-a649` for the optimizer) is used only with `VLA_FORGE_LLAMA_STUB=1` or
-  when no backend answers. No live Llama-model call has been made.
-- Optimizer: every round the model is called live with per-failure evidence (tag, start position, contact stats),
-  rendered frames and the full knob menu, and may not repeat a change that was just reverted. Scenes come from three
+- Meta: every Meta call goes through `src/vla_forge/llama.py` to Meta's Model API (`https://api.meta.ai/v1`,
+  OpenAI-compatible chat completions, Bearer `META_API_KEY` from the environment or Keychain, `response_format`
+  json_schema). Task, line plan and critic use `muse-spark-1.3` (`VLA_FORGE_META_LLM`); optimizer proposals use
+  `muse-wonder-1.0` (`VLA_FORGE_META_OPT_LLM`); never a contributor model. Calls run only with
+  `VLA_FORGE_META_CREDITS=1` and stop when the spend estimate (`runs/meta-spend.json`, Meta's list prices per model,
+  reasoning tokens billed as output) reaches $80. If Meta is off or refuses the key, the call goes to OpenAI behind the
+  same interface and the page says Muse is unavailable and names what answered; each optimizer round records the
+  backend in `backend` (`meta:<model>`, `openai:gpt-5.5`, `rules` or `stub`).
+- SubQ: `src/vla_forge/subq.py` calls SubQ Snap 1.1 through the Decisions API (`/v1/systemone`; the Snap models do not
+  take chat completions). It answers `choice` and `noul` questions over a state of up to 384K tokens. Calls stop at
+  80M tokens of the 100M free grant (`runs/subq-spend.json`).
+- Optimizer: every round both models are asked at once. Muse Wonder gets per-failure evidence (tag, start position,
+  contact stats), rendered frames and the full knob menu; SubQ gets every trajectory of every past round and every past
+  change with its score, and picks from the same menu. Neither may repeat a change that was just reverted. Both
+  changes are trained from the same parent with the same budget and scored on the same SELECT scenes; the better one
+  faces the parent (`duel` in each round's record). Scenes come from three
   disjoint seed sets: TRAIN (demonstrations), SELECT (100 scenes, keep or revert each round) and TEST (100 scenes, never
   seen by the optimizer, scored only at R0 and on the final policy; Wilson CIs, McNemar exact and paired bootstrap on
   the same scenes). A control arm runs the same number of rounds with a random valid change (same keep rule) so the
@@ -300,17 +296,20 @@ Scaffolded or limited:
 
 ```
 src/vla_forge/
-  agents.py      uAgents: gateway, task, planner, executor, scene, data, trainer, eval, critic, registry, skill-<id>
-  pipeline.py    the work behind each agent, run state, event bus
+  agents.py      the pipeline: task, router, scene, data, trainer, eval, critic, registry, planner, executor
+  lanes.py       the Meta and SubQ lanes: concurrent calls, llm_call events, totals, optimizer duels
+  llama.py       Meta's Model API client (Muse Spark, Muse Wonder), OpenAI and stub fallbacks, the $80 guard
+  subq.py        SubQ Snap through the Decisions API, the 80M-token guard
+  pipeline.py    the work behind each stage, run state, event bus
   compose.py     tier 3: steps, composed scenes, per-step training scenes
-  server.py      FastAPI: page, JSON API, SSE, skill calls through the gateway agent
+  server.py      FastAPI: page, JSON API, SSE
   sim/           MuJoCo scene (SO-101 + blocks, bowls, tape squares), tasks + success predicates, scripted expert
   datagen.py     expert demos in worker processes
   encoders.py    frozen DINOv2 + SigLIP2
   policy.py      the action head
   learn.py       datasets, training loop
   rollout.py     closed-loop evaluation, failure classification
-  llm.py         task parser and critic (OpenAI, optional Llama)
+  llm.py         task parser and critic prompts and schemas
   registry.py    skill library, nearest-skill lookup
   factory.py     factory lines: planner, station router, building (training stations), line runs and schedule
   sim/line.py    conveyor and totes for a station cell (sourced: see SOURCES.md)

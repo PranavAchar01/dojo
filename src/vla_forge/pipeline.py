@@ -83,7 +83,6 @@ class Run:
     best_state: dict | None = None
     skill_id: str = ""
     seconds: float = 0.0
-    reply_to: str = ""  # chat sender to answer when the skill is published
     error: str = ""
     # tier 3: a composed task holds its steps; each missing step is a child run of the normal pipeline
     steps: list[Step] = field(default_factory=list)

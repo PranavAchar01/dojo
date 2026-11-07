@@ -5,7 +5,7 @@
 //
 // The tour: the landing page, where the roaming robot greets and flies to each section as it scrolls in (its own
 // capture, length under "landing_len" in its marks); then the editor: a task is typed and sent, the Agents view
-// shows the Fetch.ai uAgents messages pulse and fill the log, back on the canvas the robot flies to the stage being
+// shows the pipeline messages (this script predates the Muse + SubQ view) pulse and fill the log, back on the canvas the robot flies to the stage being
 // worked on and points at it, the Thinking panel (T) opens, the dock is asked "What are you doing?" and answers from
 // the live stage, then the wait for training is sped up (the page's 4x badge) until the robot reaches the loss
 // chart, and the cut ends there. Marks go to <webm>.marks.json with "cut": "ui" for edit_demo.py.
@@ -101,7 +101,7 @@ try {
   await mark("intro");
   await sleep(2000);
 
-  // 2. type the task and send it, then watch the uAgents messages on the Agents view
+  // 2. type the task and send it, then watch the pipeline messages on the Agents view
   await mark("describe");
   await page.waitForSelector("#go:not([disabled])", { timeout: 120000 });
   await page.click("#prompt", { clickCount: 3 });
