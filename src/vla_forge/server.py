@@ -71,6 +71,11 @@ class Rename(BaseModel):
 
 
 @app.get("/")
+def landing():
+    return FileResponse(WEB / "landing.html")
+
+
+@app.get("/app")
 def index():
     return FileResponse(WEB / "index.html")
 
