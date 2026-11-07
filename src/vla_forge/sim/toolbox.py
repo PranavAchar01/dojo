@@ -29,12 +29,10 @@ REPO = Path(__file__).resolve().parents[3]
 LIB = REPO / "assets" / "library"
 
 TOOLBOX = "metal_toolbox"
-# the pipe wrench is in the library too; `feasibility()` says why it is not in the default set
 TOOLS = ("ratchet_wrench", "pliers", "screwdriver")
-ALL_TOOLS = ("pipe_wrench", *TOOLS)
+ALL_TOOLS = TOOLS
 VOXEL = 0.005
 TOOL_RGBA = {  # plain Dojo-light colours (the policy cameras and the browser draw the same flat materials)
-    "pipe_wrench": (0.80, 0.30, 0.22),
     "ratchet_wrench": (0.18, 0.40, 0.78),
     "pliers": (0.92, 0.66, 0.16),
     "screwdriver": (0.20, 0.62, 0.40),
@@ -317,47 +315,87 @@ def packed(scene, tools: list[str] | None = None, box: str = "goal") -> bool:
     return True
 
 
-# ------------------------------------------------------------------ held-out sampling
+# ------------------------------------------------------------------ placement (derived from IK probes)
 
-BOX_YAW = math.pi  # the box's long axis lies radially, its open lid leans to -y, away from the tools
-BOX_CENTRE = (0.25, -0.15)  # world xy of the cavity centre: the near half of the cavity is inside the arm's reach
+BOX_YAW = math.pi  # the cavity opens toward +y (the tools' side); the tall back and lid face away from the arm
+SLOT_LY = -0.08  # box-frame y the tools are lowered to: the near half of the cavity, clear of the shelf at the back
+CARRY_TILT = 0.1  # weight of the top-down term while carrying (1 = strict top-down): the wrist may tilt over the wall
+CLEAR = 0.015  # bottom of a carried tool over the front wall's top
+FRONT_TOP = 0.138  # measured: top of the toolbox's front wall (hull bbox)
+FINGER_BELOW = 0.006  # jaw tips sit this far under the tool's bottom while it is held
+
+
+@lru_cache(maxsize=1)
+def placement() -> dict:
+    """Where the toolbox goes, chosen by IK probes of the SO-101 (robots.solve_topdown, carry pose with the
+    top-down weight lowered): a grid of box origins is scored by the worst position error over the points the
+    tools are released at (cavity slots along its length, at carry height and just above); the first origin on
+    the grid (nearest the base first) whose worst error is below 1 mm wins, else the best one."""
+    from . import robots as R
+
+    rid = R.make_id("so101")
+    r = R.calibrate(rid)
+    m = R.robot_spec(rid).compile()
+    R.fix_qpos0(m)
+    d = mujoco.MjData(m)
+    site = m.site(r.tcp_site).id
+    seeds = R.seeds_for(rid, m, site, r.arm_joints)
+    z0 = FRONT_TOP + CLEAR + FINGER_BELOW
+    best = None
+    for ox in np.arange(0.18, 0.321, 0.02):
+        for oy in (-0.2, -0.23, -0.26):  # keeps the box's open side clear of the arm's home pose (y ~ 0)
+            worst = 0.0
+            for lx in (-0.045, 0.0, 0.045):
+                xy = np.array([ox - lx, oy - SLOT_LY])
+                for z in (z0, z0 + 0.02):
+                    ep = R.solve_topdown(
+                        m, d, site, r.arm_joints, r.home, np.array([*xy, z]),
+                        np.array([0.0, 1.0, 0.0]), seeds, w_ori=0.1 * CARRY_TILT, iters=200,
+                    )[1]
+                    worst = max(worst, float(ep))
+            cand = {"x": float(ox), "y": float(oy), "ik_err": worst}
+            if best is None or worst < best["ik_err"] - 1e-3:
+                best = cand
+            if worst < 1e-3:
+                best = cand
+                break
+        if best["ik_err"] < 1e-3:
+            break
+    return best
+
+
+# ------------------------------------------------------------------ held-out sampling
 
 
 def sample(rng: np.random.Generator, tools=TOOLS) -> tuple[dict, dict]:
-    """(toolbox prop, tools) for one scene: the cavity centre jittered a little; the tools lie on the table on the
-    +y side, along the radial direction (the jaws close across the width), apart from each other."""
-    cav = cavity()
-    cx, cy = cav["centre"]
-    c, s = math.cos(BOX_YAW), math.sin(BOX_YAW)
-    ctr = np.array(BOX_CENTRE) + rng.uniform(-0.01, 0.01, 2)
-    origin = ctr - np.array([c * cx - s * cy, s * cx + c * cy])
-    box = {"goal": ("toolbox", "gray", float(origin[0]), float(origin[1]), BOX_YAW)}
-    placed: list[tuple[float, float, float, float]] = []
+    """(toolbox prop, tools) for one scene: the box origin jittered a little; the tools lie on the table on the
+    cavity's open side, along the radial direction (the jaws close across the width), apart from each other."""
+    pl = placement()
+    ox, oy = pl["x"] + rng.uniform(-0.01, 0.01), pl["y"] + rng.uniform(-0.01, 0.01)
+    box = {"goal": ("toolbox", "gray", float(ox), float(oy), BOX_YAW)}
+    front = max(oy + 0.137 + 0.015, 0.065) # the open side's wall, plus a hand's width
     out = {}
+    rows = [int(i) for i in rng.permutation(len(tools))]  # which table row (nearest the box first) each tool takes
+    y = front
+    ys = {}
+    for i in rows:
+        w = tool_info(tools[i])["width"]
+        gap = 0.01 + rng.uniform(0, 0.004)
+        ys[i] = y + w / 2
+        y += w + gap
     for i, t in enumerate(tools):
-        info = tool_info(t)
-        for _ in range(2000):
-            x = rng.uniform(0.17, 0.26)
-            y = rng.uniform(0.04, 0.26)
-            a = rng.uniform(-0.15, 0.15) + math.pi * rng.integers(0, 2)  # along x, head either way
-            ex_ = abs(math.cos(a)) * info["length"] / 2 + abs(math.sin(a)) * info["width"] / 2
-            ey_ = abs(math.sin(a)) * info["length"] / 2 + abs(math.cos(a)) * info["width"] / 2
-            if all(abs(y - qy) > ey_ + qey + 0.012 or abs(x - qx) > ex_ + qex + 0.012 for qx, qy, qex, qey in placed):
-                break
-        else:
-            raise RuntimeError("no free spot for a tool")
-        placed.append((x, y, ex_, ey_))
-        out["target" if i == 0 else f"tool{i}"] = (t, float(x), float(y), float(a))
+        a = rng.uniform(-0.1, 0.1) + math.pi * rng.integers(0, 2)  # along x, head either way
+        x = rng.uniform(0.10, 0.18)
+        out["target" if i == 0 else f"tool{i}"] = (t, float(x), float(ys[i]), float(a))
     return box, out
 
 
 # ------------------------------------------------------------------ the scripted expert
 
 
-DROP_GAP = 0.008  # the tool is released this far over the floor, or over the tools already in the box
-SLOT = ((0.0, -0.075), (0.0, -0.03), (0.0, -0.052))  # box-frame (x, y) the tools are lowered to
 GRASP_SITE_Z = 0.005  # jaw tips just off the table, as for the 3 cm blocks
 CARRY_UP = 0.03
+SLOT = ((0.0, -0.08), (0.0, -0.05), (0.0, -0.065))  # box-frame (x, y) each tool is released over
 
 
 def _tool_state(sc, name: str, tool: str):
@@ -372,36 +410,26 @@ def _tool_state(sc, name: str, tool: str):
 
 
 def run_pack(ex) -> None:
-    """Pack every tool: grasp at the centre of mass with the jaws across the width, lift, carry over the cavity,
-    lower to just over the rim and open; the tool falls the last centimetres and settles. Built on the stock
-    Expert's IK and motion helpers (goto / grip)."""
-    from .expert import APPROACH_SPEED, DOWN, HOVER_Z, LIFT_SPEED, TRANSIT_SPEED
+    """Pack every tool: grasp at the centre of mass with the jaws across the width (top-down), lift, then carry with
+    the wrist free to tilt (reach), over the front wall and release just above the rim; the tool falls the last
+    centimetres and settles. Built on the stock Expert's IK and motion helpers (goto / grip)."""
+    from .expert import APPROACH_SPEED, HOVER_Z, LIFT_SPEED, TRANSIT_SPEED
 
     sc, r = ex.sc, ex.r
-    cav = cavity()
     box = sc.model.body("goal").id
     bp = sc.data.mocap_pos[sc.model.body_mocapid[box]]
     Rb = sc.data.xmat[box].reshape(3, 3)
     tools = sc.layout.tools
     order = sorted(tools, key=lambda n: ["target", "tool1", "tool2"].index(n))
-    rim_z = cav["rim"]
     for k, name in enumerate(order):
         tool = tools[name][0]
         com, centre, yaw, pts = _tool_state(sc, name, tool)
-        width = float(
-            np.ptp(
-                pts @ np.array([-math.sin(yaw), math.cos(yaw), 0.0])
-            )
-        )
-        hw = width / 2
-        # jaws close across the tool's width: the face normal closest to the radial direction
+        hw = float(np.ptp(pts @ np.array([-math.sin(yaw), math.cos(yaw), 0.0]))) / 2
         radial = com[:2] / max(np.linalg.norm(com[:2]), 1e-9)
-        cands = [
-            np.array([-math.sin(yaw), math.cos(yaw), 0.0]),
-            np.array([math.sin(yaw), -math.cos(yaw), 0.0]),
-        ]
+        cands = [np.array([-math.sin(yaw), math.cos(yaw), 0.0]), np.array([math.sin(yaw), -math.cos(yaw), 0.0])]
         heading = max(cands, key=lambda n: float(n[:2] @ radial))
         ex.ik.heading = heading
+        ex.ik.tilt = 1.0
         c_open = r.centre_open - 0.015 + hw
         c_grasp = r.centre_grasp - 0.015 + hw
         bottom = pts[:, 2].min()
@@ -416,26 +444,28 @@ def run_pack(ex) -> None:
         ex.goto(site(com[:2], bottom + GRASP_SITE_Z, c_grasp), APPROACH_SPEED * 0.5, settle=0.05)
         ex.grip(r.g_squeeze, settle=0.5)
         ex.calm = False
-        up = bottom + GRASP_SITE_Z + CARRY_UP
-        ex.goto(site(com[:2], up, c_grasp), LIFT_SPEED, settle=0.1)
-        # carry to over the cavity and lower the tool to just over what is already there
-        com, centre, _yaw, _pts = _tool_state(sc, name, tool)
+        ex.goto(site(com[:2], bottom + GRASP_SITE_Z + CARRY_UP, c_grasp), LIFT_SPEED, settle=0.1)
+        # carry: the wrist may tilt, the tool is raised until its bottom clears the front wall
+        ex.ik.tilt = CARRY_TILT
+        clear_z = FRONT_TOP + CLEAR
+        for _ in range(2):
+            _c, _ce, _y, p = _tool_state(sc, name, tool)
+            z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
+            ex.goto([*sc.ee_pos()[:2], z], LIFT_SPEED, settle=0.1)
+        com, centre, _y, p = _tool_state(sc, name, tool)
         grip_off = com[:2] - centre[:2]
         bx, by = SLOT[k % len(SLOT)]
         goal_xy = bp[:2] + Rb[:2, :2] @ np.array([bx, by])
-        held = sc.ee_pos()[2] - _pts[:, 2].min()  # jaw-tip height above the tool's bottom
-        rest = cav["floor_min"] + DROP_GAP
-        for other in order[:k]:
-            o = _hull_world(sc, other, tools[other][0])
-            rest = max(rest, float(o[:, 2].max()) + DROP_GAP)
-        release = rest + held
-        safe = max(release, up) + 0.01
-        ex.goto(site(com[:2], safe, c_grasp), LIFT_SPEED, settle=0.0)
+        z = sc.ee_pos()[2]
         ex.calm = True
-        ex.goto(site(goal_xy + grip_off, safe, c_grasp), TRANSIT_SPEED, settle=0.2)
-        ex.goto(site(goal_xy + grip_off, release, c_grasp), LIFT_SPEED, settle=0.15)
+        ex.goto([*(ex.ee_cmd[:2] + (goal_xy + grip_off - com[:2])), z], TRANSIT_SPEED, settle=0.3)
+        # re-centre on the slot from the measured tool position
+        com, centre, _y, p = _tool_state(sc, name, tool)
+        ex.goto([*(sc.ee_pos()[:2] + (goal_xy + grip_off - com[:2])), z], LIFT_SPEED, settle=0.2)
         ex.grip(r.g_open, settle=0.5)
-        ex.goto(site(goal_xy + grip_off, safe + 0.02, c_open), LIFT_SPEED, settle=0.0)
+        ex.goto([*sc.ee_pos()[:2], z + 0.03], LIFT_SPEED, settle=0.0)
         ex.calm = False
+    ex.ik.tilt = 1.0
+    ex.ik.heading = None
     ex.home()
     ex.hold(3.0)  # the last tool settles in the cavity
