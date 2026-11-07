@@ -506,28 +506,48 @@ def run_pack(ex) -> None:
         ex.goto(site(com[:2], bottom + gz, c_grasp), APPROACH_SPEED * 0.5, settle=0.05)
         ex.grip(SQUEEZE if SQUEEZE is not None else r.g_squeeze, settle=0.5)
         ex.calm = False
-        ex.goto(site(com[:2], bottom + gz + CARRY_UP, c_grasp), LIFT_SPEED, settle=0.1)
+        lift_goal = site(com[:2], bottom + gz + CARRY_UP, c_grasp)
+        ex.goto(lift_goal, LIFT_SPEED, settle=0.1)
         # carry: the wrist may tilt. Rise and swing toward the open side of the box in one sweep, until the tool's
         # bottom clears the front wall, then push in over the wall to the slot
         ex.ik.tilt = CARRY_TILT
         clear_z = FRONT_TOP + CLEAR
         bx, by = SLOT[k % len(SLOT)]
         goal_xy = bp[:2] + Rb[:2, :2] @ np.array([bx, by])
-        out_dir = Rb[:2, :2] @ np.array([0.0, -1.0])  # the box's open side, in the world
+        out_dir = Rb[:2, :2] @ np.array(
+            [0.0, -1.0]
+        )  # the box's open side, in the world
 
         def to_slot(extra=0.0, name=name, tool=tool, goal_xy=goal_xy, out_dir=out_dir):
             _c, _ce, _y, _p = _tool_state(sc, name, tool)
-            return sc.ee_pos()[:2] + (goal_xy + extra * out_dir + (_c[:2] - _ce[:2]) - _c[:2])
+            return sc.ee_pos()[:2] + (
+                goal_xy + extra * out_dir + (_c[:2] - _ce[:2]) - _c[:2]
+            )
 
         _c, _ce, _y, p = _tool_state(sc, name, tool)
         z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
         ex.calm = True
-        ex.goto([*to_slot(OUT_DIST), z], LIFT_SPEED, settle=0.3)
+        sag = [np.zeros(3)]
+
+        def go(goal, speed, settle, sag=sag):
+            """goto, then correct for the arm's sag under the tool's weight (a P-controlled joint hangs low):
+            the commanded point is shifted by what the measured tool-centre point fell short."""
+            goal = np.asarray(goal, float)
+            ex.goto(goal + sag[0], speed, settle)
+            sag[0] = np.clip(sag[0] + (goal - sc.ee_pos()), -0.05, 0.05)
+            ex.goto(goal + sag[0], speed, 0.1)
+
+        go(lift_goal, LIFT_SPEED, 0.3)
+        go(lift_goal, LIFT_SPEED, 0.3)
+        _c, _ce, _y, p = _tool_state(sc, name, tool)
+        z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
+        go([*to_slot(OUT_DIST), z], LIFT_SPEED, 0.3)
         _c, _ce, _y, p = _tool_state(sc, name, tool)
         z += clear_z - p[:, 2].min()
-        ex.goto([*to_slot(OUT_DIST), z], LIFT_SPEED, settle=0.2)
-        ex.goto([*to_slot(0.0), z], LIFT_SPEED, settle=0.2)
-        ex.goto([*to_slot(0.0), z], LIFT_SPEED, settle=0.2)
+        go([*to_slot(OUT_DIST), z], LIFT_SPEED, 0.2)
+        go([*to_slot(0.0), z], LIFT_SPEED, 0.2)
+        go([*to_slot(0.0), z], LIFT_SPEED, 0.2)
+        z = sc.ee_pos()[2]
         ex.grip(r.g_open, settle=0.5)
         ex.goto([*sc.ee_pos()[:2], z + 0.03], LIFT_SPEED, settle=0.0)
         ex.calm = False
