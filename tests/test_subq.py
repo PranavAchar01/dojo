@@ -103,3 +103,52 @@ def test_tally_counts_each_winner():
         ]
     )
     assert t["meta"] == 1 and t["subq"] == 2 and t["agreed"] == 1 and t["tie"] == 0
+
+
+def test_menu_skips_reverted_changes_and_no_ops():
+    from vla_forge import optimizer as O
+
+    cfg = dict(O.DEFAULTS)
+    hist = [{"change": {"knob": "lr", "value": 2e-4}, "kept": False}]
+    opts = list(O.menu(cfg, hist).values())
+    assert not any(c["knob"] == "lr" and c["value"] == 2e-4 for c in opts)
+    assert not any(c["knob"] == "batch" and c["value"] == cfg["batch"] for c in opts)
+    assert any(c["knob"] == "extra_demos_near_failures" for c in opts)
+    assert 2 <= len(opts) <= 255
+
+
+def test_subq_change_maps_the_pick_back_to_a_valid_change(monkeypatch):
+    from vla_forge import optimizer as O
+
+    def fake(state, questions, kind, http=None):
+        crit = questions["change"]["criteria"]
+        names = list(crit)
+        return {
+            "change": {
+                "choice": names[3],
+                "probabilities": {names[3]: 0.6, names[0]: 0.3, names[1]: 0.1},
+            }
+        }
+
+    monkeypatch.setattr(subq, "decide", fake)
+    ch, p = O.subq_change({}, dict(O.DEFAULTS), [])
+    assert p == 0.6 and ch == {**ch, **O.clean_change({**ch, "reason": ""})} | {
+        "reason": ch["reason"],
+        "runners_up": ch["runners_up"],
+    }
+    assert len(ch["runners_up"]) == 2
+
+
+def test_propose_pair_returns_both_and_keeps_meta_when_subq_fails(monkeypatch):
+    from vla_forge import optimizer as O
+
+    monkeypatch.setattr(
+        O, "propose", lambda *a: ({"knob": "lr", "value": 1e-4}, "meta:muse-wonder-1.0")
+    )
+
+    def down(*a):
+        raise subq.Unavailable("SubQ rejected the API key")
+
+    monkeypatch.setattr(O, "subq_change", down)
+    (_m, be), (q, _p, err) = O.propose_pair({}, [], 1, None, None, {}, {})
+    assert be == "meta:muse-wonder-1.0" and q is None and "rejected" in err

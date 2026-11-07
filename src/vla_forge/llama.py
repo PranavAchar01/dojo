@@ -385,6 +385,12 @@ def label(backend: str) -> str:
         return NAMES.get(m, m)
     if backend.startswith("openai:"):
         return f"OpenAI {backend.split(':', 1)[1]} (Meta unavailable)"
+    if backend.startswith("subq:"):
+        from .subq import NAME
+
+        return NAME
+    if backend == "random":
+        return "random (control arm)"
     return "rules (no model answered)"
 
 
