@@ -6,6 +6,7 @@ GET    /api/assets/{id}            one entry with provenance
 GET    /api/assets/{id}/glb        the web file
 GET    /api/assets/{id}/thumb      the cached thumbnail (404 until scripts/assets_thumbs.mjs has run)
 GET    /api/assets/{id}/mjcf       the MuJoCo MJCF text
+POST   /api/assets/import-url      JSON {url, name, units, kind}: the server downloads a public link, then as below
 POST   /api/assets/import          raw body = the file, X-Filename header, ?name= ?units= ?kind=
 GET    /api/assets/import/{job}    conversion status
 DELETE /api/assets/{id}            user models only: moved to assets/user/_trash/, not erased
@@ -14,10 +15,13 @@ DELETE /api/assets/{id}            user models only: moved to assets/user/_trash
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import socket
 import threading
+import urllib.request
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -132,6 +136,10 @@ async def import_model(
         imp.validate_upload(filename, data)
     except imp.ImportRejected as e:
         raise HTTPException(422, str(e)) from None
+    return await _start(filename, data, name, units, kind)
+
+
+async def _start(filename: str, data: bytes, name: str, units: str, kind: str) -> dict:
     job = imp.Job(id=f"j{len(JOBS) + 1}_{int(imp.time.time())}", filename=filename)
     JOBS[job.id] = job
 
@@ -144,6 +152,67 @@ async def import_model(
     threading.Thread(target=run, daemon=True).start()
     await asyncio.sleep(0)
     return job.to_json()
+
+
+def _public_host(host: str) -> bool:
+    """True when every address the host resolves to is a public one (no loopback, LAN or link-local)."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only when it stays on http(s) and a public host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parts = urlparse(newurl)
+        if parts.scheme not in ("http", "https") or not _public_host(
+            parts.hostname or ""
+        ):
+            raise imp.ImportRejected("that link redirects to a non-public address")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_PublicRedirects)
+
+
+def _fetch(url: str) -> tuple[str, bytes]:
+    parts = urlparse(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise imp.ImportRejected("use a web link that starts with http or https")
+    if not _public_host(parts.hostname):
+        raise imp.ImportRejected("that address is not a public web link")
+    req = urllib.request.Request(url, headers={"User-Agent": "dojo-model-import"})
+    try:
+        with _OPENER.open(req, timeout=30) as r:
+            data = r.read(imp.MAX_UPLOAD + 1)
+    except OSError as e:
+        raise imp.ImportRejected(f"could not download that link ({e})") from None
+    if len(data) > imp.MAX_UPLOAD:
+        raise imp.ImportRejected(
+            f"the file is over {imp.MAX_UPLOAD // (1024 * 1024)} MB"
+        )
+    name = unquote(Path(urlparse(url).path).name) or "model"
+    return name, data
+
+
+@router.post("/import-url")
+async def import_url(body: dict):
+    url = str(body.get("url", "")).strip()
+    try:
+        filename, data = await asyncio.to_thread(_fetch, url)
+        imp.validate_upload(filename, data)
+    except imp.ImportRejected as e:
+        raise HTTPException(422, str(e)) from None
+    return await _start(
+        filename,
+        data,
+        str(body.get("name", "")),
+        str(body.get("units", "auto")),
+        str(body.get("kind", "dynamic")),
+    )
 
 
 @router.get("/import/{job_id}")

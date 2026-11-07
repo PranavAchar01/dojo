@@ -206,3 +206,16 @@ def test_struct_header_sanity():
     bad = b"\0" * 80 + struct.pack("<I", 5) + b"\0" * 10
     with pytest.raises(imp.ImportRejected):
         imp.validate_upload("a.stl", bad)
+
+
+def test_link_import_refuses_private_addresses():
+    from vla_forge import assets_api as api
+
+    for url in (
+        "http://127.0.0.1/x.glb",
+        "http://localhost:8100/x.glb",
+        "file:///etc/passwd",
+        "ftp://example.com/a.glb",
+    ):
+        with pytest.raises(imp.ImportRejected):
+            api._fetch(url)
