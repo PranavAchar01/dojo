@@ -70,7 +70,18 @@ const pctN = (v) => `${Math.round(v * 100)}%`;
 const mkEl = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 const MOMENTS = 8, COLS = 10, TW = 96, TH = 72;
 let rsiUI = null;
-function rsiClose() { if (rsiUI) { clearInterval(rsiUI.timer); removeEventListener("resize", rsiUI.place); rsiUI.box.remove(); rsiUI = null; } }
+// the panel is the next chapter: built at open, hidden, and shown only while the replay sits at its end
+function rsiSync() {
+  const U = rsiUI; if (!U || !R) return;
+  const end = R.pos >= R.total;
+  if (!end) U.dismissed = false;
+  const want = end && !U.dismissed;
+  if (want === !U.box.hidden) return;
+  U.box.hidden = !want;
+  document.body.classList.toggle("rsi-open", want);
+  if (want) { U.place(); U.draw(); }
+}
+function rsiClose() { document.body.classList.remove("rsi-open"); if (rsiUI) { clearInterval(rsiUI.timer); removeEventListener("resize", rsiUI.place); rsiUI.box.remove(); rsiUI = null; } }
 async function rsiPanel(rsi) {
   const r = await fetch(`/api/optimizer/runs/${rsi.run}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
   if (!r || !R || !bar || r.status === "running") return;
@@ -81,13 +92,15 @@ async function rsiPanel(rsi) {
   const best = r.rounds[r.best_round] || rows[rows.length - 1];
   const c = r.test && r.test.compare, h = r.hero;
   const box = mkEl("section", "rp-rsi");
+  box.hidden = true;
+  box.dataset.keepclear = "8";
   box.setAttribute("data-keepclear", "");
   box.setAttribute("aria-label", "Recursive self-improvement example");
   const top = mkEl("header", "rsi-top");
   top.append(mkEl("span", "rsi-tag", "RSI"), mkEl("h3", "", `The optimizer lifted this skill from ${rows[0].success} to ${best.success} of ${best.n} scenes`));
   const x = mkEl("button", "rsi-x", "×");
   x.setAttribute("aria-label", "Hide the RSI example");
-  x.onclick = rsiClose;
+  x.onclick = () => { rsiUI.dismissed = true; rsiSync(); };
   top.append(x);
   const main = mkEl("div", "rsi-main");
   const left = mkEl("div", "rsi-left");
@@ -194,8 +207,9 @@ async function rsiPanel(rsi) {
     box.classList.toggle("final", i === rows.length - 1);
   }
   U.draw = draw;
-  U.timer = setInterval(() => { U.tick++; draw(); place(); }, 320);
+  U.timer = setInterval(() => { if (box.hidden) return; U.tick++; draw(); place(); }, 320);
   draw();
+  rsiSync();
 }
 
 async function open(tile) {
@@ -242,7 +256,7 @@ function seek(target) {
 }
 
 function paint() {
-  if (rsiUI) rsiUI.frac = R.pos / R.total;
+  if (rsiUI) { rsiUI.frac = R.pos / R.total; rsiSync(); }
   const sc = bar.querySelector(".rp-scrub");
   if (document.activeElement !== sc) sc.value = String(Math.round((R.pos / R.total) * 1000));
   bar.querySelector(".rp-time").textContent = `${fmt(R.pos)} / ${fmt(R.total)}`;
