@@ -1,5 +1,5 @@
 hook	hook	This is VLA Forge. You describe a task in plain words, and it trains a robot policy for it. All of this runs in simulation.
-describe	explain	The canvas starts blank. I type one task for an SO-101: put the blue block in the back-left slot of the tray.
+describe	explain	The canvas starts blank. I type one task for an SO-101: put the blue block in the front-left slot of the tray.
 train	explain	The agents write the success check, collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
 round2	honest	The first round got {r1} of {rn}, under the bar, so the critic sent it back for another.
 trained	proud	The new skill trained in {t} seconds and got {s} of {n} held-out scenes, in simulation.
