@@ -21,7 +21,7 @@ const require = createRequire(`${process.env.PPTR_DIR || "./node_modules"}/`);
 const puppeteer = require("puppeteer-core");
 
 const BASE = process.env.BASE || "http://127.0.0.1:8100";
-const TASK = process.env.TASK || "put the blue block in the back-left slot of the tray";
+const TASK = process.env.TASK || "put the blue block in the front-left slot of the tray";
 const TWO = "two arms: one seats the housing in the pallet, the other inserts it into the socket";
 const OPT_RUN = process.env.OPT_RUN || "234442-a649"; // a saved real optimizer run in runs/opt-<id>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

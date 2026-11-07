@@ -1,0 +1,123 @@
+{
+ "recorded": "2026-11-07T10:11:16.921Z",
+ "sim_skill": {
+  "instruction": "put the blue block in the front-left slot of the tray",
+  "skill_id": "put-the-blue-block-in-the-front-left-slot-of-the-tray-99a5",
+  "parent": "put-the-blue-block-in-the-front-right-slot-of-the-tray-40c7",
+  "train_seconds": 174.4,
+  "held_out_success": 0.7,
+  "n_eval": 20,
+  "rounds": [
+   {
+    "succeeded": 13,
+    "n": 20
+   },
+   {
+    "succeeded": 14,
+    "n": 20
+   }
+  ],
+  "new_runs": 1
+ },
+ "arms": {
+  "line_id": "021012-f0ee",
+  "prompt": "two arms: one seats the housing in the pallet, the other inserts it into the socket",
+  "arms": [
+   {
+    "name": "Seat housing in pallet",
+    "controller": "vla",
+    "task": "kit",
+    "instruction": null,
+    "held_out_success": null,
+    "n_eval": null
+   },
+   {
+    "name": "Insert into socket",
+    "controller": "vla",
+    "task": "insert",
+    "instruction": null,
+    "held_out_success": null,
+    "n_eval": null
+   }
+  ],
+  "text": "8 of 12 tries finished by both arms, in simulation. 12 tries (12 red), seed 7. Not finished: try 3 (red) at arm 1, landed on a divider; try 4 (red) at arm 1, dropped it on the way; try 11 (red) at arm 2, jammed on the socket rim; try 12 (red) at arm 1, landed on a divider.",
+  "tries": 12,
+  "completed": 8,
+  "seed": 7
+ },
+ "optimizer": {
+  "run": "234442-a649",
+  "skill": "insert the green block into the socket",
+  "n_scenes": 100,
+  "best_round": 3,
+  "rounds": [
+   {
+    "round": 0,
+    "success": 60,
+    "n": 100,
+    "status": "start",
+    "ci": [
+     0.502,
+     0.691
+    ],
+    "change": null
+   },
+   {
+    "round": 1,
+    "success": 62,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.522,
+     0.709
+    ],
+    "change": "add 50 demonstrations at the failed starts"
+   },
+   {
+    "round": 2,
+    "success": 68,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.583,
+     0.763
+    ],
+    "change": "add 60 demonstrations at the failed starts"
+   },
+   {
+    "round": 3,
+    "success": 75,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.657,
+     0.825
+    ],
+    "change": "add 60 demonstrations at the failed starts"
+   },
+   {
+    "round": 4,
+    "success": 72,
+    "n": 100,
+    "status": "reverted",
+    "ci": [
+     0.625,
+     0.799
+    ],
+    "change": "add 60 demonstrations at the failed starts"
+   },
+   {
+    "round": 5,
+    "success": 69,
+    "n": 100,
+    "status": "reverted",
+    "ci": [
+     0.594,
+     0.772
+    ],
+    "change": "add 40 demonstrations at the failed starts"
+   }
+  ]
+ },
+ "retry": true
+}
