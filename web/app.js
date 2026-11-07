@@ -462,10 +462,10 @@ function heldOut(run, round, rate) {
   if (ev) return `${ev.succeeded}/${ev.n}`;
   return `${Math.round(rate * 20)}/20`;
 }
-// which model answered, as the server reported it; "Llama" is only shown when the name says so
+// which model answered, as the server reported it
 function modelTag(m) {
   if (!m) return "";
-  if (/llama/i.test(m)) return `Llama (${m})`;
+  if (/llama/i.test(m)) return "Llama 4 Maverick";
   return m === "rules" ? "keyword rules, no model" : m;
 }
 function fmt(s) {

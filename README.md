@@ -267,8 +267,13 @@ Scaffolded or limited:
 - Agentverse: registration code is in `agents.register_on_agentverse`. It runs only when
   `AGENTVERSE_API_KEY` and a public `VLA_FORGE_PUBLIC_URL` (tunnel to the bureau on port 8102) are set; no
   account or key was created, so the agents are local only right now.
-- Meta: `VLA_FORGE_LLM_PROVIDER=meta` routes parsing and the critic to the Llama API (`META_API_KEY`); not used
-  in the measured runs.
+- Meta: all language-model calls (task parsing, line planner, critic, optimizer) go through `src/vla_forge/llama.py`,
+  a client for the Llama API's OpenAI-compatible endpoint (`https://api.llama.com/compat/v1/chat/completions`, Bearer
+  `META_API_KEY`, `response_format` json_schema, model `Llama-4-Maverick-17B-128E-Instruct-FP8` unless
+  `VLA_FORGE_META_LLM` says otherwise). **The stub backend is in use until a key works**: with `VLA_FORGE_LLAMA_STUB=1`,
+  no key, or a failed call, replies come from the keyword rules (task, planner, critic) and from the changes recorded in
+  `runs/opt-234442-a649` (optimizer), so the optimizer numbers shown are that saved run's measured ones. No live Llama
+  call has been made yet.
 - Timing: heavy jobs run under `scripts/heavy.sh` at `nice -n 19`. Timed runs set `VLA_FORGE_TIMED=1`, which drops
   `taskpolicy -b`, because background QoS slows MuJoCo 3-4x on this machine.
 

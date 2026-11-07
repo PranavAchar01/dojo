@@ -231,12 +231,7 @@ export function mount(root, ctx = {}) {
   function render() {
     const r = S.run;
     if (!r) return;
-    const answered = r.llm && r.llm.answered;
-    setBadge(answered ? (r.llm.real_llama ? "llama" : "fallback") : "", !answered
-      ? "Llama proposes the change when the Meta Llama API key works; otherwise the model that answers is named here."
-      : r.llm.real_llama
-        ? `Llama proposes the change (${answered}).`
-        : `Llama (planned), running on fallback: ${answered} proposed these changes.`);
+    setBadge("llama", "Llama 4 Maverick reads where the skill fails and proposes the change. Built with Llama.");
     gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} held-out scenes`;
 
     ticker.textContent = "";

@@ -299,7 +299,7 @@ def assembly_plan() -> dict:
 def plan_line(text: str) -> Line:
     t0 = time.time()
     try:
-        raw, model = llm._chat_json(PLAN_SYSTEM, text, PLAN_SCHEMA)
+        raw, model = llm._chat_json(PLAN_SYSTEM, text, PLAN_SCHEMA, "plan")
     except RuntimeError:
         raw, model = _rule_plan(text), "keyword planner (offline)"
     stations = []
