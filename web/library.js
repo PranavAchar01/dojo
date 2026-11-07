@@ -336,14 +336,15 @@ function onTest(e) {
 // ---------------------------------------------------------------- replay a tile's recorded rollouts
 async function replay(id, i = 0) {
   const t = tiles.find((x) => x.id === id);
+  if (t) F().selectSkill(t);
   const r = await fetch(`/api/skills/${id}/replay/${i}`);
   if (!r.ok) return toast("No recording yet", "Run Test to record this tile on fresh scenes");
   const p = await r.json();
   F().setView("sim");
   F().setShown({ run: null, round: -1, index: -1 });
   F().startPlayback(p);
-  F().setCaption(`“${t?.name || id}” · replay`);
-  F().setBadge(p.success ? `Replay ${i + 1} · success` : `Replay ${i + 1} · ${p.failure}`, p.success);
+  F().setCaption(`“${t?.name || id}” · recorded rollout`);
+  F().setBadge(p.success ? `Rollout ${i + 1} · success` : `Rollout ${i + 1} · ${p.failure}`, p.success);
   const chips = $("#chips");
   chips.innerHTML = "";
   chips.dataset.pending = "";
@@ -353,8 +354,8 @@ async function replay(id, i = 0) {
     c.onclick = () => replay(id, k);
     chips.append(c);
   });
-  $("#round-label").textContent = `Replay · ${p.source}`;
-  $("#pb-label").textContent = `replay ${i + 1}/${p.all.length}`;
+  $("#round-label").textContent = `Recorded · ${p.source}`;
+  $("#pb-label").textContent = `rollout ${i + 1}/${p.all.length}`;
 }
 
 // ---------------------------------------------------------------- composer mode (remix / from scratch)
@@ -442,13 +443,12 @@ function tileEl(t, byId) {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
   th.append(el("span", "tile-tier mono", t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${t.robot !== "so101" ? " custom" : ""}`, robotLabel(t.robot)));
-  if (t.replay) {
-    const pl = el("button", "tile-play");
-    pl.setAttribute("aria-label", "Replay");
-    pl.innerHTML = '<svg viewBox="0 0 20 20"><path d="M6.5 4.5v11l8.5-5.5z"/></svg>';
-    pl.onclick = () => replay(t.id);
-    th.append(pl);
-  }
+  // one click on the tile plays its recorded rollout straight away; the buttons below keep their own jobs
+  a.classList.add("tap");
+  a.tabIndex = 0;
+  a.setAttribute("aria-label", `${t.name}: play its recorded rollout`);
+  a.addEventListener("click", (ev) => { if (!ev.target.closest("button, a, input, .tile-name")) replay(t.id); });
+  a.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target === a) replay(t.id); });
   if (testing[t.id]) {
     const T = tests[testing[t.id]];
     const ov = el("div", "tile-testing");
@@ -499,7 +499,6 @@ function tileEl(t, byId) {
     acts.append(b);
     return b;
   };
-  if (t.replay) mk("Replay", () => replay(t.id));
   const tb = mk(testing[t.id] ? "Testing..." : "Test", () => startTest(t.id));
   tb.disabled = !!testing[t.id];
   if (t.origin !== "chain") mk("Remix", () => setMode("remix", t.id, t.name));

@@ -42,7 +42,7 @@ for (const [key, name, icon] of STAGES) {
   li.dataset.stage = key;
   li.append(svgIcon(icon), el("span", "", name), el("span", "m"));
   if (key === "planner" || key === "executor") li.classList.add("off");
-  if (key === "optimizer") { li.classList.add("tap"); li.setAttribute("role", "button"); li.tabIndex = 0; li.title = "Open the optimizer"; }
+  li.classList.add("tap"); li.setAttribute("role", "button"); li.tabIndex = 0; li.title = `Open ${name}`;
   $("#rail").append(li);
   rail[key] = li;
 }
@@ -455,6 +455,7 @@ let shown = { run: null, round: -1, index: -1 }; // rollout on screen
 let losses = []; // per round arrays of [t, loss] of the run being trained
 let planRows = [];
 let lastSkill = null;
+let selSkill = null; // the skill on screen: the run's own once it is saved, or the tile picked in the library
 let skillsCache = [];
 
 // "16/20" from the evaluated round when we have it, else the rate on the standard 20 scenes
@@ -493,7 +494,7 @@ function youMsg(text) {
   m.append(el("div", "who", "You"), el("div", "txt", text));
   thread.append(m);
   forgeMsg = el("div", "msg forge");
-  forgeMsg.append(el("div", "who", "Forge"));
+  forgeMsg.append(el("div", "who", "Dojo"));
   const list = el("div", "tools-list");
   forgeMsg.append(list);
   thread.append(forgeMsg);
@@ -739,24 +740,26 @@ function setView(v) {
   const app = $("#app");
   const prev = app.dataset.view;
   app.dataset.view = v;
-  app.classList.toggle("immersive", v !== "sim");
+  // the library keeps the chat beside it, so a new task can be typed straight from it
+  app.classList.toggle("immersive", v !== "sim" && v !== "skills");
+  app.classList.toggle("lib", v === "skills");
   for (const k of ["sim", "robot", "ladder", "agents", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();
   if (v === "skills") refreshSkills();
-  // the panels slide away over ~300ms; resize the 3D canvases once the layout has settled
+  // the panels slide away over ~220ms; resize the 3D canvases once the layout has settled
   resize();
   if (prev !== v) {
     const again = () => { resize(); window.dispatchEvent(new Event("resize")); };
-    setTimeout(again, 340);
+    setTimeout(again, 240);
   }
   window.dispatchEvent(new CustomEvent("forge:view", { detail: v }));
 }
 window.setView = setView;
-$("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); setTimeout(resize, 340); };
-$("#toggle-right").onclick = () => { $("#app").classList.toggle("no-right"); setTimeout(resize, 340); };
-$("#app").dataset.view = "sim";
+$("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); setTimeout(resize, 240); };
+$("#toggle-right").onclick = () => { $("#app").classList.toggle("no-right"); setTimeout(resize, 240); };
+$("#app").dataset.view = "skills";
 
 const TIER_NAMES = {
   1: ["Tier 1", "one motion: reach, push, lift"],
@@ -881,6 +884,7 @@ es.onmessage = (m) => {
 };
 function beginRun(rid) {
   current = rid;
+  selSkill = null;
   composite = false;
   family.clear();
   runStart = Date.now() / 1000;
@@ -943,7 +947,7 @@ function handle(e) {
       $("#go").disabled = false;
       break;
     case "reused":
-      lastSkill = e.skill;
+      lastSkill = selSkill = e.skill;
       $("#call-last").disabled = false;
       runDone = Date.now() / 1000;
       for (const k of ["scene", "data", "trainer", "eval", "critic"]) rail[k].classList.add("off");
@@ -1050,7 +1054,7 @@ function handle(e) {
         forgeNote(`Saved skill-${e.skill.slice(-4)}: ${held} on held-out scenes, in simulation.`, e.run);
         break;
       }
-      lastSkill = e.skill;
+      lastSkill = selSkill = e.skill;
       $("#call-last").disabled = false;
       runDone = runStart + e.seconds;
       $("#elapsed").textContent = fmt(e.seconds);
@@ -1066,6 +1070,7 @@ let lastPrompt = "";
 async function submit(text) {
   if (!text) return;
   lastPrompt = text;
+  if ($("#app").dataset.view !== "sim") setView("sim");
   $("#go").disabled = true;
   $("#prompt").value = "";
   $("#crumb-run").textContent = text;
@@ -1105,6 +1110,17 @@ window.forge = {
   showScene(sc) { play = null; buildWorld(sc); applyFrame(sc.frame); $("#pb-fill").style.width = "0"; $("#vp-badge").classList.add("hidden"); $("#step-badge").classList.add("hidden"); },
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
+  // a finished tile picked in the library: the rail, the bubble and the bot show that skill as saved
+  selectSkill(t) {
+    selSkill = t.id;
+    if (current && !runDone) return;
+    const held = `${Math.round(t.success_rate * (t.n_eval || 20))}/${t.n_eval || 20}`;
+    resetStages(t.tier === 3);
+    stage("eval", "done", held);
+    stage("registry", "done", held);
+    $("#crumb-run").textContent = t.name;
+    window.dispatchEvent(new CustomEvent("dojo:skill", { detail: { id: t.id, name: t.name, held } }));
+  },
   note: forgeNote, modelTag, lights, cellMarks, plate: () => plate, grid, gridMid,
   setCamShift(y, scale) { camShift = y; camScale = scale; setCam(camName); },
   setSingleVisible(v) { if (world) world.root.visible = world.mirror.visible = v; plate.visible = cellMarks.visible = v && staged; },
@@ -1127,8 +1143,35 @@ function optimizerOpen(on) {
   optRoot.dataset.open = on ? "1" : "";
   window.dispatchEvent(new CustomEvent("forge:optimizer", { detail: { open: on } }));
 }
-rail.optimizer.addEventListener("click", () => optimizerOpen(optSec.hidden));
-rail.optimizer.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); optimizerOpen(optSec.hidden); } });
+// every step on the rail opens that step's detail for the skill on screen: its line in the chat, or its inspector card
+const DETAIL = { planner: "#plan-sec", trainer: "#loss-sec", eval: "#rounds-sec", critic: "#critic-sec", executor: "#arms-sec" };
+function pulse(n) { n.classList.remove("pulse"); void n.offsetWidth; n.classList.add("pulse"); setTimeout(() => n.classList.remove("pulse"), 1300); }
+function openStage(k) {
+  if (k === "optimizer") return optimizerOpen(optSec.hidden);
+  if (k === "registry") return selSkill || lastSkill ? window.forgeLib?.openTile(selSkill || lastSkill) : setView("skills");
+  setView("sim");
+  if (DETAIL[k]) {
+    $("#app").classList.remove("no-right");
+    const sec = $(DETAIL[k]);
+    sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return pulse(sec);
+  }
+  $("#app").classList.remove("no-left");
+  if (k === "scene") setCam("orbit");
+  const line = current && toolEls[`${current}:${k}`];
+  if (line) { line.scrollIntoView({ block: "center", behavior: "smooth" }); return pulse(line); }
+  if (k === "task") $("#prompt").focus();
+  pulse($("#thread"));
+}
+for (const [k, li] of Object.entries(rail)) {
+  li.addEventListener("click", () => openStage(k));
+  li.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openStage(k); } });
+}
+// the optimizer runs in the background on one skill at a time; the rail only shows it on that skill
+function optStage(state, metric, skill) {
+  if (skill && skill !== selSkill && optSec.hidden) return stage("optimizer", "idle", "");
+  stage("optimizer", state, metric);
+}
 $("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
 (async function loadOptimizer() {
   const have = async (url, type) => {
@@ -1147,7 +1190,7 @@ $("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
     const mod = await import("/static/optimizer.js");
     optRoot.dataset.loaded = "1";
     // optional named export: mount(root, ctx). A module that wires itself to #optimizer-root needs no export.
-    if (typeof mod.mount === "function") mod.mount(optRoot, { forge: window.forge, stage, open: optimizerOpen, current: () => current });
+    if (typeof mod.mount === "function") mod.mount(optRoot, { forge: window.forge, stage: (k, st, m, skill) => (k === "optimizer" ? optStage(st, m, skill) : stage(k, st, m)), open: optimizerOpen, current: () => current });
   } catch (err) {
     optRoot.dataset.loaded = "error";
     optRoot.textContent = `The optimizer did not load: ${err.message}`;
@@ -1155,6 +1198,7 @@ $("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
 })();
 
 idleScene();
+setView("skills"); // the library is the first thing after the landing page
 
 // ---------------------------------------------------------------- live tab capture (?capture=1, demo recording)
 window.setSpeed = (on) => { $("#speed").classList.toggle("hidden", !on); };
