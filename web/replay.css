@@ -24,6 +24,8 @@
 
 /* RSI example: the grid of simulations playing together beside the round-by-round story, under the replay bar */
 .rp-rsi { --acc: #0866ff; position: fixed; z-index: 41; top: 210px; left: 50%; transform: translateX(-50%); width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 230px); overflow: auto; display: grid; gap: 14px; padding: 16px 18px 18px; border-radius: var(--r); background: #fff; box-shadow: 0 0 0 1px #d9dfe5, 0 2px 4px rgba(28, 43, 51, .04), 0 18px 44px rgba(28, 43, 51, .12); font-family: "Figtree", var(--ui); color: #1c2b33; animation: rsi-in .45s var(--soft, ease) both; }
+.rp-rsi[hidden] { display: none; }
+body.rsi-open #view-sim .caption { opacity: 0; transition: opacity .2s; }
 @keyframes rsi-in { from { opacity: 0; transform: translate(-50%, 10px); } }
 .rp-rsi .rsi-top { display: flex; align-items: center; gap: 12px; }
 .rp-rsi .rsi-top h3 { flex: 1; margin: 0; font: 650 17px/1.25 "Figtree", var(--ui); letter-spacing: -.01em; }
