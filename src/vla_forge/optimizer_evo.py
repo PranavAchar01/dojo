@@ -38,7 +38,7 @@ import numpy as np
 from openevolve.config import DatabaseConfig
 from openevolve.database import Program, ProgramDatabase
 
-from . import blender_montage, montage
+from . import blender_montage, lanes, llama, montage, subq
 from . import optimizer as O
 from .encoders import device
 from .learn import Demos, train
@@ -176,7 +176,7 @@ def run(
     stage = montage.Stage(robot)
     cfg0 = {**O.DEFAULTS, "train_seconds": float(train_seconds)}
     opt.llm = opt.llm or {
-        "asked": "Llama 4 Maverick",
+        "asked": f"{llama.NAMES.get(llama.OPT_MODEL, llama.OPT_MODEL)} and {subq.NAME}",
         "backend": None,
         "backends_used": [],
     }
@@ -286,8 +286,7 @@ def run(
         )
         (out / "traj" / f"r{rnd}.json").write_text(json.dumps([light(s) for s in sc]))
 
-    def evaluate_round(rnd: int, m: VLA, sheets: bool) -> list[dict]:
-        phase("scoring", round=rnd)
+    def score_with_traj(rnd: int, m: VLA) -> tuple[list[dict], dict]:
         traj: dict[int, np.ndarray] = {}
         with comp:
             sc = O.score(
@@ -296,8 +295,28 @@ def run(
                 layouts,
                 robot,
                 lambda n: ev(opt.id, "opt_scoring", round=rnd, done=n),
-                traj=traj if sheets else None,
+                traj=traj,
             )
+        return sc, traj
+
+    def evaluate_round(
+        rnd: int, m: VLA, sheets: bool, pre: tuple[list[dict], dict] | None = None
+    ) -> list[dict]:
+        """Score (or take a scoring already done, `pre`) and, with sheets, save the trajectories and render them."""
+        phase("scoring", round=rnd)
+        traj: dict[int, np.ndarray] = {}
+        if pre is not None:
+            sc, traj = pre
+        else:
+            with comp:
+                sc = O.score(
+                    m,
+                    spec,
+                    layouts,
+                    robot,
+                    lambda n: ev(opt.id, "opt_scoring", round=rnd, done=n),
+                    traj=traj if sheets else None,
+                )
         if sheets:
             save_traj(rnd, traj, sc)
             phase("rendering", round=rnd)
@@ -389,7 +408,7 @@ def run(
         rnd: int, change: dict | None, backend: str, text: str, kind: str
     ) -> dict:
         ch = (
-            {**change, "text": text, "model": "Llama 4 Maverick"}
+            {**change, "text": text, "model": llama.label(backend)}
             if change
             else {
                 "knob": None,
@@ -428,6 +447,40 @@ def run(
     # ------------------------------------------------------------------ the two arms, one round each
     history: list[dict] = []
 
+    def change_of(arms: list, who: str) -> dict:
+        return next(ch for w, ch, _ in arms if w == who)
+
+    def subq_view(pround: int, report: dict, cfg: dict) -> dict:
+        """Everything SubQ reads: every round, every scored scene of every round, then trajectories (parent's round
+        first), each subsampled to 6 moments."""
+        rounds = [
+            {
+                k: r.get(k)
+                for k in ("round", "parent", "status", "success", "vs", "failures")
+            }
+            | {"change": (r.get("change") or {}).get("text")}
+            for r in opt.rounds
+            if r.get("status") != "training"
+        ]
+        scenes, traj = {}, {}
+        for f in sorted((out / "traj").glob("r*.json")):
+            with contextlib.suppress(OSError, ValueError):
+                scenes[f.stem] = json.loads(f.read_text())
+        order = [out / "traj" / f"r{pround}.npz"] + sorted(
+            (out / "traj").glob("r*.npz"), key=lambda p: -p.stat().st_mtime
+        )
+        for f in dict.fromkeys(order):
+            if not f.exists():
+                continue
+            with contextlib.suppress(OSError, ValueError), np.load(f) as z:
+                traj[f.stem] = {
+                    k: np.round(
+                        z[k][np.linspace(0, len(z[k]) - 1, 6).astype(int)], 3
+                    ).tolist()
+                    for k in z.files
+                }
+        return O.subq_state(report, cfg, rounds, scenes, traj)
+
     def optimizer_round(rnd: int) -> None:
         t1 = time.time()
         phase("proposing", round=rnd)
@@ -457,22 +510,90 @@ def run(
             ],
             "inspirations": [p.id for p in insp],
         }
-        change, backend = O.propose(report, hist, rnd, [png] if png else None, extra)
+        (change, backend), (q_change, q_p, q_err) = O.propose_pair(
+            report,
+            hist,
+            rnd,
+            [png] if png else None,
+            extra,
+            subq_view(pround, report, prec["cfg"]),
+            prec["cfg"],
+            opt.id,
+        )
         opt.llm["backend"] = backend
         if backend not in opt.llm["backends_used"]:
             opt.llm["backends_used"].append(backend)
-        opt.llm["real_llama"] = backend.startswith("meta:")
+        opt.llm["real_meta"] = backend.startswith("meta:")
         row = row_base(rnd, change, backend, O.describe(change), "optimizer")
         row.update({"parent": pround, "program": f"p{rnd}", "evidence": ev_scenes})
         opt.rounds.append(row)
         save()
         ev(opt.id, "opt_change", round=rnd, change=row["change"])
-        crec, cdata = apply_change(change, pst, prec, pst.scored, rnd)
-        phase("training", round=rnd)
-        cand, tst = train_child(pst.model, cdata, crec["cfg"], "optimizer", rnd)
-        sc = evaluate_round(rnd, cand, sheets=True)
-        k = sum(s["success"] for s in sc)
+        # head to head: each distinct proposal trains from the same parent with the same budget, scored on the same SELECT
+        arms = [("meta", change, backend)]
+        if q_change and not O.same_change(q_change, change):
+            arms.append(("subq", q_change, f"subq:{subq.MODEL}"))
+        res: dict[str, dict] = {}
+        for who, ch, _be in arms:
+            crec, cdata = apply_change(ch, pst, prec, pst.scored, rnd)
+            phase("training", round=rnd, arm=who)
+            # the loss chart follows the first arm only, so two curves never interleave
+            kind = "optimizer" if who == "meta" else "duel"
+            cand, tst = train_child(pst.model, cdata, crec["cfg"], kind, rnd)
+            phase("scoring", round=rnd, arm=who)
+            sc, traj = score_with_traj(rnd, cand)
+            res[who] = {
+                "crec": crec,
+                "cdata": cdata,
+                "cand": cand,
+                "tst": tst,
+                "pre": (sc, traj),
+                "k": sum(s["success"] for s in sc),
+            }
+        if "subq" not in res:
+            winner = "agreed" if q_change else "solo"
+            take = "meta"
+        else:
+            km, kq = res["meta"]["k"], res["subq"]["k"]
+            winner = "meta" if km > kq else "subq" if kq > km else "tie"
+            take = "subq" if winner == "subq" else "meta"
+        w = res[take]
+        if take == "subq":
+            change, backend = q_change, f"subq:{subq.MODEL}"
+            row["change"] = {
+                **q_change,
+                "text": O.describe(q_change),
+                "model": subq.NAME,
+            }
+            row["backend"] = backend
+        crec, cdata, cand, tst = w["crec"], w["cdata"], w["cand"], w["tst"]
+        sc = evaluate_round(rnd, cand, sheets=True, pre=w["pre"])
+        k = w["k"]
         finish_row(row, k, k_parent, sc, crec["cfg"], tst, t1)
+        row["duel"] = {
+            "round": rnd,
+            "n_select": N,
+            "parent_k": k_parent,
+            "meta": {
+                "change": {kk: change_of(arms, "meta")[kk] for kk in ("knob", "value")},
+                "label": llama.label(arms[0][2]),
+                "backend": arms[0][2],
+                "k": res["meta"]["k"],
+            },
+            "subq": {
+                "change": {kk: q_change[kk] for kk in ("knob", "value")}
+                if q_change
+                else None,
+                "p": round(q_p, 3) if q_p is not None else None,
+                "error": q_err,
+                "k": res["subq"]["k"]
+                if "subq" in res
+                else (res["meta"]["k"] if q_change else None),
+            },
+            "winner": winner,
+            "admitted": k > k_parent,
+        }
+        lanes.duel(opt.id, row["duel"])
         history.append(
             {
                 "round": rnd,

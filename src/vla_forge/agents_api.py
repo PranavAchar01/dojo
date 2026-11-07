@@ -20,9 +20,10 @@ async def graph():
 @router.get("/api/llm")
 async def llm():
     """Totals per lane, calls in flight, recent calls, this session's optimizer duels and who answers on each lane.
-    When this session has no duels yet, the duels of the latest saved optimizer run that has them."""
+    When this session has no duels yet, the duels saved in recent optimizer runs."""
     snap = lanes.snapshot()
     snap["models"] = await asyncio.to_thread(HOLD["agents"].models)
     if not snap["duels"]:
         snap["saved_duels"] = await asyncio.to_thread(optimizer.saved_duels)
+        snap["saved_tally"] = lanes.tally(snap["saved_duels"])
     return snap

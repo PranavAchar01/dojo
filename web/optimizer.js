@@ -241,7 +241,7 @@ export function mount(root, ctx = {}) {
     return ({
       scoring: `scoring ${n} scenes`, rendering: "rendering the grid", collecting: "collecting demonstrations",
       testing: "scoring the held-out TEST scenes", control: "running the control arm",
-      training: "fine-tuning the policy", proposing: "Llama is reading the failures", replay: "rendering the replay",
+      training: "fine-tuning the policy", proposing: "Muse Wonder and SubQ are both proposing", replay: "rendering the replay",
     })[r.phase] || r.phase || "working";
   }
 
@@ -249,7 +249,7 @@ export function mount(root, ctx = {}) {
   function render() {
     const r = S.run;
     if (!r) return;
-    setBadge("llama", "Llama 4 Maverick reads where the skill fails and proposes the change. Built with Llama.");
+    setBadge("llama", "Muse Wonder reads where the skill fails and writes a change; SubQ reads every round and picks one. Both train, the better one counts.");
     gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} selection scenes`;
 
     ticker.textContent = "";
@@ -332,7 +332,7 @@ export function mount(root, ctx = {}) {
     const e = r.engine;
     if (!e || !e.population) return;
     popCard.append(el("div", "opt-held-h", "Population"),
-      el("div", "opt-held-sub", `${e.population.length} policies kept across ${e.islands} islands. Framework: OpenEvolve population database. Proposals: Llama 4 Maverick.`));
+      el("div", "opt-held-sub", `${e.population.length} policies kept across ${e.islands} islands. Framework: OpenEvolve population database. Proposals: Muse Wonder and SubQ Snap, head to head.`));
     for (const p of e.population.slice().sort((a, b) => b.success - a.success).slice(0, 5)) {
       const l = el("button", "opt-pop-row" + (p.round === r.best_round ? " best" : ""));
       const bits = [...Object.entries(p.recipe.changed_settings || {}).map(([k, v]) => `${k} ${typeof v === "number" ? +v.toPrecision(2) : v}`), ...(p.recipe.extra_demos || [])];
@@ -579,7 +579,7 @@ export function mount(root, ctx = {}) {
     pair.textContent = `Same scene: R0 ${a.success ? "succeeded" : "failed"}${b.round !== 0 ? `, best R${b.round} ${b.success ? "succeeded" : "failed"}` : ""}.`;
     zInfo.append(pair);
     const agent = el("div", "opt-zoom-agent");
-    agent.append(el("div", "opt-zoom-agent-h", "Llama 4 Maverick"));
+    agent.append(el("div", "opt-zoom-agent-h", "Muse Wonder + SubQ"));
     if (i.note) {
       agent.append(el("div", "opt-zoom-agent-t", `"${i.note.text}"`),
         el("div", "opt-note", i.note.kind === "scene" ? `Its note on this scene, written in round ${i.note.round} when it chose that change.` : `Its diagnosis of the failure pattern in round ${i.note.round}, not a note on this scene alone.`));

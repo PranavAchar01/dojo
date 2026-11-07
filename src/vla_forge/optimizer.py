@@ -6,9 +6,12 @@ final kept policy, with 95% Wilson intervals and a paired comparison (McNemar ex
 A control arm repeats the same number of rounds with a random valid change each round (or no change at all), under the
 same keep/revert rule, so a gain can be attributed to the optimizer and not to extra training.
 
-Every round the model (llama.py: Meta's Llama API if its key works, else OpenAI behind the same interface) reads the
-per-failure evidence and rendered frames and proposes exactly one change from a fixed menu, validated here; it may not
-repeat a change that was just reverted. The backend that really answered is recorded per round. Each SELECT scoring
+Every round two models propose at the same moment (lanes.both). Muse Wonder (llama.py: Meta's Model API if its key
+works, else OpenAI behind the same interface, labelled as such) reads the per-failure evidence and rendered frames and
+writes one change from a fixed menu; SubQ Snap (subq.py) reads every past round, every scored scene and the recorded
+trajectories, and picks one change from the same menu, enumerated. Both are validated here and may not repeat a change
+that was just reverted. Both children are trained from the same parent and scored on the same SELECT scenes; the round
+records both, the winner and the backend that really answered. Each SELECT scoring
 pass is rendered in Blender (blender_montage.py) from the recorded MuJoCo trajectories. Every round is written to
 runs/opt-<id>/run.json.
 """
@@ -30,7 +33,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from . import blender_montage, llama, montage
+from . import blender_montage, lanes, llama, montage, subq
 from .datagen import demo_job, pool
 from .encoders import device
 from .learn import SCOPES, Demos
@@ -473,6 +476,119 @@ def propose(
         why = "the model repeated a reverted change"
         payload["rejected_this_round"] = {"knob": ch["knob"], "value": ch["value"]}
     return fallback_change(rnd, history, why), "rules"
+
+
+# SubQ picks from the menu enumerated on this grid (each value inside its knob's range)
+GRID = {
+    "extra_demos_near_failures": (10, 20, 30, 40, 50, 60),
+    "extra_demos_random": (10, 30, 60),
+    "lr": (5e-5, 1e-4, 2e-4, 4e-4, 6e-4),
+    "train_seconds": (20, 40, 60, 75),
+    "state_noise": (0.0, 0.02, 0.05, 0.08),
+    "replay_frac": (0.0, 0.2, 0.4, 0.7),
+    "batch": (64, 128, 256, 512),
+    "weight_decay": (1e-5, 1e-4, 1e-3, 1e-2),
+    "scope": tuple(SCOPES),
+}
+SUBQ_ASK = (
+    "Pick the one change to how the policy is fine-tuned that will most raise success on the same SELECT scenes next "
+    "round. The state holds every past round (its change, its SELECT score, kept or reverted), the current parent's "
+    "settings and failure report, every scored scene of every round, and the recorded joint and object trajectories."
+)
+
+
+def menu(cfg: dict, history: list[dict]) -> dict[str, dict]:
+    """Every valid change on the grid, minus reverted ones and minus no-ops on the parent's settings."""
+    ban = barred(history)
+    out: dict[str, dict] = {}
+    for knob, vals in GRID.items():
+        for v in vals:
+            ch = clean_change({"knob": knob, "value": str(v), "reason": ""})
+            if any(_same(ch, b) for b in ban):
+                continue
+            noop = knob in cfg and not knob.startswith("extra_demos")
+            if noop and _same(ch, {"knob": knob, "value": cfg[knob]}):
+                continue
+            out[f"opt_{len(out)}"] = ch
+    return out
+
+
+def subq_state(
+    report: dict, cfg: dict, rounds: list[dict], scenes: dict, traj: dict
+) -> dict:
+    """What SubQ reads, most decisive first (subq.fit cuts from the end when it is too long)."""
+    return {
+        "parent_settings": cfg,
+        "parent_failure_report": report,
+        "rounds": rounds,
+        "knobs": {k: KNOBS[k][2] for k in KNOBS},
+        "scenes_by_round": scenes,
+        "trajectories": traj,
+    }
+
+
+def subq_change(state: dict, cfg: dict, history: list[dict]) -> tuple[dict, float]:
+    """SubQ's change: a `choice` over the enumerated menu. Returns (change, its probability). Raises subq.Unavailable."""
+    opts = menu(cfg, history)
+    crit = {name: describe(ch) for name, ch in opts.items()}
+    ans = subq.decide(
+        state,
+        {"change": {"type": "choice", "instructions": SUBQ_ASK, "criteria": crit}},
+        "optimizer",
+    )
+    pick, p = subq.choice(ans["change"])
+    ch = dict(opts[pick])
+    probs = sorted(
+        (ans["change"].get("probabilities") or {}).items(), key=lambda kv: -kv[1]
+    )
+    ch["reason"] = f"picked with p {p:.2f} of {len(opts)} options"
+    ch["runners_up"] = [
+        {"text": crit[n], "p": round(float(q), 3)} for n, q in probs[1:4] if n in crit
+    ]
+    return ch, p
+
+
+def propose_pair(
+    report: dict,
+    history: list[dict],
+    rnd: int,
+    images: list[bytes] | None,
+    extra: dict | None,
+    state: dict,
+    cfg: dict,
+    run: str = "",
+) -> tuple[tuple[dict, str], tuple[dict | None, float | None, str]]:
+    """Muse Wonder and SubQ at the same moment. ((meta change, backend), (subq change or None, p, error))."""
+    with lanes.about(run, f"round {rnd} proposal"):
+        m, q = lanes.both(
+            lambda: propose(report, history, rnd, images, extra),
+            lambda: subq_change(state, cfg, history),
+        )
+    if isinstance(
+        m, Exception
+    ):  # propose never raises for model errors; this is a bug, surface it
+        raise m
+    if isinstance(q, Exception):
+        return m, (None, None, str(q) or type(q).__name__)
+    return m, (q[0], q[1], "")
+
+
+def same_change(a: dict | None, b: dict | None) -> bool:
+    return bool(a and b) and _same(a, b)
+
+
+def saved_duels(limit: int = 40) -> list[dict]:
+    """Head to head rows from saved optimizer runs, newest run first, for the Muse + SubQ view after a restart."""
+    out: list[dict] = []
+    for d in sorted(RUNS.glob("opt-*/run.json"), key=lambda p: -p.stat().st_mtime):
+        try:
+            rows = json.loads(d.read_text()).get("rounds") or []
+        except (OSError, ValueError):
+            continue
+        out += [r["duel"] for r in reversed(rows) if r.get("duel")]
+        if len(out) >= limit:
+            break
+    return list(reversed(out[:limit]))
 
 
 @dataclass

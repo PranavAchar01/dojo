@@ -17,7 +17,7 @@ from threading import Lock
 import numpy as np
 from PIL import Image
 
-from . import montage, optimizer
+from . import llama, montage, optimizer
 from .encoders import device
 from .policy import VLA
 from .registry import ROOT, Registry
@@ -181,7 +181,7 @@ def info(oid: str, rnd: int, scene: int) -> dict:
         "before": at(0),
         "after": at(best),
         "best_round": best,
-        "model": "Llama 4 Maverick",
+        "model": llama.label(row.get("backend") or "") if row.get("backend") else "",
     }
 
 
