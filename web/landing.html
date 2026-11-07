@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLA Forge</title>
+<meta name="description" content="Describe a factory line in a sentence. VLA Forge trains and measures a vision-language-action policy for every station, in simulation, in minutes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/landing.css">
+</head>
+<body class="lp">
+<span id="ready-dot" class="dot on" hidden></span>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#line">Factory line</a>
+      <a href="#skills">Skills</a>
+      <a href="#robots">Robots</a>
+      <a href="#models">Models</a>
+    </nav>
+    <a class="cta dark sm" href="/app">Open the app<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+  </div>
+</header>
+
+<main>
+  <!-- ------------------------------------------------------------ hero -->
+  <section class="hero">
+    <div class="plane" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for factory lines</p>
+          <h1 class="rv" style="--d:60ms">Describe the line.<br>Get a <em>policy</em> for every station.</h1>
+          <p class="lede rv" style="--d:140ms">Say what the line should do. VLA Forge splits it into stations, trains and measures a policy for each one in about three minutes, and chains them with scripted cells where a script is enough.</p>
+          <div class="hero-cta rv" style="--d:220ms">
+            <a class="cta big" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+            <a class="cta ghost big" href="#watch">Watch a line run</a>
+          </div>
+        </div>
+        <div class="hero-mascot rv" style="--d:300ms" aria-hidden="true">
+          <span class="mascot lg" data-follow></span>
+          <span class="bb-thought on"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
+        </div>
+      </div>
+
+      <figure class="stage rv" id="watch" style="--d:200ms">
+        <div class="stage-bar">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="stage-t">vla-forge <span class="sep">/</span> line</span>
+          <span class="stage-r">Recorded from the app, 4x</span>
+        </div>
+        <div class="stage-media">
+          <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/static/assets/line-run.jpg" width="1200" height="406" aria-label="Three stations on a conveyor in the simulator: two policy-driven SO-101 arms and a scripted ViperX sorting coloured parts into totes">
+            <source src="/static/assets/line-run.webm" type="video/webm">
+            <source src="/static/assets/line-run.mp4" type="video/mp4">
+          </video>
+        </div>
+        <figcaption>Two trained SO-101 stations and one scripted ViperX at the end of the line, in simulation. The panel counts what the simulator measures.</figcaption>
+      </figure>
+
+      <dl class="numbers rv">
+        <div><dt>Parts through the line</dt><dd class="num">30<span class="of"> / 30</span></dd></div>
+        <div><dt>Throughput</dt><dd class="num">7.2<span class="of"> parts / min</span></dd></div>
+        <div><dt>Station 1, held-out scenes</dt><dd class="num">19<span class="of"> / 20</span></dd></div>
+        <div><dt>Station 2, after one retrain</dt><dd class="num">15<span class="of"> / 20</span></dd></div>
+      </dl>
+      <p class="fine rv">One recorded run, in simulation (demo/v5-results.json). Station success is measured on 20 layouts the policy never trained on. Training took 88.7 s and 167.7 s.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ how it works -->
+  <section class="band" id="how">
+    <div class="wrap">
+      <p class="kicker rv">How it works</p>
+      <h2 class="rv">One sentence goes in. <em>Eight agents</em> hand it down the pipe.</h2>
+      <p class="sub rv">Each stage is a Fetch.ai uAgent passing real messages in one Bureau. Every stage streams its logs, demos, loss and evaluation to the page as it happens.</p>
+      <ol class="pipe" id="pipe">
+        <li><span class="n">01</span><h3>Prompt</h3><p>A planner turns the sentence into a task and a success check the simulator can evaluate.</p></li>
+        <li><span class="n">02</span><h3>Route</h3><p>The router picks the nearest skill in the library, or the base policy, and checks the robot can do the task.</p></li>
+        <li><span class="n">03</span><h3>Scene</h3><p>MuJoCo builds the table and 20 held-out layouts the policy never sees in training.</p></li>
+        <li><span class="n">04</span><h3>Demos</h3><p>A scripted expert collects demonstrations with randomised colours, positions and noise.</p></li>
+        <li><span class="n">05</span><h3>Train</h3><p>The action head of the VLA is fine-tuned from the nearest skill, on one Mac.</p></li>
+        <li><span class="n">06</span><h3>Eval</h3><p>Twenty rollouts on the held-out scenes. Success is counted, not claimed.</p></li>
+        <li><span class="n">07</span><h3>Critic</h3><p>It reads the failed rollouts and retrains near them if there is time left.</p></li>
+        <li><span class="n">08</span><h3>Publish</h3><p>The skill joins the library and becomes its own agent that other agents can call.</p></li>
+      </ol>
+      <p class="fine rv">Inputs to the policy: two camera images, the instruction and the joint positions. Output: the next 10 joint targets. Budget: 3 minutes per prompt.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ factory line -->
+  <section class="band tint" id="line">
+    <div class="wrap">
+      <p class="kicker rv">Factory line</p>
+      <h2 class="rv">A line is a <em>chain of stations</em>.</h2>
+      <p class="sub rv">A station is either a trained VLA or a script. The planner picks which, the router checks that the robot can do it, and the line runs them in order along one conveyor.</p>
+
+      <blockquote class="prompt rv">
+        <span class="q">Prompt</span>
+        Kitting line: red parts go to the blue tote, then yellow parts to the green tote, and a scripted ViperX at the end of the line catches everything else in the gray tote.
+      </blockquote>
+
+      <div class="chain rv" id="chain">
+        <div class="belt" aria-hidden="true"><i class="blk r"></i><i class="blk y"></i><i class="blk r"></i><i class="blk y"></i><i class="blk b"></i></div>
+        <article class="st">
+          <header><span class="idx">01</span><span class="kind vla">VLA</span></header>
+          <h3>Red to Blue</h3>
+          <p>SO-101, trained for this station in 88.7 s.</p>
+          <div class="meter"><b style="--w:95%"></b></div>
+          <p class="res"><b class="num">19 / 20</b> held-out scenes, in simulation</p>
+        </article>
+        <article class="st">
+          <header><span class="idx">02</span><span class="kind vla">VLA</span></header>
+          <h3>Yellow to Green</h3>
+          <p>SO-101, trained in 167.7 s with one retrain after the critic read the misses.</p>
+          <div class="meter"><b style="--w:75%"></b></div>
+          <p class="res"><b class="num">15 / 20</b> held-out scenes, in simulation</p>
+        </article>
+        <article class="st">
+          <header><span class="idx">03</span><span class="kind script">Scripted</span></header>
+          <h3>End-of-line catch-all</h3>
+          <p>A ViperX with a programmed cell takes whatever the policies left.</p>
+          <div class="meter off"><b></b></div>
+          <p class="res">No training. A script where a script is enough.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ skills -->
+  <section class="band" id="skills">
+    <div class="wrap">
+      <p class="kicker rv">Skill library</p>
+      <h2 class="rv">Every prompt <em>grows</em> the library.</h2>
+      <p class="sub rv">Each published skill is saved with its measured score and starts the next prompt. The nearest skill is the starting point, so later skills train faster.</p>
+      <ul class="tiles">
+        <li class="tile rv"><img src="/static/assets/skill-touch.jpg" alt="Simulator view: the SO-101 arm reaching a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>touch the red block</h3><p class="res"><b class="num">20 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-lift.jpg" alt="Simulator view: the SO-101 arm holding a yellow block up" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>pick up the yellow block and hold it up</h3><p class="res"><b class="num">19 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
+        <li class="tile rv"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a block in a bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-stack.jpg" alt="Simulator view: the SO-101 arm stacking an orange block on a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>stack the orange block on the red block</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-sort.jpg" alt="Simulator view: bowls and coloured blocks for the sorting task" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>sort the blue and green blocks into the bowls of the same color</h3><p class="res"><b class="num">10 / 20</b> in simulation</p></div></li>
+      </ul>
+      <p class="fine rv">Tier 3 composes tier 1 and 2 skills, so it is the hardest and scores lowest. Scores are the measured results in the README, on 20 held-out scenes each.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ robots -->
+  <section class="band tint" id="robots">
+    <div class="wrap">
+      <p class="kicker rv">Robot builder</p>
+      <h2 class="rv">Pick an arm, a wrist and a gripper. <em>Every part is sourced.</em></h2>
+      <p class="sub rv">The builder only offers parts that exist as published open-source MuJoCo models. It composes them into one file, checks reach, joint limits and grip, then trains the next skill on that robot. Nothing here was modelled from scratch.</p>
+      <div class="lp-parts rv">
+        <div class="pcol">
+          <h3>Arms</h3>
+          <ul>
+            <li><b>SO-101 follower</b><span>TheRobotStudio</span><a class="lic" href="https://github.com/TheRobotStudio/SO-ARM100" target="_blank" rel="noopener">Apache-2.0</a></li>
+            <li><b>SO-100</b><span>TheRobotStudio, via MuJoCo Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/trs_so_arm100" target="_blank" rel="noopener">Apache-2.0</a></li>
+            <li><b>Koch v1.1</b><span>Alexander Koch, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/low_cost_robot_arm" target="_blank" rel="noopener">Apache-2.0</a></li>
+            <li><b>WidowX 250</b><span>Trossen Robotics, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/trossen_wx250s" target="_blank" rel="noopener">BSD-3-Clause</a></li>
+            <li><b>ViperX 300</b><span>Trossen Robotics, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/trossen_vx300s" target="_blank" rel="noopener">BSD-3-Clause</a></li>
+          </ul>
+        </div>
+        <div class="pcol">
+          <h3>End effectors</h3>
+          <ul>
+            <li><b>The arm's own jaw</b><span>as the arm</span><span class="lic same">as the arm</span></li>
+            <li><b>Robotiq 2F-85</b><span>Robotiq, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/robotiq_2f85" target="_blank" rel="noopener">BSD-2-Clause</a></li>
+            <li><b>Franka Hand</b><span>Franka Robotics, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/franka_emika_panda" target="_blank" rel="noopener">Apache-2.0</a></li>
+          </ul>
+          <h3 class="gap">Line equipment</h3>
+          <ul>
+            <li><b>Tote</b><span>robosuite bins arena</span><a class="lic" href="https://github.com/ARISE-Initiative/robosuite/blob/5ce6643f3092639d08f7b0f90ed1c6a84f50552c/robosuite/models/assets/arenas/bins_arena.xml" target="_blank" rel="noopener">MIT</a></li>
+            <li><b>Conveyor</b><span>MuJoCo maintainer recipe, issue 547</span><a class="lic" href="https://github.com/google-deepmind/mujoco/issues/547" target="_blank" rel="noopener">Apache-2.0</a></li>
+          </ul>
+        </div>
+      </div>
+      <p class="fine rv">Menagerie files are copied from commit 98a70c5 with their upstream LICENSE files. Full table in SOURCES.md. Suction grippers are left out because no open MuJoCo model exists, and we do not model parts ourselves.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ models -->
+  <section class="band" id="models">
+    <div class="wrap">
+      <p class="kicker rv">Models</p>
+      <h2 class="rv">What runs <em>today</em>, and what is planned.</h2>
+      <p class="sub rv">The planner reads your sentence and the critic reads the failures. The policy itself sits on two frozen encoders and a small trained head.</p>
+      <div class="models rv">
+        <div class="mrow">
+          <div class="mrole">Planner and critic</div>
+          <div class="mlist">
+            <div class="m live"><b>OpenAI</b><span>Parses the task, writes the success check, reads failures.</span><i class="status live">Live</i></div>
+            <div class="m soon"><b>Llama by Meta</b><span>Llama API as a second planner and critic. A provider switch exists in the code and is switched off. Not integrated yet.</span><i class="status soon">Planned</i></div>
+          </div>
+        </div>
+        <div class="mrow">
+          <div class="mrole">Policy backbone</div>
+          <div class="mlist">
+            <div class="m live"><b>DINOv2-small</b><span>Meta AI. Frozen vision features from the front and wrist cameras.</span><i class="status live">Live</i></div>
+            <div class="m live"><b>SigLIP2 base</b><span>Google. Frozen text tower for the instruction.</span><i class="status live">Live</i></div>
+            <div class="m live"><b>Action head</b><span>4.9 M parameters, trained here: FiLM, a Perceiver read-out and a small transformer.</span><i class="status live">Live</i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ closing -->
+  <section class="closer">
+    <div class="wrap">
+      <span class="mascot lg" data-follow aria-hidden="true"></span>
+      <h2 class="rv">What should the line <em>learn</em>?</h2>
+      <p class="sub rv">Type a task, or a whole line. The forge does the rest and shows its work.</p>
+      <a class="cta big rv" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+    </div>
+  </section>
+</main>
+
+<footer class="lp-foot">
+  <div class="wrap">
+    <span>VLA Forge. Everything robotic on this page is in simulation.</span>
+    <span class="fl"><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a><a href="https://github.com/fetchai/uAgents" target="_blank" rel="noopener">uAgents</a></span>
+  </div>
+</footer>
+
+<script type="module" src="/static/mascot.js"></script>
+<script src="/static/landing.js" defer></script>
+</body>
+</html>
