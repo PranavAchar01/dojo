@@ -45,6 +45,7 @@ let token = 0;
 let clock = { t: 0, playing: false, last: 0, end: 0, finished: new Set(), badge: "" };
 let armRuns = {}; // arm index -> { run, stage, frac }
 let previewScene = null;
+let readonly = null; // id of a saved Library run on screen: its arms are shown, not edited
 let saved = null; // what the single-arm view had before the cell took over
 
 // ------------------------------------------------------------------ entry points
@@ -69,6 +70,48 @@ async function handle(text) {
   } catch (err) {
     F().note(err.message);
   }
+}
+
+// a Library card: the saved line run plays with every arm moving; nothing on it can be re-routed or re-run
+async function openLine(id, name) {
+  const l = await api(`/api/line/${id}`);
+  if (!l.result?.playback) throw new Error("this run has no saved recording");
+  readonly = null;
+  taskText = name || l.name;
+  extra = 0;
+  prevN = 0;
+  armRuns = {};
+  line = null;
+  await setCell(l);
+  readonly = l.id;
+  renderPanel();
+  F().note(`${l.result.completed} of ${l.result.n_parts} tries finished by ${l.stations.length === 2 ? "both arms" : "all arms"}, in simulation.`);
+}
+// the picture of the card: the cell at second t of the recorded schedule, every earlier part resting where it ended
+function seek(t) {
+  clock.playing = false;
+  clock.t = t;
+  const pb = line.result.playback;
+  for (const c of cells) { c.done.forEach((m) => c.root.remove(m)); c.done = []; }
+  clock.finished = new Set();
+  let n = 0;
+  cells.forEach((cell, k) => {
+    const e = pb.episodes.find((x) => x.station === k && t >= x.start && t < x.start + x.duration);
+    if (e) { applyCell(cell, e.frames[Math.min(e.frames.length - 1, Math.floor((t - e.start) * pb.fps))], true); n++; if (cell.partMat) cell.partMat.color.copy(F().srgb(colorOf(e.color))); }
+    else applyCell(cell, cell.home, false);
+  });
+  for (const e of pb.episodes) if (e.kind === "pick" && t >= e.start + e.duration) { clock.finished.add(`${e.station}:${e.part}`); restPart(e); }
+  return n;
+}
+// when the schedule has the most arms working at once, with every arm's part visible
+function busiest() {
+  const pb = line.result.playback;
+  let best = [0, 0];
+  for (let t = 20; t < pb.episodes.reduce((m, e) => Math.max(m, e.start + e.duration), 0); t += 0.5) {
+    const n = cells.filter((_, k) => pb.episodes.some((e) => e.station === k && t >= e.start + 1 && t < e.start + e.duration - 1)).length;
+    if (n > best[1]) best = [t, n];
+  }
+  return best;
 }
 
 // adds an arm to whatever is on the canvas, now: the new one builds in beside the arms already standing
@@ -125,7 +168,7 @@ function exit() {
   token++;
   const f = F();
   clear();
-  line = null; extra = 0; prevN = 0; armRuns = {}; prior = null;
+  line = null; extra = 0; prevN = 0; armRuns = {}; prior = null; readonly = null;
   f.setMulti(false);
   f.setSingleVisible(true);
   f.controls.maxDistance = saved.max;
@@ -203,7 +246,7 @@ async function build3D() {
       bodies[partBody].traverse((o) => { if (!cube && o.isMesh) cube = o; });
       partMat = cube?.material;
     }
-    const tag = st ? `ARM ${k + 1}  ${st.controller === "vla" ? "VLA" : "SCRIPTED"}` : `ARM ${k + 1}`;
+    const tag = st ? `ARM ${k + 1}  ${st.controller === "vla" ? "TRAINED VLA" : "SCRIPTED"}` : `ARM ${k + 1}`;
     floorLabel(grp, tag, 0.5, root.position.y - 0.2, Math.PI / 2, 0.042, st?.controller === "vla" ? "rgba(8,102,255,0.9)" : "rgba(44,56,66,0.9)");
     const cell = { root, bodies, belt, cube, partMat, partBody, home: sc.home || sc.frame, done: [], born: k < prevN ? 0 : performance.now() + (k - prevN) * 160 };
     cells.push(cell);
@@ -318,11 +361,11 @@ function armRow(st, i) {
   return `<li class="arm ${isVla ? "vla" : "scripted"} st-${st.status}" data-i="${i}">
     <div class="arm-h"><span class="arm-n">${i + 1}</span><b>${esc(st.name)}</b><span class="arm-st">${esc(STATUS[st.status] || st.status)}</span></div>
     <div class="arm-task">${esc(st.instruction)}</div>
-    <div class="arm-meta">${esc(st.robot_label || st.robot)} · ${isVla ? "VLA policy" : "scripted"}</div>
+    <div class="arm-meta">${esc(st.robot_label || st.robot)} · ${isVla ? "trained VLA" : "scripted"}</div>
     ${run ? `<div class="arm-train"><div class="arm-bar"><i style="width:${Math.round(run.frac * 100)}%"></i></div><span>${esc(run.stage)}</span></div>` : ""}
     <div class="arm-facts">${facts.map(esc).join(" · ")}</div>
     ${why ? `<div class="arm-why">${esc(why)}</div>` : ""}
-    <button type="button" class="arm-toggle" ${busy ? "disabled" : ""}>${isVla ? "Use a script" : "Use a VLA"}</button>
+    ${readonly === line.id ? "" : `<button type="button" class="arm-toggle" ${busy ? "disabled" : ""}>${isVla ? "Use a script" : "Use a VLA"}</button>`}
   </li>`;
 }
 const noTask = (from, count = extra) => Array.from({ length: count }, (_, i) => `<li class="arm bare"><div class="arm-h"><span class="arm-n">${from + i + 1}</span><b>SO-101</b><span class="arm-st">No task yet</span></div><div class="arm-meta">Say what it should do, or describe the task the arms do together.</div></li>`).join("");
@@ -351,6 +394,7 @@ function renderPanel() {
   $("#arms-model").textContent = model ? `Planner: ${F().modelTag(model)}` : "";
   list.innerHTML = line.stations.map(armRow).join("") + noTask(line.stations.length);
   go.disabled = busy || refused || !line.stations.length;
+  if (readonly === line.id) { go.disabled = true; go.textContent = "Saved run"; renderResult(); return; }
   go.textContent = busy ? (line.status === "building" ? "Training" : "Running") : nTrain ? `Train ${nTrain} arm${nTrain > 1 ? "s" : ""} and run` : "Run";
   renderResult();
 }
@@ -438,4 +482,4 @@ window.addEventListener("forge:event", async (ev) => {
 window.addEventListener("forge:newchat", () => exit());
 window.addEventListener("forge:view", (e) => { if (e.detail === "sim") setTimeout(fit, 340); });
 
-window.forgeArms = { wants, handle, exit, tick, active: () => active };
+window.forgeArms = { wants, handle, exit, tick, openLine, seek, busiest, active: () => active };
