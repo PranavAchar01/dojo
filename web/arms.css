@@ -1,0 +1,40 @@
+/* Multi-arm cells: the Arms section of the right panel, plus the rail's Optimize step and its mount point. */
+.rail li.tap { cursor: pointer; }
+.rail li.tap:hover { background: var(--accent-bg); color: var(--accent-700); }
+.rail li.sel { background: var(--accent-bg); color: var(--accent-700); }
+.model-line { font-size: 11.5px; color: var(--ink3); margin: -2px 0 8px; min-height: 0; }
+.model-line:empty { display: none; }
+
+.app.multi #loss-sec, .app.multi #rounds-sec, .app.multi #plan-sec, .app.multi #critic-sec { display: none; }
+.app:not(.multi) #arms-sec { display: none; }
+.app.multi #pb-prev, .app.multi #pb-next { display: none; }
+
+.arms { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.arm { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
+.arm.vla { border-left: 3px solid var(--accent); }
+.arm.scripted { border-left: 3px solid var(--ink3); }
+.arm-h { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+.arm-h b { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arm-n { width: 20px; height: 20px; border-radius: 6px; background: var(--accent-bg); color: var(--accent-700); font-weight: 700; font-size: 11.5px; display: grid; place-items: center; flex: none; }
+.arm-st { font-size: 11px; color: var(--ink3); font-weight: 600; }
+.arm-task { font-size: 12.5px; color: var(--ink2); line-height: 1.4; }
+.arm-meta, .arm-why { font-size: 11.5px; color: var(--ink3); }
+.arm-facts { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.arm-train { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink3); }
+.arm-bar { flex: 1; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.arm-bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.arm-toggle { align-self: flex-start; margin-top: 2px; font: 600 11.5px var(--ui); color: var(--accent-700); background: none; border: 1px solid var(--accent-200); border-radius: 8px; padding: 3px 9px; cursor: pointer; }
+.arm-toggle:hover:not(:disabled) { background: var(--accent-bg); }
+.arm-toggle:disabled { opacity: .45; cursor: default; }
+.arms-go { width: 100%; margin-top: 10px; }
+.arms-result { margin-top: 8px; font-size: 13px; color: var(--ink); }
+.arms-result p { margin: 0 0 4px; }
+.arms-fine { font-size: 11.5px; color: var(--ink3); line-height: 1.45; }
+.arms-bad { color: var(--bad); }
+
+#optimizer-sec .sec-h { display: flex; align-items: center; justify-content: space-between; }
+#optimizer-close { background: none; border: 0; color: var(--ink3); cursor: pointer; font-size: 16px; line-height: 1; }
+#optimizer-root:empty::before { content: "The optimizer is not loaded in this build."; font-size: 12.5px; color: var(--ink3); }
+
+/* the canvas before a task: bare floor and grid, no playbar or caption */
+#view-sim.blank #playbar, #view-sim.blank #vp-caption, #view-sim.noplay #playbar { display: none; }

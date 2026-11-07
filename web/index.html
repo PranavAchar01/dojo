@@ -6,10 +6,10 @@
 <title>VLA Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/library.css">
-<link rel="stylesheet" href="/static/line.css">
+<link rel="stylesheet" href="/static/arms.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
@@ -40,7 +40,6 @@
       <div class="tg view">
         <div class="seg" role="tablist">
           <button class="on" data-view="sim">Sim</button>
-          <button data-view="line">Line</button>
           <button data-view="robot">Robot</button>
           <button data-view="skills">Library</button>
           <button data-view="ladder">Ladder</button>
@@ -64,11 +63,13 @@
             <span class="bb-thought on" aria-hidden="true"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
           </div>
           <h1>What should the arm <em>learn</em>?</h1>
-          <p>Type a task. Agents turn it into a success check, collect demos, fine-tune a vision-language-action policy from the nearest skill, and measure it on 20 scenes it never saw.</p>
+          <p>Type a task, or ask for more than one arm. Agents turn it into a success check, collect demos, fine-tune a vision-language-action policy from the nearest skill, and measure it on 20 scenes it never saw.</p>
           <div class="examples">
             <button class="ex"><span class="t">T1</span>touch the red block</button>
             <button class="ex"><span class="t">T2</span>put the blue block in the blue bowl</button>
             <button class="ex"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
+            <button class="ex" data-say="add another SO-101"><span class="t">+1</span>add another SO-101</button>
+            <button class="ex" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket"><span class="t">2 arms</span>two arms: one seats the housing in the pallet, the other inserts it into the socket</button>
           </div>
         </div>
       </div>
@@ -84,7 +85,7 @@
     </aside>
 
     <section class="canvas">
-      <div class="view" id="view-sim">
+      <div class="view blank" id="view-sim">
         <canvas id="three"></canvas>
         <div class="boot" id="boot"><div class="rl-card"><span class="mascot xl" data-follow></span><div class="boot-bar"><i></i></div><span class="boot-t">Warming up the agents</span></div></div>
         <div class="caption">
@@ -111,9 +112,7 @@
         </div>
       </div>
 
-      <div class="view hidden" id="view-line"></div>
-
-      <div class="view hidden" id="view-robot">
+            <div class="view hidden" id="view-robot">
         <div class="doc build">
           <div class="doc-h">
             <h2>Build the <em>robot</em></h2>
@@ -182,22 +181,34 @@
     </section>
 
     <aside class="inspector" id="inspector">
-      <div class="sec">
+      <div class="sec" id="loss-sec">
         <div class="sec-h"><span class="lbl">Training loss</span><span id="loss-now" class="num v"></span></div>
         <svg id="loss" class="loss" viewBox="0 0 300 96" preserveAspectRatio="none"></svg>
         <div class="foot num"><span id="loss-steps"></span><span id="loss-init"></span></div>
       </div>
-      <div class="sec">
+      <div class="sec" id="rounds-sec">
         <div class="sec-h"><span class="lbl">Measured success</span><span class="dim">20 held-out scenes</span></div>
         <div id="rounds" class="rounds"></div>
       </div>
       <div class="sec" id="plan-sec">
         <div class="sec-h"><span class="lbl">Plan</span><span id="plan-note" class="dim"></span></div>
+        <div class="model-line dim" id="plan-model"></div>
         <ol id="plan" class="plan"></ol>
       </div>
-      <div class="sec grow">
-        <div class="sec-h"><span class="lbl">Critic</span></div>
-        <div id="critic" class="critic"><span class="dim">Reads the failed rollouts after each round and picks what to train next.</span></div>
+      <div class="sec" id="arms-sec">
+        <div class="sec-h"><span class="lbl">Arms</span><span id="arms-note" class="dim"></span></div>
+        <div class="model-line dim" id="arms-model"></div>
+        <ol id="arms" class="arms"></ol>
+        <div id="arms-result" class="arms-result"></div>
+        <button class="primary arms-go" id="arms-go" type="button" disabled>Train arms and run</button>
+      </div>
+      <div class="sec grow" id="critic-sec">
+        <div class="sec-h"><span class="lbl">Critic</span><span id="critic-model" class="dim"></span></div>
+        <div id="critic" class="critic"><span class="dim">Reads the failed rollouts after each round and picks what to train next. Runs on Llama when the Llama provider is on; the model that answered is named here.</span></div>
+      </div>
+      <div class="sec" id="optimizer-sec" hidden>
+        <div class="sec-h"><span class="lbl">Optimizer</span><button class="ib sm" id="optimizer-close" type="button" title="Close the optimizer" aria-label="Close the optimizer"><svg viewBox="0 0 20 20"><path d="m5.5 5.5 9 9m0-9-9 9"/></svg></button></div>
+        <div id="optimizer-root"></div>
       </div>
     </aside>
   </div>
@@ -206,6 +217,6 @@
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/mascot.js"></script>
 <script type="module" src="/static/library.js"></script>
-<script type="module" src="/static/line.js"></script>
+<script type="module" src="/static/arms.js"></script>
 </body>
 </html>

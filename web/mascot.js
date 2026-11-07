@@ -1,8 +1,9 @@
-// The forge bot: an original monochrome robot drawn for VLA Forge. A chamfered head plate, a gripper on a short mast
-// for an antenna (the thing it learns to use), and two tall eyes cut out of the plate.
-// Ink is currentColor and the eye cut-outs are var(--paper), so the same mark works on light pages and in a dark tile.
-// It reads the page's own state (agent rail, rollout badge, ready dot) and shows one mood:
-// idle, think (agents working or warming up), ok (a successful rollout) or fail.
+// The forge bot: an original robot drawn for VLA Forge, in the Meta palette. A chamfered head plate in Meta blue, smart
+// glasses (dark wayfarer-style lenses with a small camera dot on the corner), two tall eyes in the lenses, and an
+// antenna that ends in a small open loop (the thing it learns to use is still a gripper: the loop opens and closes).
+// Head ink is currentColor, the eyes are var(--paper) and the glasses are var(--frame), so the same mark works on
+// light pages and in a tinted tile. It reads the page's own state (agent rail, rollout badge, ready dot) and shows one
+// mood: idle, think (agents working or warming up), ok (a finished rollout) or fail.
 
 const EYES = `<g class="mb-eyes open"><rect x="14.5" y="24" width="6" height="12" rx="3"/><rect x="27.5" y="24" width="6" height="12" rx="3"/></g>
     <g class="mb-eyes happy"><path d="M14 31.5 L17.5 27 L21 31.5"/><path d="M27 31.5 L30.5 27 L34 31.5"/></g>
@@ -11,8 +12,9 @@ const EYES = `<g class="mb-eyes open"><rect x="14.5" y="24" width="6" height="12
 export function mascotSVG() {
   return `<svg viewBox="0 0 48 48" aria-hidden="true">
   <g class="mb-body">
-    <g class="mb-antenna"><path class="mb-arm" d="M24 16 V9"/><g class="mb-bulb"><path class="mb-arm" d="M18 3.5 L24 9 L30 3.5"/></g></g>
+    <g class="mb-antenna"><path class="mb-arm" d="M24 16 V10"/><g class="mb-bulb"><path class="mb-loop" d="M24 6.2 C22.2 2.2 16.4 2.2 16.4 6.2 C16.4 10.2 22.2 10.2 24 6.2 C25.8 2.2 31.6 2.2 31.6 6.2 C31.6 10.2 25.8 10.2 24 6.2 Z"/></g></g>
     <path class="mb-head" d="M12 16 H36 L44 24 V37 L37 44 H11 L4 37 V24 Z"/>
+    <g class="mb-glasses"><rect class="mb-lens" x="10.5" y="21" width="13.5" height="18" rx="5.5"/><rect class="mb-lens" x="24" y="21" width="13.5" height="18" rx="5.5"/><path class="mb-temple" d="M10.8 25 L4.6 24.4 M37.2 25 L43.4 24.4"/><circle class="mb-cam" cx="36" cy="23.2" r="1.1"/></g>
     <g class="mb-look">${EYES}</g>
   </g>
 </svg>`;

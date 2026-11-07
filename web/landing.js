@@ -18,7 +18,7 @@ addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
 const video = document.getElementById("hero-video");
-if (video) {
+if (video && video.play) {
   if (reduced) {
     video.removeAttribute("autoplay");
     video.pause();

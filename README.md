@@ -202,7 +202,7 @@ The library router calls it for the active robot on every skill a prompt needs (
 carries its reason, for example a pick on the WidowX 250: "the fingers open only 25 mm; a 3 cm block needs at
 least 38 mm". Reuse and remix only match tiles trained on the same robot, and each tile shows its robot.
 
-## Factory lines (the Line tab)
+## Several arms (same chat and canvas)
 
 A company describes its line in words; the planner splits it into stations along one conveyor; the router checks
 each station; the agents train every station that needs a skill; then the whole line runs, part by part.
@@ -292,6 +292,6 @@ src/vla_forge/
   sim/line.py    conveyor and totes for a station cell (sourced: see SOURCES.md)
   viz.py         scene export for three.js
   sim/robots.py  robot builder: part catalog, MJCF assembly, calibration, checks, robot_feasibility
-web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js), factory line (line.js)
+web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js), multi-arm cells (arms.js)
 scripts/         pretrain_base.py, experiment.py, ladder.py, record_demo.mjs, narrate.py, edit_demo.py, heavy.sh
 ```

@@ -11,7 +11,7 @@
 .lib-filter button:active { transform: scale(.92, .88); transition-duration: .1s; }
 .lib-filter button.on { background: var(--ink); color: #fff; box-shadow: none; }
 .lib-bar select { height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: #e9eef3; font: 600 14px var(--ui); color: var(--ink2); }
-#lib-new { margin-left: auto; height: 44px; padding: 0 20px; border-radius: 999px; border: 0; font-size: 15px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 16px rgba(255, 90, 31, .28); transition: transform .45s var(--liquid), box-shadow .25s, background-color .2s; }
+#lib-new { margin-left: auto; height: 44px; padding: 0 20px; border-radius: 999px; border: 0; font-size: 15px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 16px rgba(8, 102, 255, .28); transition: transform .45s var(--liquid), box-shadow .25s, background-color .2s; }
 #lib-new:hover { background: var(--accent-400); transform: translateY(-2px); }
 #lib-new svg { fill: none; stroke: currentColor; stroke-width: 1.8; }
 .lib-count { font-size: 14px; color: var(--ink2); margin: 0 0 18px; font-variant-numeric: tabular-nums; }

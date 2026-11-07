@@ -3,7 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
 import { initBuilder, showBuilder } from "./builder.js";
-import { HAZE, setupRenderer, makeEnvironment, makeStage, addStudioLights, buildLab, basePlate, floorLabel, robotMaterial as studioMaterial, partsMesh } from "./studio.js";
+import { HAZE, setupRenderer, makeEnvironment, makeStage, addStudioLights, buildLab, basePlate, floorLabel, cellBrackets, robotMaterial as studioMaterial, partsMesh } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -29,17 +29,19 @@ const STAGES = [
   ["trainer", "Train", '<path d="M3 15c3 0 3-9 7-9s4 6 7 6"/>'],
   ["eval", "Eval", '<path d="m5 10.5 3 3 7-7"/>'],
   ["critic", "Critic", '<circle cx="9" cy="9" r="4.8"/><path d="m12.6 12.6 3.9 3.9"/>'],
+  ["optimizer", "Optimize", '<path d="M4 6h8M15 6h1M4 14h1M8 14h8"/><circle cx="13.5" cy="6" r="1.6"/><circle cx="6.5" cy="14" r="1.6"/>'],
   ["executor", "Run", '<path d="M6.5 4.5v11l8.5-5.5z"/>'],
   ["registry", "Publish", '<path d="M10 3.5v9M6 8.5l4 4 4-4M4 16.5h12"/>'],
 ];
 const NAMES = Object.fromEntries(STAGES.map(([k, n]) => [k, n]));
-NAMES.router = "Router"; NAMES.trainer = "Trainer"; NAMES.data = "Data"; NAMES.planner = "Planner"; NAMES.executor = "Executor"; NAMES.registry = "Registry";
+NAMES.optimizer = "Optimizer"; NAMES.router = "Router"; NAMES.trainer = "Trainer"; NAMES.data = "Data"; NAMES.planner = "Planner"; NAMES.executor = "Executor"; NAMES.registry = "Registry";
 const rail = {};
 for (const [key, name, icon] of STAGES) {
   if (key === "executor") $("#rail").append(el("li", "sep"));
   const li = el("li");
   li.append(svgIcon(icon), el("span", "", name), el("span", "m"));
   if (key === "planner" || key === "executor") li.classList.add("off");
+  if (key === "optimizer") { li.classList.add("tap"); li.setAttribute("role", "button"); li.tabIndex = 0; li.title = "Open the optimizer"; }
   $("#rail").append(li);
   rail[key] = li;
 }
@@ -82,11 +84,56 @@ controls.maxDistance = 2.6;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.update();
 
-addStudioLights(scene3, { target: [0.2, 0, 0], extent: 1.1 });
-const lab = buildLab(scene3, renderer, { cell: [-0.34, -0.58, 0.74, 0.58], joints: false });
-floorLabel(lab, "CELL 01  ·  SO-101", 0.5, -0.545, Math.PI / 2, 0.034);
+const lights = addStudioLights(scene3, { target: [0.2, 0, 0], extent: 1.1 });
+const lab = buildLab(scene3, renderer, { cell: null, joints: false });
+// the taped cell, its label and the arm's floor plate only exist once a task has a scene; before that the canvas is
+// the bare floor with a faint grid (like the Etch studio)
+const cellMarks = new THREE.Group();
+cellBrackets(cellMarks, [-0.34, -0.58, 0.74, 0.58]);
+floorLabel(cellMarks, "CELL 01  ·  SO-101", 0.5, -0.545, Math.PI / 2, 0.034);
+cellMarks.visible = false;
+scene3.add(cellMarks);
 let plate = basePlate(0.17);
+plate.visible = false;
 scene3.add(plate);
+const grid = new THREE.GridHelper(6, 60, 0x0866ff, 0x0866ff);
+grid.rotation.x = Math.PI / 2;
+grid.position.z = 0.0016;
+for (const m of [].concat(grid.material)) { m.transparent = true; m.opacity = 0.11; m.depthWrite = false; m.fog = true; }
+scene3.add(grid);
+const gridMid = new THREE.GridHelper(6, 6, 0x0866ff, 0x0866ff);
+gridMid.rotation.x = Math.PI / 2;
+gridMid.position.z = 0.0018;
+for (const m of [].concat(gridMid.material)) { m.transparent = true; m.opacity = 0.24; m.depthWrite = false; m.fog = true; }
+scene3.add(gridMid);
+let staged = false; // false: bare floor and grid
+let stageT = { t0: 0, from: 0, to: 0 };
+function setStaged(on) {
+  if (on === staged) return;
+  staged = on;
+  $("#view-sim").classList.toggle("blank", !on);
+  cellMarks.visible = plate.visible = on && !window.forgeArms?.active();
+  stageT = { t0: performance.now(), from: on ? 0 : 1, to: on ? 1 : 0 };
+}
+function stageStep(now) {
+  const k = Math.min(1, (now - stageT.t0) / 700);
+  const e = 1 - Math.pow(1 - k, 3);
+  const v = stageT.from + (stageT.to - stageT.from) * e; // 0 = blank, 1 = built
+  for (const g of [grid, gridMid]) {
+    g.visible = v < 0.999;
+    for (const m of [].concat(g.material)) m.opacity = (g === grid ? 0.11 : 0.24) * (1 - v);
+  }
+  if (world && k < 1) {
+    const up = 0.02 + 0.98 * (1 - Math.pow(1 - k, 4) * (1 + 1.6 * (1 - k)));
+    const z = staged ? Math.max(0.02, Math.min(1.02, up)) : 1;
+    const xy = staged ? 0.96 + 0.04 * e : 1;
+    world.root.scale.set(xy, xy, z);
+    world.mirror.scale.set(xy, xy, -z);
+    plate.scale.set(xy, xy, z);
+  } else if (world && staged) {
+    world.root.scale.set(1, 1, 1); world.mirror.scale.set(1, 1, -1); plate.scale.set(1, 1, 1);
+  }
+}
 const postStage = makeStage(renderer, scene3, camera);
 
 const geomCache = new Map();
@@ -244,6 +291,7 @@ function populate(sc, root, rid, meshes, { shadows = true, belt: wantBelt = true
 async function buildWorld(sc) {
   const rid = sc.robot_id || "so101";
   const meshes = await meshesFor(rid);
+  window.forgeArms?.exit(); // a single-arm scene replaces any multi-arm cell
   if (world) { scene3.remove(world.root); scene3.remove(world.mirror); }
   if (!world || world.rid !== rid) {
     camFor(rid); // frame a new arm once; keep the viewer's orbit otherwise
@@ -251,6 +299,7 @@ async function buildWorld(sc) {
     plate = basePlate(0.17 * camScale);
     scene3.add(plate);
   }
+  plate.visible = cellMarks.visible = true;
   const root = new THREE.Group();
   const lone = populate(sc, root, rid, meshes, { belt: false });
   scene3.add(root);
@@ -260,6 +309,26 @@ async function buildWorld(sc) {
   const twin = populate(sc, mirror, rid, meshes, { shadows: false, belt: false });
   scene3.add(mirror);
   world = { root, mirror, bodies: lone.bodies, twin: twin.bodies, n: sc.bodies.length, rid, belt: null };
+  if (!staged) { // the scene builds in on the bare floor: the arm rises, the grid fades
+    world.root.scale.set(1, 1, 0.02);
+    world.mirror.scale.set(1, 1, -0.02);
+    plate.scale.set(1, 1, 0.02);
+    setStaged(true);
+  }
+}
+// back to the bare floor (new chat)
+function clearWorld() {
+  window.forgeArms?.exit();
+  if (world) { scene3.remove(world.root); scene3.remove(world.mirror); world = null; }
+  play = null;
+  plate.visible = cellMarks.visible = false;
+  staged = true;
+  setStaged(false);
+  stageT = { t0: performance.now(), from: 0, to: 0 };
+  for (const g of [grid, gridMid]) { g.visible = true; for (const m of [].concat(g.material)) m.opacity = g === grid ? 0.11 : 0.24; }
+  $("#step-badge").classList.add("hidden");
+  $("#vp-badge").classList.add("hidden");
+  $("#pb-fill").style.width = "0";
 }
 function applyFrame(frame) {
   if (!world || !frame) return;
@@ -298,6 +367,7 @@ const CAMS = {
 };
 // Orbit starts in front of the arm (+x, the side the gripper works toward), 20 degrees to the right, so the arm faces
 // the camera, and only sways about 8 degrees either way, so the camera never swings round behind it.
+let camShift = 0; // y offset of the aim point: a multi-arm cell is centred on its own middle
 const SWAY = { az: (-20 * Math.PI) / 180, amp: (8 * Math.PI) / 180, period: 30, r: 1.2, h: 0.4, resume: 4000 };
 let userUntil = 0; // sway pauses while the user drags and for a few seconds after
 function swayPose(now) {
@@ -305,7 +375,7 @@ function swayPose(now) {
   const t = CAMS.orbit.target;
   const tz = t[2] + (k - 1) * 0.16;
   const az = SWAY.az + SWAY.amp * Math.sin((2 * Math.PI * now) / (SWAY.period * 1000));
-  return [t[0] + Math.cos(az) * SWAY.r * k, t[1] + Math.sin(az) * SWAY.r * k, tz + SWAY.h * k, tz];
+  return [t[0] + Math.cos(az) * SWAY.r * k, t[1] + camShift + Math.sin(az) * SWAY.r * k, tz + SWAY.h * k, tz];
 }
 // bigger arms stand taller and swing wider: back the camera off and lift its aim so the whole arm and the blocks fit
 const ARM_SCALE = { so101: 1, so100: 1, koch: 1, wx250s: 1.22, vx300s: 1.42 };
@@ -319,7 +389,7 @@ function setCam(name) {
   const c = CAMS[name];
   camName = name;
   const k = camScale;
-  const t = [c.target[0], c.target[1], c.target[2] + (k - 1) * 0.16];
+  const t = [c.target[0], c.target[1] + camShift, c.target[2] + (k - 1) * 0.16];
   controls.target.fromArray(t);
   if (name === "orbit") {
     const p = swayPose(performance.now());
@@ -335,6 +405,8 @@ function setCam(name) {
 document.querySelectorAll("[data-cam]").forEach((b) => b.addEventListener("click", () => setCam(b.dataset.cam)));
 
 function tick() {
+  stageStep(performance.now());
+  window.forgeArms?.tick(performance.now());
   if (play) {
     const hold = 1.2;
     const dur = play.frames.length / play.fps;
@@ -384,6 +456,18 @@ let planRows = [];
 let lastSkill = null;
 let skillsCache = [];
 
+// "16/20" from the evaluated round when we have it, else the rate on the standard 20 scenes
+function heldOut(run, round, rate) {
+  const ev = (roundsBy[run] || [])[round]?.eval;
+  if (ev) return `${ev.succeeded}/${ev.n}`;
+  return `${Math.round(rate * 20)}/20`;
+}
+// which model answered, as the server reported it; "Llama" is only shown when the name says so
+function modelTag(m) {
+  if (!m) return "";
+  if (/llama/i.test(m)) return `Llama (${m})`;
+  return m === "rules" ? "keyword rules, no model" : m;
+}
 function fmt(s) {
   s = Math.max(0, Math.floor(s));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -396,6 +480,7 @@ setInterval(() => {
 
 // ---------------------------------------------------------------- chat thread
 const thread = $("#thread");
+const emptyState = $("#empty").cloneNode(true);
 const toolEls = {}; // `${run}:${agent}` -> element
 const toolLists = {}; // run id -> tools-list element
 let forgeMsg = null;
@@ -452,6 +537,20 @@ function settle(run, agent, state = "done") {
 $("#new-chat").addEventListener("click", () => {
   thread.innerHTML = "";
   for (const k of Object.keys(toolEls)) delete toolEls[k];
+  if (current && !runDone) return; // a run in flight keeps its scene
+  thread.append(emptyState.cloneNode(true));
+  wireExamples();
+  window.dispatchEvent(new CustomEvent("forge:newchat"));
+  clearWorld();
+  current = null;
+  $("#crumb-run").textContent = "new task";
+  $("#vp-caption").textContent = "SO-101 · MuJoCo";
+  $("#chips").innerHTML = "";
+  $("#round-label").textContent = "Rollouts";
+  $("#pb-label").textContent = "rollout ·";
+  resetLoss(); resetStages(false); renderPlan([], ""); drawRounds();
+  $("#critic").innerHTML = "";
+  setTier(0);
 });
 
 // ---------------------------------------------------------------- inspector
@@ -604,6 +703,16 @@ $("#round-pick").onclick = () => {
   showRound(shown.run, rs[(k + 1) % rs.length].index);
 };
 
+// the arm and cell appear once a task has parsed: the run's own scene when it exists, else the default one
+async function ensureScene(rid) {
+  if (world || window.forgeArms?.active()) return;
+  let res = await fetch(`/api/runs/${rid}/scene`);
+  if (!res.ok) res = await fetch("/api/preview");
+  const sc = await res.json();
+  play = null;
+  await buildWorld(sc);
+  applyFrame(sc.frame);
+}
 async function showPreview(rid) {
   const res = await fetch(`/api/runs/${rid}/scene`);
   if (!res.ok) return;
@@ -626,7 +735,7 @@ function setView(v) {
   const prev = app.dataset.view;
   app.dataset.view = v;
   app.classList.toggle("immersive", v !== "sim");
-  for (const k of ["sim", "line", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  for (const k of ["sim", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();
@@ -730,7 +839,7 @@ window.addEventListener("robot-change", (e) => {
   robotNow = e.detail.id;
   $("#robot-chip").textContent = `${e.detail.label} · sim`;
   const live = current && !runDone; // a run in flight keeps its own arm on screen
-  if (changed && !live) {
+  if (changed && !live && world) {
     play = null;
     $("#step-badge")?.classList.add("hidden");
     $("#vp-caption").textContent = `${e.detail.label} · MuJoCo`;
@@ -743,55 +852,7 @@ async function idleScene() {
   initBuilder(robotNow);
   renderSkills(st.skills);
   setReady(st.ready);
-  const tops = st.runs.filter((r) => !r.parent);
-  const last = tops[tops.length - 1];
-  if (last && last.status === "published") {
-    adoptRun(last, st.runs);
-  } else {
-    const sc = await (await fetch("/api/preview")).json();
-    await buildWorld(sc);
-    applyFrame(sc.frame);
-  }
-}
-function adoptRun(summary, all) {
-  current = summary.id;
-  composite = summary.tier === 3;
-  lastSkill = summary.skill_id;
-  $("#call-last").disabled = !lastSkill;
-  family.clear();
-  const list = youMsg(summary.prompt);
-  toolLists[summary.id] = list;
-  forgeNote(`Published skill-${summary.skill_id.slice(-4)} in ${fmt(summary.elapsed)}.`);
-  $("#crumb-run").textContent = summary.prompt;
-  $("#vp-caption").textContent = summary.spec ? `“${summary.spec.instruction}”` : `“${summary.prompt}”`;
-  setTier(summary.tier);
-  runStart = 1; runDone = 1 + summary.elapsed;
-  $("#elapsed").textContent = fmt(summary.elapsed);
-  roundsBy[summary.id] = summary.rounds.map((r) => ({ ...r }));
-  resetStages(composite);
-  for (const [k] of STAGES) stage(k, "done");
-  resetLoss();
-  let lossRun = summary;
-  if (composite) {
-    for (const p of summary.plan) if (p.child) family.set(p.child, p.step);
-    const kids = all.filter((r) => r.parent === summary.id);
-    if (kids.length) lossRun = kids[kids.length - 1];
-  }
-  for (const r of lossRun.rounds) losses.push(r.loss.map(([t, l]) => [t, l]));
-  drawLoss();
-  if (lossRun.init_from && lossRun.init_from.reason) $("#loss-init").textContent = lossRun.init_from.reason;
-  const crit = $("#critic");
-  crit.innerHTML = "";
-  for (const r of summary.rounds) {
-    if (!r.plan || !r.plan.action) continue;
-    const p = el("div");
-    p.append(el("b", "", `Round ${r.index + 1}: ${r.plan.action}. `), document.createTextNode(r.plan.rationale));
-    crit.append(p);
-  }
-  renderPlan(summary.plan, composite ? `${summary.plan.length} steps` : "");
-  drawLoss();
-  if (composite && !crit.children.length) crit.append(el("span", "dim", "Tier 3 runs each step's published skill as is; the critic works inside each skill's own training."));
-  if (summary.best_round >= 0) showRound(summary.id, summary.best_round);
+  // the canvas stays bare until a prompt has a scene; finished runs live in the Library and the Ladder
 }
 function setTier(t) {
   const e = $("#tier");
@@ -804,7 +865,7 @@ const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   window.forgeLib?.onEvent(e, e.run === current || family.has(e.run));
-  window.dispatchEvent(new CustomEvent("forge:event", { detail: e })); // the Line tab listens here (one stream per page)
+  window.dispatchEvent(new CustomEvent("forge:event", { detail: e })); // the multi-arm cell (arms.js) and the optimizer listen here (one stream per page)
   if (e.kind === "ready") { setReady(true); return; }
   if (e.kind === "agents") return;
   if (e.run !== current && !family.has(e.run)) {
@@ -861,8 +922,10 @@ function handle(e) {
         $("#vp-caption").textContent = `“${e.spec.instruction}”`;
       }
       if (e.parse && e.parse.note) forgeNote(e.parse.note);
+      if (e.parse && e.parse.model) $("#plan-model").textContent = `Planner: ${modelTag(e.parse.model)}`;
       settle(e.run, "task");
       stage("task", "done");
+      if (!e.steps) ensureScene(e.run);
       break;
     case "route":
       settle(e.run, "router", e.refused ? "fail" : "done");
@@ -879,7 +942,7 @@ function handle(e) {
       $("#call-last").disabled = false;
       runDone = Date.now() / 1000;
       for (const k of ["scene", "data", "trainer", "eval", "critic"]) rail[k].classList.add("off");
-      stage("registry", "done", `${Math.round(100 * e.tile.success_rate)}%`);
+      stage("registry", "done", `${Math.round(e.tile.success_rate * (e.tile.n_eval || 20))}/${e.tile.n_eval || 20}`);
       $("#go").disabled = false;
       break;
     case "saving":
@@ -963,6 +1026,7 @@ function handle(e) {
     }
     case "critic": {
       stage("critic", "done", e.plan.action);
+      if (e.model || e.plan.model) $("#critic-model").textContent = modelTag(e.model || e.plan.model);
       settle(e.run, "critic");
       const rr = roundsBy[e.run] || [];
       if (rr[e.round]) rr[e.round].plan = e.plan;
@@ -974,17 +1038,18 @@ function handle(e) {
     }
     case "published":
       settle(e.run, "registry");
-      stage("registry", isChild ? "idle" : "done", isChild ? "" : `${Math.round(100 * e.success_rate)}%`);
+      const held = heldOut(e.run, e.best_round, e.success_rate);
+      stage("registry", isChild ? "idle" : "done", isChild ? "" : held);
       refreshSkills(e.skill);
       if (isChild) {
-        forgeNote(`Published skill-${e.skill.slice(-4)}: ${Math.round(100 * e.success_rate)}% in ${fmt(e.seconds)}.`, e.run);
+        forgeNote(`Saved skill-${e.skill.slice(-4)}: ${held} on held-out scenes, in simulation.`, e.run);
         break;
       }
       lastSkill = e.skill;
       $("#call-last").disabled = false;
       runDone = runStart + e.seconds;
       $("#elapsed").textContent = fmt(e.seconds);
-      forgeNote(`Published skill-${e.skill.slice(-4)} in ${fmt(e.seconds)}: ${Math.round(100 * e.success_rate)}% of 20 held-out scenes.`);
+      forgeNote(`Saved skill-${e.skill.slice(-4)}: ${held} on held-out scenes, in simulation.`);
       if (!composite && e.best_round !== shown.round) showRound(e.run, e.best_round);
       $("#go").disabled = false;
       break;
@@ -1000,6 +1065,12 @@ async function submit(text) {
   $("#prompt").value = "";
   $("#crumb-run").textContent = text;
   const how = window.forgeLib?.takeMode() || { mode: "auto", from_skill: "" };
+  if (how.mode === "auto" && window.forgeArms?.wants(text)) {
+    youMsg(text);
+    $("#go").disabled = false;
+    await window.forgeArms.handle(text);
+    return;
+  }
   const res = await fetch("/api/prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text, ...how }) });
   if (!res.ok) $("#go").disabled = false;
 }
@@ -1007,10 +1078,13 @@ $("#prompt-form").addEventListener("submit", (ev) => { ev.preventDefault(); subm
 $("#prompt").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); submit($("#prompt").value.trim()); }
 });
-document.querySelectorAll(".ex").forEach((b) => b.addEventListener("click", () => {
-  $("#prompt").value = b.childNodes[b.childNodes.length - 1].textContent;
-  $("#prompt").focus();
-}));
+function wireExamples() {
+  document.querySelectorAll(".ex").forEach((b) => b.addEventListener("click", () => {
+    $("#prompt").value = b.dataset.say || b.childNodes[b.childNodes.length - 1].textContent;
+    $("#prompt").focus();
+  }));
+}
+wireExamples();
 window.submitPrompt = submit;
 // what the library (library.js) needs from the sim view and the chat thread
 window.forge = {
@@ -1026,9 +1100,52 @@ window.forge = {
   showScene(sc) { play = null; buildWorld(sc); applyFrame(sc.frame); $("#pb-fill").style.width = "0"; $("#vp-badge").classList.add("hidden"); $("#step-badge").classList.add("hidden"); },
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
+  note: forgeNote, modelTag, lights, cellMarks, plate: () => plate, grid, gridMid,
+  setCamShift(y, scale) { camShift = y; camScale = scale; setCam(camName); },
+  setSingleVisible(v) { if (world) world.root.visible = world.mirror.visible = v; plate.visible = cellMarks.visible = v && staged; },
+  stageIn() { setStaged(true); },
+  setMulti(on) { $("#app").classList.toggle("multi", on); $("#view-sim").classList.toggle("multi", on); },
   THREE, scene3, camera, controls, renderer,
   meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage, applyFrame, buildWorld, populate, armScale: (rid) => ARM_SCALE[String(rid || "so101").split(".")[0]] || 1,
 };
+
+// ---------------------------------------------------------------- optimizer mount (web/optimizer.js + optimizer.css, optional)
+// DOM contract: #optimizer-sec (hidden until the Optimize step is clicked) holds #optimizer-root, an empty div the
+// optimizer owns. If the files are absent the section opens with a one-line note and the app is otherwise unchanged.
+const optSec = $("#optimizer-sec"), optRoot = $("#optimizer-root");
+function optimizerOpen(on) {
+  optSec.hidden = !on;
+  rail.optimizer.classList.toggle("sel", on);
+  if (on) { $("#app").classList.remove("no-right"); optSec.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  optRoot.dataset.open = on ? "1" : "";
+  window.dispatchEvent(new CustomEvent("forge:optimizer", { detail: { open: on } }));
+}
+rail.optimizer.addEventListener("click", () => optimizerOpen(optSec.hidden));
+rail.optimizer.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); optimizerOpen(optSec.hidden); } });
+$("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
+(async function loadOptimizer() {
+  const have = async (url, type) => {
+    try {
+      const r = await fetch(url, { method: "HEAD" });
+      return r.ok && (r.headers.get("content-type") || "").includes(type);
+    } catch { return false; }
+  };
+  if (await have("/static/optimizer.css", "css")) {
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = "/static/optimizer.css";
+    document.head.append(l);
+  }
+  if (!(await have("/static/optimizer.js", "javascript"))) { optRoot.dataset.loaded = "absent"; return; }
+  try {
+    const mod = await import("/static/optimizer.js");
+    optRoot.dataset.loaded = "1";
+    // optional named export: mount(root, ctx). A module that wires itself to #optimizer-root needs no export.
+    if (typeof mod.mount === "function") mod.mount(optRoot, { forge: window.forge, stage, open: optimizerOpen, current: () => current });
+  } catch (err) {
+    optRoot.dataset.loaded = "error";
+    optRoot.textContent = `The optimizer did not load: ${err.message}`;
+  }
+})();
 
 idleScene();
 
