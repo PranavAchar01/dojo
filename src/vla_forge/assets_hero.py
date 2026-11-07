@@ -144,7 +144,14 @@ def run(n_parts: int = 6, seed: int = 7) -> dict:
         for st in (KIT, INSERT)
     }
     lay = dressed(F._cell_layout(KIT, "red", L.BELT_X, L.WINDOW_Y, 0.0))
+    cells = [
+        dressed(F._cell_layout(st, "red", L.BELT_X, L.WINDOW_Y, 0.0))
+        for st in (KIT, INSERT)
+    ]
     result = {
+        "pitch": PITCH,
+        "cells": [{"scene": export_cell(c)} for c in cells],
+        "dressing": export_dressing(lay),
         "cell": CELL,
         "controller": "scripted expert with privileged state (not a trained VLA)",
         "n_parts": n_parts,
@@ -188,6 +195,62 @@ def palette(m: mujoco.MjModel) -> None:
         ).copy()
         m.geom_rgba[g] = np.asarray(_COLORS[robot_role(rgba, mesh)])
         m.geom_matid[g] = -1
+
+
+def export_cell(lay) -> dict:
+    """The engine's scene export for one station, with the arm in the current Dojo look."""
+    from .sim.scene import build_spec
+
+    sc = export_scene(lay)
+    m = build_spec(lay).compile()
+    palette(m)
+    robot = [
+        g
+        for g in range(m.ngeom)
+        if m.geom_group[g] == 2 and m.geom_type[g] == mujoco.mjtGeom.mjGEOM_MESH
+    ]
+    for rec, g in zip(sc["robot"], robot, strict=True):
+        rec["rgba"] = [round(float(v), 4) for v in m.geom_rgba[g]]
+    return sc
+
+
+def export_dressing(lay) -> list[dict]:
+    """The dressed scene as data for the browser: boxes and cylinders as primitives, library models by id and
+    scale. `body` indexes the scene export's bodies, -1 is the world."""
+    from .sim.scene import build_spec
+
+    m = build_spec(lay).compile()
+    out, seen = [], set()
+    for g in range(m.ngeom):
+        if m.geom_group[g] != 1:
+            continue
+        b = int(m.geom_bodyid[g]) - 1
+        t = int(m.geom_type[g])
+        mat = int(m.geom_matid[g])
+        rgba = m.mat_rgba[mat] if mat >= 0 else m.geom_rgba[g]
+        item = {
+            "body": b,
+            "name": m.body(int(m.geom_bodyid[g])).name,
+            "pos": [round(float(v), 5) for v in m.geom_pos[g]],
+            "quat": [round(float(v), 5) for v in m.geom_quat[g]],
+            "rgba": [round(float(v), 4) for v in rgba],
+            "mat": mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_MATERIAL, mat) or "",
+            "front": (mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_GEOM, g) or "").startswith("gf_"),
+        }
+        if t == mujoco.mjtGeom.mjGEOM_MESH:
+            mesh = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, int(m.geom_dataid[g]))
+            tag = mesh.split("/")[0]  # "<id>@<scale>"
+            key = (b, tag, tuple(item["pos"]), tuple(item["quat"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            mid, scale = tag.split("@")
+            out.append({**item, "kind": "mesh", "id": mid, "scale": float(scale)})
+        elif t == mujoco.mjtGeom.mjGEOM_BOX:
+            out.append({**item, "kind": "box", "size": [round(float(v), 5) for v in m.geom_size[g]]})
+        elif t == mujoco.mjtGeom.mjGEOM_CYLINDER:
+            out.append({**item, "kind": "cyl", "size": [round(float(v), 5) for v in m.geom_size[g][:2]]})
+    return out
 
 
 class Cell:
