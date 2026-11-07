@@ -564,7 +564,7 @@ function drawLoss() {
   svg.closest(".sec").dataset.empty = all.length ? "" : "1";
   if (!all.length) {
     svg.innerHTML = `<text class="ph" x="150" y="52" text-anchor="middle">No training yet</text>`;
-    if (composite && planRows.length && planRows.every((p) => p.source === "reuse")) $("#loss-steps").textContent = "no training: every step reused a skill agent";
+    if (composite && planRows.length && planRows.every((p) => p.source === "reuse")) $("#loss-steps").textContent = "no training: every step reused a trained model";
     return;
   }
   const total = losses.reduce((a, l) => a + (l.length ? l[l.length - 1][0] : 0), 0) || 1;
@@ -609,7 +609,7 @@ function drawRounds() {
       ev.per_step.forEach((k, i) => box.append(barRow(`Step ${i + 1}`, k, ev.n)));
       box.append(barRow("All steps", ev.succeeded, ev.n));
     } else {
-      box.append(el("span", "dim", "Measured end to end once every step has a skill agent."));
+      box.append(el("span", "dim", "Measured end to end once every step has a trained model."));
     }
     return;
   }
@@ -764,7 +764,7 @@ $("#app").dataset.view = "skills";
 const TIER_NAMES = {
   1: ["Tier 1", "one motion: reach, push, lift"],
   2: ["Tier 2", "carry a block somewhere: place, stack"],
-  3: ["Tier 3", "several steps, chained from published skill agents"],
+  3: ["Tier 3", "several steps, chained from published models"],
 };
 async function renderLadder() {
   const st = await (await fetch("/api/state")).json();
@@ -791,7 +791,7 @@ async function renderLadder() {
       if (tier === 3) {
         const reuse = r.plan.filter((p) => p.source === "reuse").length;
         const trained = r.plan.filter((p) => p.source === "train");
-        from = `calls ${r.plan.length} skill agents; reused ${reuse}` + (trained.length ? `, trained ${trained.length} (${trained.map((p) => Math.round(p.seconds) + "s").join(", ")})` : "");
+        from = `calls ${r.plan.length} models; reused ${reuse}` + (trained.length ? `, trained ${trained.length} (${trained.map((p) => Math.round(p.seconds) + "s").join(", ")})` : "");
       } else if (r.parent) {
         const src = r.init_from && r.init_from.skill ? `, fine-tuned from "${skills[r.init_from.skill]?.instruction || r.init_from.skill}"` : ", from the base policy";
         from = `step ${r.step_index + 1} of a tier 3 task${src}`;
@@ -831,7 +831,7 @@ $("#call-last").onclick = async () => {
   b.disabled = true;
   forgeNote(`Calling skill-${lastSkill.slice(-4)} in a fresh scene...`);
   const r = await fetch(`/api/skills/${lastSkill}/run`, { method: "POST" });
-  forgeNote(r.ok ? (await r.json()).reply : "The skill agent did not answer.");
+  forgeNote(r.ok ? (await r.json()).reply : "The model did not answer.");
   b.disabled = false;
 };
 function setReady(on) {

@@ -27,8 +27,8 @@ const ago = (t) => {
 
 const DECISION = {
   reuse: "Reuse a tile",
-  train: "Train a new skill",
-  chain: "Chain skills",
+  train: "Train a new model",
+  chain: "Chain models",
   too_complex: "Too complex",
   not_feasible: "Not feasible",
 };
@@ -376,7 +376,7 @@ function setMode(m, from, name) {
   x.setAttribute("aria-label", "Clear mode");
   x.onclick = () => setMode("auto", "", "");
   chip.append(x);
-  $("#prompt").placeholder = m === "remix" ? `What should “${name}” learn instead?` : "A new skill, trained from the base policy...";
+  $("#prompt").placeholder = m === "remix" ? `What should “${name}” learn instead?` : "A new model, trained from the base policy...";
   $("#prompt").focus();
 }
 function takeMode() {
@@ -556,8 +556,8 @@ function draw() {
   drawSkeleton();
   const chains = tiles.filter((t) => t.tier === 3).length;
   const nt = tiles.reduce((s, t) => s + t.tests.length, 0);
-  $("#lib-count").textContent = `${tiles.length} skill${tiles.length === 1 ? "" : "s"} · ${chains} chain${chains === 1 ? "" : "s"} · ${nt} test run${nt === 1 ? "" : "s"}` + (vis.length !== tiles.length ? ` · showing ${vis.length}` : "");
-  if (!vis.length) box.append(el("div", "empty-note", tiles.length ? "Nothing matches." : "No skills yet. Finish a prompt and it lands here."));
+  $("#lib-count").textContent = `${tiles.length} trained model${tiles.length === 1 ? "" : "s"} · ${chains} chain${chains === 1 ? "" : "s"} · ${nt} test run${nt === 1 ? "" : "s"}` + (vis.length !== tiles.length ? ` · showing ${vis.length}` : "");
+  if (!vis.length) box.append(el("div", "empty-note", tiles.length ? "Nothing matches." : "No trained models yet. Finish a prompt and it lands here."));
 }
 async function refresh(freshId) {
   const r = await fetch("/api/library");
