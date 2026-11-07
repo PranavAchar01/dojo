@@ -1104,6 +1104,7 @@ window.forge = {
   setCamShift(y, scale) { camShift = y; camScale = scale; setCam(camName); },
   setSingleVisible(v) { if (world) world.root.visible = world.mirror.visible = v; plate.visible = cellMarks.visible = v && staged; },
   stageIn() { setStaged(true); },
+  hasWorld: () => !!world,
   setMulti(on) { $("#app").classList.toggle("multi", on); $("#view-sim").classList.toggle("multi", on); },
   THREE, scene3, camera, controls, renderer,
   meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage, applyFrame, buildWorld, populate, armScale: (rid) => ARM_SCALE[String(rid || "so101").split(".")[0]] || 1,

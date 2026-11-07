@@ -32,7 +32,7 @@ const DECISION = {
   too_complex: "Too complex",
   not_feasible: "Not feasible",
 };
-const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a cell" };
+const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task" };
 
 let tiles = [];
 let loaded = false;
