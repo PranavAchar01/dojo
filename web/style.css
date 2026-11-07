@@ -1,29 +1,28 @@
 /* VLA Forge. Interface ported from Etch (the author's own board editor, deploy/etch-app at a0bb241d): editor.css for the
    shell (two-row top bar, segmented views, icon buttons, right panel, floating stage controls, dock pill, bottom sheet
    rules), explore.css for the library pages (workplane grid, serif hero, chips, white cards) and new-board.css for the
-   composer and prompt cards. Figtree for everything, Averia Serif Libre for titles. Etch's blue accent is swapped for
-   VLA Forge's safety orange; everything else keeps Etch's values. */
+   composer and prompt cards. Figtree throughout. Colors are the Meta theme (see :root). */
 :root {
-  /* Etch editor tokens */
-  --bg: #ffffff; --stage: #f4f6f8; --ink: #14181c; --ink2: #4a545e; --ink3: #7c8791; --line: #e3e7eb; --line2: #d3d9df;
-  --ok: #1f9d55; --bad: #d64545; --warn: #c98a12;
-  --card: #ffffff; --shadow: 0 1px 2px rgba(16, 24, 32, .06), 0 8px 28px rgba(16, 24, 32, .1);
-  --ring: 0 0 0 1px #ececec, 0 1px 2px rgba(17, 17, 17, .03), 0 4px 14px rgba(17, 17, 17, .03);
-  --ring-up: 0 0 0 1px #e4e4e4, 0 2px 4px rgba(17, 17, 17, .04), 0 12px 28px rgba(17, 17, 17, .07);
+  /* Meta theme: Meta's brand blues on clean light greys with near-black text. The same tokens serve the library,
+     arms and builder sheets and the landing page. */
+  --bg: #ffffff; --stage: #f1f4f7; --ink: #1c2b33; --ink2: #465a69; --ink3: #65788b; --line: #dee3e9; --line2: #ced0d4;
+  --ok: #1a8f4e; --bad: #d64545; --warn: #c98a12;
+  --card: #ffffff; --shadow: 0 1px 2px rgba(28, 43, 51, .06), 0 8px 28px rgba(28, 43, 51, .1);
+  --ring: 0 0 0 1px #e4e8ec, 0 1px 2px rgba(28, 43, 51, .03), 0 4px 14px rgba(28, 43, 51, .03);
+  --ring-up: 0 0 0 1px #d9dfe5, 0 2px 4px rgba(28, 43, 51, .04), 0 12px 28px rgba(28, 43, 51, .07);
   --r: 12px; --panel: 320px;
-  --ui: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; --serif: "Averia Serif Libre", Georgia, serif;
+  --ui: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; --serif: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --bounce: cubic-bezier(.34, 1.56, .64, 1); --ease: cubic-bezier(.2, .8, .2, 1);
   --liquid: cubic-bezier(.34, 1.4, .64, 1); --soft: cubic-bezier(.22, 1, .36, 1);
-  /* Explore workplane */
-  --plane-bg: #f5f8fb; --plane-line: rgba(72, 152, 204, .12); --plane-major: rgba(72, 152, 204, .24);
+  /* workplane */
+  --plane-bg: #f5f8fb; --plane-line: rgba(8, 102, 255, .07); --plane-major: rgba(8, 102, 255, .14);
 
-  /* the one accent: safety orange in place of Etch's blue. --accent-700 takes Etch's --accent-ink role (accent text),
-     --accent-bg its tint; text on an orange fill is near-black (6.3:1). */
-  --accent: #ff5a1f;
-  --accent-50: #fff4ed; --accent-100: #ffe4d3; --accent-200: #ffc9a8; --accent-300: #ffa070; --accent-400: #ff7a3d;
-  --accent-600: #f04e14; --accent-700: #b93a0a;
-  --accent-bg: #fff1e8; --accent-ink: #120a06;
-  --accent-glow: rgba(255, 90, 31, .14);
+  /* the one accent: Meta blue. --accent-700 is accent text, --accent-bg its tint; text on a blue fill is white. */
+  --accent: #0866ff;
+  --accent-50: #f0f6ff; --accent-100: #e0edff; --accent-200: #b9d4ff; --accent-300: #8ab7ff; --accent-400: #3d85ff;
+  --accent-600: #0064e0; --accent-700: #0050b8;
+  --accent-bg: #eaf3ff; --accent-ink: #ffffff;
+  --accent-glow: rgba(8, 102, 255, .16);
 
   /* names the library, line and builder sheets use, mapped onto Etch's tokens */
   --text: var(--ink); --text-muted: var(--ink2); --text-dim: var(--ink3); --prose: var(--ink2);
@@ -54,19 +53,18 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .crumb { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: var(--ink3); }
 .crumb-mid { color: var(--ink2); }
 .brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--ink); flex: none; text-decoration: none; }
-a.brand:hover { color: var(--accent, #ff5a1f); }
-.logo-tile { width: 26px; height: 26px; border-radius: 8px; background: var(--ink); display: grid; place-items: center; }
-.logo-tile .mascot { color: #fff; --paper: var(--ink); }
+a.brand:hover { color: var(--accent); }
+.logo-tile { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-bg); display: grid; place-items: center; }
 .sep { color: var(--line2); }
-.title { font: 400 18px/1.2 var(--serif); color: var(--ink); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 2px 6px; margin-left: -6px; border-radius: 7px; }
+.title { font: 600 18px/1.2 var(--serif); color: var(--ink); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 2px 6px; margin-left: -6px; border-radius: 7px; }
 .sv { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--ui); color: var(--ink3); white-space: nowrap; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink3); animation: tt-now-dot 1.1s ease-in-out infinite; }
 .dot.on { background: var(--ok); box-shadow: none; animation: none; }
 .top-r { display: flex; align-items: center; gap: 8px; flex: none; }
 .btn { height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line2); background: var(--bg); font-weight: 600; transition: background .15s, border-color .15s, transform .2s var(--bounce), opacity .15s; }
 .btn:hover:not(:disabled) { background: #f4f6f8; }
-.btn.dark { background: var(--ink); border-color: var(--ink); color: #fff; }
-.btn.dark:hover:not(:disabled) { background: #2a3138; }
+.btn.dark { background: var(--accent-600); border-color: var(--accent-600); color: #fff; }
+.btn.dark:hover:not(:disabled) { background: #0057c2; }
 .btn:disabled { opacity: .35; cursor: default; }
 .btn svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
 .pill-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 10px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(16, 24, 32, .05); font-size: 12.5px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
@@ -90,14 +88,14 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 32, .12); }
 
 /* primary actions: Etch's dark button. .primary is what the library and builder scripts create. */
-.primary { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--ink); background: var(--ink); color: #fff; font-weight: 600; transition: background .15s, transform .2s var(--bounce), opacity .15s; }
-.primary:hover:not(:disabled) { background: #2a3138; }
+.primary { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--accent-600); background: var(--accent-600); color: #fff; font-weight: 600; transition: background .15s, transform .2s var(--bounce), opacity .15s; }
+.primary:hover:not(:disabled) { background: #0057c2; }
 .primary:active:not(:disabled) { transform: scale(.97); }
 .primary:disabled { opacity: .35; cursor: default; }
 .primary svg { width: 13px; height: 13px; }
 
 /* ---------- the mascot: original monochrome bot (mascot.js) ---------- */
-.mascot { position: relative; display: inline-block; flex: none; line-height: 0; width: 22px; height: 22px; vertical-align: middle; color: var(--ink); --paper: #fff; }
+.mascot { position: relative; display: inline-block; flex: none; line-height: 0; width: 22px; height: 22px; vertical-align: middle; color: var(--accent-600); --paper: #fff; --frame: #0f1a22; }
 .mascot svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: none; }
 .mascot.xs { width: 18px; height: 18px; }
 .mascot.sm { width: 20px; height: 20px; }
@@ -106,6 +104,10 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .mascot.xl { width: 72px; height: 72px; }
 .mb-head { fill: currentColor; }
 .mb-arm { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.mb-loop { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linejoin: round; }
+.mb-lens { fill: var(--frame); }
+.mb-temple { fill: none; stroke: var(--frame); stroke-width: 2.6; stroke-linecap: round; }
+.mb-cam { fill: var(--accent-300); }
 .mb-eyes rect { fill: var(--paper); }
 .mb-eyes path { fill: none; stroke: var(--paper); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
 .mb-body { transform-origin: 24px 44px; animation: bb-float 3.2s ease-in-out infinite; }
@@ -144,12 +146,12 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 
 /* ---------- chat (Etch right-panel look, new-board composer and prompt cards) ---------- */
 .rp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 12px 6px 16px; }
-.rp-head h2 { margin: 0; font: 400 20px/1.2 var(--serif); }
+.rp-head h2 { margin: 0; font: 600 20px/1.2 var(--serif); }
 .thread { flex: 1; overflow-y: auto; padding: 10px 16px 10px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
 .empty { margin-top: auto; }
 .hero-bot { position: relative; width: 64px; height: 64px; margin: 0 0 18px 2px; animation: rise .55s var(--soft) both; }
 .empty h1 { font: 700 34px/1.06 var(--serif); letter-spacing: -.02em; margin: 0 0 10px; text-wrap: balance; animation: rise .55s var(--soft) 80ms both; }
-.empty h1 em { font-style: italic; color: var(--accent); }
+.empty h1 em { font-style: normal; color: var(--accent); }
 .empty p { color: var(--ink2); margin: 0 0 16px; font-size: 14px; line-height: 1.5; animation: rise .55s var(--soft) 140ms both; }
 .examples { display: flex; flex-direction: column; gap: 8px; }
 .ex { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 12px 14px; border: 0; border-radius: 18px; background: #fff; font: 500 13.5px/1.35 var(--ui); color: var(--ink); box-shadow: var(--ring); transition: box-shadow .3s var(--ease), transform .45s var(--liquid); animation: rise .5s var(--soft) both; }
@@ -175,7 +177,7 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .msg .who { display: flex; align-items: center; gap: 7px; font: 600 12px/1 var(--ui); color: var(--ink3); margin-bottom: 6px; }
 .msg.forge .who { color: var(--ink); }
 .msg .txt { color: var(--ink2); font-size: 14px; line-height: 1.5; }
-.msg.you .txt { color: var(--ink); font: 400 16px/1.35 var(--serif); }
+.msg.you .txt { color: var(--ink); font: 600 16px/1.35 var(--serif); }
 .msg .note { color: var(--ink3); font-size: 12.5px; margin-top: 4px; animation: note-in .22s ease-out both; }
 .tools-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .tool { display: flex; gap: 8px; align-items: flex-start; padding: 7px 10px; border-radius: 10px; background: #f6f8fa; font-size: 12.5px; color: var(--ink2); transition: background .26s, box-shadow .26s; animation: tt-pop .22s var(--soft) both; }
@@ -198,8 +200,8 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .chip-mode { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px 0 5px; border: 0; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #dde5ec inset; font: 600 12.5px var(--ui); color: var(--ink2); transition: box-shadow .2s, color .2s; }
 .chip-mode:hover { color: var(--ink); box-shadow: 0 0 0 1px #c3d2df inset; }
 .chip-mode .sq { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); box-shadow: inset 0 0 0 5px var(--accent-bg); }
-.send { width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--ink); color: #fff; transition: background-color .15s, opacity .15s, transform .45s var(--liquid); }
-.send:hover:not(:disabled) { background: #2a3138; }
+.send { width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--accent-600); color: #fff; transition: background-color .15s, opacity .15s, transform .45s var(--liquid); }
+.send:hover:not(:disabled) { background: #0057c2; }
 .send:active:not(:disabled) { transform: scale(.9); }
 .send svg { width: 17px; height: 17px; stroke-width: 2; }
 .send:disabled { opacity: .28; cursor: default; }
@@ -247,7 +249,7 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .rail li.off { display: none; }
 
 /* playback: Etch's dark dock pill */
-.pill { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 12; display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 8px; background: #14181c; color: #fff; border-radius: 999px; box-shadow: var(--shadow); animation: pill-rise .5s var(--soft) .2s both; }
+.pill { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 12; display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 8px; background: #1c2b33; color: #fff; border-radius: 999px; box-shadow: var(--shadow); animation: pill-rise .5s var(--soft) .2s both; }
 .pill button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: #2b3239; color: #fff; font-size: 16px; line-height: 1; transition: background .15s, transform .3s var(--bounce); }
 .pill button:hover { background: #3a434c; }
 .pill button:active { transform: scale(.9); }
@@ -279,7 +281,7 @@ a.brand:hover { color: var(--accent, #ff5a1f); }
 .sec:nth-child(2) { animation-delay: 70ms; } .sec:nth-child(3) { animation-delay: 140ms; } .sec:nth-child(4) { animation-delay: 210ms; }
 .sec.grow { flex: 1; border-bottom: 0; }
 .sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; font-size: 12px; }
-.sec-h .lbl { font: 400 17px/1.25 var(--serif); color: var(--ink); }
+.sec-h .lbl { font: 600 17px/1.25 var(--serif); color: var(--ink); }
 .sec-h .v { font-size: 13px; font-weight: 700; color: var(--ink); }
 .loss { width: 100%; height: 96px; display: block; background: #fafbfc; border: 1px solid var(--line); border-radius: 12px; }
 .loss path { fill: none; stroke: var(--accent); stroke-width: 1.8; vector-effect: non-scaling-stroke; }
@@ -317,7 +319,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .app.immersive .doc { max-width: 1680px; padding: 0 clamp(28px, 4vw, 72px) 80px; }
 .doc-h { padding: 48px 0 28px; max-width: 760px; }
 .doc-h h2 { margin: 0; font: 700 clamp(34px, 5vw, 56px)/1.04 var(--serif); letter-spacing: -.02em; text-wrap: balance; }
-.doc-h h2 em { font-style: italic; color: var(--accent); }
+.doc-h h2 em { font-style: normal; color: var(--accent); }
 .doc-h p { margin: 14px 0 0; font-size: 17px; line-height: 1.55; color: var(--ink2); max-width: 640px; text-wrap: pretty; }
 #ladder:empty, #skills:empty { min-height: 180px; border-radius: 22px; background: linear-gradient(100deg, #e6eaee 30%, #f3f5f7 50%, #e6eaee 70%) 0 0 / 250% 100%; animation: g-sk 1.2s linear infinite; }
 .tier-block { margin-bottom: 20px; background: #fff; border-radius: 22px; box-shadow: var(--ring); overflow: hidden; transition: box-shadow .35s var(--soft); animation: rise .55s var(--soft) both; }
@@ -354,7 +356,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .skill button:active:not(:disabled) { transform: scale(.94); }
 .skill button:disabled { opacity: .5; }
 .skill .reply { font-size: 12.5px; color: var(--ink2); }
-.empty-note { display: flex; align-items: center; gap: 12px; padding: 48px 16px; justify-content: center; color: var(--ink2); font: 400 17px var(--serif); animation: rise .5s var(--soft) both; }
+.empty-note { display: flex; align-items: center; gap: 12px; padding: 48px 16px; justify-content: center; color: var(--ink2); font: 600 17px var(--serif); animation: rise .5s var(--soft) both; }
 
 /* ---------- motion (Etch) ---------- */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -416,7 +418,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .asm-view { position: relative; height: clamp(290px, 38vh, 420px); border-bottom: 1px solid var(--line); background: var(--stage); }
 #asm { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .asm-cap { position: absolute; top: 12px; left: 14px; right: 14px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
-.asm-cap b { font: 400 18px/1.2 var(--serif); }
+.asm-cap b { font: 600 18px/1.2 var(--serif); }
 .asm-cap .num { font-size: 12px; }
 .asm-load { position: absolute; right: 14px; bottom: 36px; font-size: 12.5px; color: var(--accent-700); }
 .asm-legend { position: absolute; left: 14px; bottom: 10px; display: flex; gap: 12px; font-size: 11.5px; color: var(--ink3); pointer-events: none; }
@@ -442,7 +444,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .primary.use { justify-content: center; margin-top: 6px; height: 44px; border-radius: 999px; font-size: 15px; }
 .use-note { font-size: 12px; color: var(--ink2); line-height: 1.4; }
 .not-offered { margin-top: 28px; font-size: 13px; color: var(--ink2); }
-.not-offered summary { cursor: pointer; color: var(--ink); font: 400 17px var(--serif); }
+.not-offered summary { cursor: pointer; color: var(--ink); font: 600 17px var(--serif); }
 .not-offered ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .not-offered b { font-weight: 600; color: var(--ink); }
 @media (max-width: 1100px) { .build-grid { grid-template-columns: 1fr; } .assembly { position: static; } }

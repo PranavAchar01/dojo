@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VLA Forge</title>
-<meta name="description" content="Describe a factory line in a sentence. VLA Forge trains and measures a vision-language-action policy for every station, in simulation, in minutes.">
+<meta name="description" content="Describe a task in a sentence. VLA Forge trains and measures a vision-language-action policy for it on an SO-101, and for each arm when the task needs several, in simulation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,400;0,700;1,400;1,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/landing.css">
 </head>
@@ -19,7 +19,7 @@
     <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#how">How it works</a>
-      <a href="#line">Factory line</a>
+      <a href="#arms">Several arms</a>
       <a href="#skills">Skills</a>
       <a href="#robots">Robots</a>
       <a href="#models">Models</a>
@@ -35,12 +35,12 @@
     <div class="wrap">
       <div class="hero-top">
         <div class="hero-copy">
-          <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for factory lines</p>
-          <h1 class="rv" style="--d:60ms">Describe the line.<br>Get a <em>policy</em> for every station.</h1>
-          <p class="lede rv" style="--d:140ms">Say what the line should do. VLA Forge splits it into stations, trains and measures a policy for each one in about three minutes, and chains them with scripted cells where a script is enough.</p>
+          <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
+          <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
+          <p class="lede rv" style="--d:140ms">Say what the arm should do. VLA Forge trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
           <div class="hero-cta rv" style="--d:220ms">
             <a class="cta big" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
-            <a class="cta ghost big" href="#watch">Watch a line run</a>
+            <a class="cta ghost big" href="#watch">See several arms</a>
           </div>
         </div>
         <div class="hero-mascot rv" style="--d:300ms" aria-hidden="true">
@@ -52,25 +52,22 @@
       <figure class="stage rv" id="watch" style="--d:200ms">
         <div class="stage-bar">
           <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="stage-t">vla-forge <span class="sep">/</span> line</span>
-          <span class="stage-r">Recorded from the app, 4x</span>
+          <span class="stage-t">vla-forge <span class="sep">/</span> app</span>
+          <span class="stage-r">Screenshot of the app, in simulation</span>
         </div>
         <div class="stage-media">
-          <video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/static/assets/line-run.jpg" width="1200" height="406" aria-label="Three stations on a conveyor in the simulator: one SO-101 seats a housing in a pallet slot, a second SO-101 inserts the part into a socket, and a scripted ViperX crates the finished assembly">
-            <source src="/static/assets/line-run.webm" type="video/webm">
-            <source src="/static/assets/line-run.mp4" type="video/mp4">
-          </video>
+          <img id="hero-video" src="/static/assets/multi-arm.jpg" width="1600" height="778" alt="The app with two SO-101 arms in one cell on a concrete floor, the arms list on the right showing each arm's sub-task">
         </div>
-        <figcaption>Two trained SO-101 stations and one scripted ViperX at the end of the assembly line, in simulation. The panel counts what the simulator measures.</figcaption>
+        <figcaption>Two SO-101 arms in one cell, each with its own sub-task, in simulation. The panel lists what the simulator measured.</figcaption>
       </figure>
 
       <dl class="numbers rv">
-        <div><dt>Housings through the line</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
-        <div><dt>Throughput</dt><dd class="num">2.97<span class="of"> parts / min</span></dd></div>
-        <div><dt>Each VLA station, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
-        <div><dt>Crated by the scripted ViperX</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
+        <div><dt>Parts through every arm</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
+        <div><dt>Arm 1, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
+        <div><dt>Arm 2, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
+        <div><dt>Scripted ViperX, in the cell run</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
       </dl>
-      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Station success is measured on 20 layouts the policy never trained on. Training took 94.5 s and 107.5 s. The line run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
+      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Success is measured on 20 layouts the policy never trained on. The cell run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
     </div>
   </section>
 
@@ -81,7 +78,7 @@
       <h2 class="rv">One sentence goes in. <em>Eight agents</em> hand it down the pipe.</h2>
       <p class="sub rv">Each stage is a Fetch.ai uAgent passing real messages in one Bureau. Every stage streams its logs, demos, loss and evaluation to the page as it happens.</p>
       <ol class="pipe" id="pipe">
-        <li><span class="n">01</span><h3>Prompt</h3><p>A planner turns the sentence into a task and a success check the simulator can evaluate.</p></li>
+        <li><span class="n">01</span><h3>Prompt</h3><p>A planner turns the sentence into a task and a success check the simulator can evaluate. It runs on OpenAI or Llama, and the app names the model that answered.</p></li>
         <li><span class="n">02</span><h3>Route</h3><p>The router picks the nearest skill in the library, or the base policy, and checks the robot can do the task.</p></li>
         <li><span class="n">03</span><h3>Scene</h3><p>MuJoCo builds the table and 20 held-out layouts the policy never sees in training.</p></li>
         <li><span class="n">04</span><h3>Demos</h3><p>A scripted expert collects demonstrations with randomised colours, positions and noise.</p></li>
@@ -94,16 +91,16 @@
     </div>
   </section>
 
-  <!-- ------------------------------------------------------------ factory line -->
-  <section class="band tint" id="line">
+  <!-- ------------------------------------------------------------ several arms -->
+  <section class="band tint" id="arms">
     <div class="wrap">
-      <p class="kicker rv">Factory line</p>
-      <h2 class="rv">A line is a <em>chain of stations</em>.</h2>
-      <p class="sub rv">A station is either a trained VLA or a script. The planner picks which, the router checks that the robot can do it, and the line runs them in order along one conveyor.</p>
+      <p class="kicker rv">Several arms</p>
+      <h2 class="rv">One chat, <em>one arm or several</em>.</h2>
+      <p class="sub rv">Ask for "another SO-101", or describe a task that needs more than one arm. The planner gives each arm a sub-task and the router checks the robot can do it. Each arm is either a trained VLA or a script, and the cell runs them in order.</p>
 
       <blockquote class="prompt rv">
         <span class="q">Prompt</span>
-        Assemble housings: an SO-101 seats each housing in a pallet slot, a second SO-101 inserts it into a socket, then a scripted ViperX moves the finished assembly into the crate.
+        Two arms: one seats the housing in the pallet, the other inserts it into the socket, then a ViperX crates the assembly.
       </blockquote>
 
       <div class="chain rv" id="chain">
@@ -111,26 +108,26 @@
         <article class="st">
           <header><span class="idx">01</span><span class="kind vla">VLA</span></header>
           <h3>Pallet seating</h3>
-          <p>SO-101 seats the housing in a pallet slot. Trained for this station in 94.5 s.</p>
+          <p>SO-101 seats the housing in a pallet slot. Trained in 94.5 s.</p>
           <div class="meter"><b style="--w:80%"></b></div>
-          <p class="res"><b class="num">16 / 20</b> held-out scenes, 26 / 30 on the line, in simulation</p>
+          <p class="res"><b class="num">16 / 20</b> on held-out scenes, in simulation</p>
         </article>
         <article class="st">
           <header><span class="idx">02</span><span class="kind vla">VLA</span></header>
           <h3>Socket insertion</h3>
           <p>SO-101 inserts the part into the socket. Trained in 107.5 s.</p>
           <div class="meter"><b style="--w:80%"></b></div>
-          <p class="res"><b class="num">16 / 20</b> held-out scenes, 22 / 26 on the line, in simulation</p>
+          <p class="res"><b class="num">16 / 20</b> on held-out scenes, in simulation</p>
         </article>
         <article class="st">
           <header><span class="idx">03</span><span class="kind script">Scripted</span></header>
-          <h3>Finished assembly crating</h3>
-          <p>A ViperX with a programmed cell moves the finished assembly into the crate.</p>
+          <h3>Crating</h3>
+          <p>A ViperX with a programmed cell moves the finished assembly into the crate. No training.</p>
           <div class="meter off"><b></b></div>
-          <p class="res"><b class="num">22 / 22</b> crated on the line. No training: a script where a script is enough.</p>
+          <p class="res"><b class="num">22 / 22</b> in the cell run, in simulation</p>
         </article>
       </div>
-      <p class="fine rv">In simulation: 30 parts, 22 through all three stations in 444.6 s. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each station is its own simulated cell and the part is re-staged on each belt.</p>
+      <p class="fine rv">In simulation: 30 parts, 22 through all three arms. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each arm is its own simulated cell and the part is re-staged for the next one.</p>
     </div>
   </section>
 
@@ -176,7 +173,7 @@
             <li><b>Robotiq 2F-85</b><span>Robotiq, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/robotiq_2f85" target="_blank" rel="noopener">BSD-2-Clause</a></li>
             <li><b>Franka Hand</b><span>Franka Robotics, via Menagerie</span><a class="lic" href="https://github.com/google-deepmind/mujoco_menagerie/tree/98a70c569c4c1b6da467a20012f766ee1f8dc521/franka_emika_panda" target="_blank" rel="noopener">Apache-2.0</a></li>
           </ul>
-          <h3 class="gap">Line equipment</h3>
+          <h3 class="gap">Cell equipment</h3>
           <ul>
             <li><b>Tote</b><span>robosuite bins arena</span><a class="lic" href="https://github.com/ARISE-Initiative/robosuite/blob/5ce6643f3092639d08f7b0f90ed1c6a84f50552c/robosuite/models/assets/arenas/bins_arena.xml" target="_blank" rel="noopener">MIT</a></li>
             <li><b>Conveyor</b><span>MuJoCo maintainer recipe, issue 547</span><a class="lic" href="https://github.com/google-deepmind/mujoco/issues/547" target="_blank" rel="noopener">Apache-2.0</a></li>
@@ -198,7 +195,7 @@
           <div class="mrole">Planner and critic</div>
           <div class="mlist">
             <div class="m live"><b>OpenAI</b><span>Parses the task, writes the success check, reads failures.</span><i class="status live">Live</i></div>
-            <div class="m soon"><b>Llama by Meta</b><span>Llama API as a second planner and critic. A provider switch exists in the code and is switched off. Not integrated yet.</span><i class="status soon">Planned</i></div>
+            <div class="m live"><b>Llama by Meta</b><span>Built with Llama: a provider switch (VLA_FORGE_LLM_PROVIDER=meta) sends the planner and critic to the Llama API. The app labels the model that answered each task.</span><i class="status live">Switchable</i></div>
           </div>
         </div>
         <div class="mrow">
@@ -217,8 +214,8 @@
   <section class="closer">
     <div class="wrap">
       <span class="mascot lg" data-follow aria-hidden="true"></span>
-      <h2 class="rv">What should the line <em>learn</em>?</h2>
-      <p class="sub rv">Type a task, or a whole line. The forge does the rest and shows its work.</p>
+      <h2 class="rv">What should the arm <em>learn</em>?</h2>
+      <p class="sub rv">Type a task, or ask for more than one arm. The forge shows its work as it goes.</p>
       <a class="cta big rv" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
     </div>
   </section>
@@ -227,7 +224,7 @@
 <footer class="lp-foot">
   <div class="wrap">
     <span>VLA Forge. Everything robotic on this page is in simulation.</span>
-    <span class="fl"><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a><a href="https://github.com/fetchai/uAgents" target="_blank" rel="noopener">uAgents</a></span>
+    <span class="fl"><span>Built with Llama</span><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a><a href="https://github.com/fetchai/uAgents" target="_blank" rel="noopener">uAgents</a></span>
   </div>
 </footer>
 
