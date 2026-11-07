@@ -27,6 +27,7 @@ import mujoco
 import numpy as np
 
 from .assets_sources import REPO
+from .sim.display import CONCRETE, FLOOR, STEEL
 
 LIB = REPO / "assets" / "library"
 SCENES = REPO / "scenes"
@@ -39,6 +40,17 @@ def load_description(name: str) -> dict:
 
 def _quat_z(yaw: float) -> list[float]:
     return [math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2)]
+
+
+def _has_cutout(path) -> bool:
+    from PIL import Image
+
+    """A texture drawn with transparent holes (alpha), or one whose holes were flattened to black by the converter."""
+    with Image.open(path) as im:
+        if im.mode in ("RGBA", "LA"):
+            return im.getchannel("A").getextrema()[0] < 200
+        grey = np.asarray(im.convert("L"))
+        return bool((grey < 14).mean() > 0.5)
 
 
 class _Assets:
@@ -62,8 +74,21 @@ class _Assets:
                 type=mujoco.mjtTexture.mjTEXTURE_2D,
                 file=str(folder / t.get("file")),
             )
+        cutout = {
+            t.get("name")
+            for t in asset.findall("texture")
+            if _has_cutout(folder / t.get("file"))
+        }
         for m in asset.findall("material"):
             kw = {}
+            if m.get("texture") in cutout:
+                # chain-link and the like: MuJoCo draws no alpha cut-outs, so the screen becomes a clear panel
+                self.spec.add_material(
+                    name=f"{tag}/{m.get('name')}",
+                    rgba=[0.78, 0.84, 0.9, 0.22],
+                    specular=0.5,
+                )
+                continue
             if m.get("texture"):
                 kw["textures"] = ["", f"{tag}/{m.get('texture')}"]
             self.spec.add_material(
@@ -85,6 +110,7 @@ class _Assets:
                 name=f"{tag}/{mesh}",
                 file=str(folder / file),
                 scale=[scale] * 3,
+                inertia=mujoco.mjtMeshInertia.mjMESH_INERTIA_SHELL,
             )
             visual.append(
                 {"mesh": f"{tag}/{mesh}", "material": f"{tag}/{g.get('material')}"}
@@ -146,22 +172,16 @@ def dress(spec: mujoco.MjSpec, name: str) -> None:
     assets = _Assets(spec)
 
     floor = cell["floor"]
-    env = LIB / "env"
-    spec.add_texture(
-        name="concrete_tex",
-        type=mujoco.mjtTexture.mjTEXTURE_2D,
-        file=str(env / "floor_diff.png"),
-    )
     spec.add_material(
         name="concrete_mat",
-        textures=["", "concrete_tex"],
-        texuniform=True,
-        texrepeat=[floor["repeat"]] * 2,
-        specular=floor.get("specular", 0.25),
-        shininess=floor.get("shininess", 0.4),
-        reflectance=floor.get("reflectance", 0.04),
+        rgba=list(FLOOR),
+        specular=floor.get("specular", 0.3),
+        shininess=floor.get("shininess", 0.5),
+        reflectance=floor.get("reflectance", 0.12),
     )
-    next(g for g in spec.geoms if g.name == "floor").material = "concrete_mat"
+    ground = next(g for g in spec.geoms if g.name == "floor")
+    ground.material = "concrete_mat"
+    ground.size = [8.0, 8.0, 0.1]  # out to the walls
 
     for i, lamp in enumerate(cell.get("lights", [])):
         world.add_light(
@@ -179,7 +199,189 @@ def dress(spec: mujoco.MjSpec, name: str) -> None:
         assets.attach(
             body, p["id"], p.get("scale", 1.0), yaw=math.radians(p.get("yaw", 0.0))
         )
+    _add_frame(spec, assets, cell)
     _add_product(spec, assets, cell)
+    _add_belt_items(spec, assets, cell)
+
+
+# ---------------------------------------------------------------- the workcell frame
+
+PITCH = 1.2  # metres between the two arms along the belt
+
+
+def _box(parent, pos, half, rgba, mat=None, group=VIS_GROUP):
+    kw = {"material": mat} if mat else {"rgba": list(rgba)}
+    parent.add_geom(
+        type=mujoco.mjtGeom.mjGEOM_BOX,
+        pos=list(pos),
+        size=list(half),
+        group=group,
+        contype=0,
+        conaffinity=0,
+        density=0,
+        **kw,
+    )
+
+
+def _cyl(parent, pos, radius, half_len, axis, mat):
+    q = {"x": [0.7071, 0, 0.7071, 0], "y": [0.7071, -0.7071, 0, 0]}[axis]
+    parent.add_geom(
+        type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+        pos=list(pos),
+        quat=q,
+        size=[radius, half_len, 0],
+        material=mat,
+        group=VIS_GROUP,
+        contype=0,
+        conaffinity=0,
+        density=0,
+    )
+
+
+def _add_frame(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
+    """Aluminium-extrusion table, conveyor frame with rollers, tabletop guard panels, a parts bin and the walls.
+
+    The table and the belt in the physics are unchanged; this adds the structure around them for a line of two
+    cells (the table and belt visuals run on to the second arm). Plain boxes and cylinders for the extrusions and
+    rollers; the guard panels and bin are library models.
+    """
+    fr = cell.get("frame")
+    if not fr:
+        return
+    world = spec.worldbody
+    y0, y1 = -0.6, PITCH * (fr.get("cells", 2) - 1) + 0.6
+    x0, x1 = -0.25, 0.65
+    spec.add_material(
+        name="alu", rgba=[0.80, 0.815, 0.835, 1], specular=0.7, shininess=0.55
+    )
+    spec.add_material(
+        name="wall_mat", rgba=[0.86, 0.87, 0.885, 1], specular=0.05, emission=0.55
+    )
+    spec.add_material(name="top_mat", rgba=list(CONCRETE), specular=0.15)
+
+    # the table top runs on past the first cell
+    _box(
+        world,
+        [(x0 + x1) / 2, (0.6 + y1) / 2, -0.02],
+        [(x1 - x0) / 2, (y1 - 0.6) / 2, 0.02],
+        CONCRETE,
+        "top_mat",
+    )
+    # extrusion frame: legs, a skirt just under the top, a low shelf
+    leg = 0.022
+    for x in (x0 + leg, x1 - leg):
+        for y in (y0 + leg, (y0 + y1) / 2, y1 - leg):
+            _box(world, [x, y, -0.40], [leg, leg, 0.35], STEEL, "alu")
+    for x in (x0 + leg, x1 - leg):
+        _box(world, [x, (y0 + y1) / 2, -0.062], [leg, (y1 - y0) / 2, leg], STEEL, "alu")
+    for y in (y0 + leg, y1 - leg):
+        _box(world, [(x0 + x1) / 2, y, -0.062], [(x1 - x0) / 2, leg, leg], STEEL, "alu")
+
+    # the conveyor: side rails, end rollers, a roller bed, legs to the floor past the table
+    bx, hw = 0.245, 0.035
+    by0, by1 = -0.95, PITCH * (fr.get("cells", 2) - 1) + 0.95
+    cy, hl = (by0 + by1) / 2, (by1 - by0) / 2
+    for side in (-1, 1):
+        _box(
+            world,
+            [bx + side * (hw + 0.007), cy, 0.006],
+            [0.007, hl, 0.014],
+            STEEL,
+            "alu",
+        )
+    _box(world, [bx, cy, -0.0035], [hw, hl, 0.0015], STEEL, "alu")
+    for y in np.arange(by0 + 0.03, by1, 0.06):
+        _cyl(world, [bx, float(y), -0.0045], 0.004, hw, "x", "alu")
+    for y in (by0, by1):
+        _cyl(world, [bx, y, -0.001], 0.009, hw + 0.002, "x", "alu")
+    for y in (by0 + 0.03, by1 - 0.03):
+        for side in (-1, 1):
+            _box(
+                world,
+                [bx + side * (hw + 0.007), y, -0.38],
+                [0.008, 0.008, 0.37],
+                STEEL,
+                "alu",
+            )
+    # the belt's visible surface continues over the whole run (the physics belt is the stretch in each cell)
+    spec.add_texture(
+        name="belt_tex",
+        type=mujoco.mjtTexture.mjTEXTURE_2D,
+        builtin=mujoco.mjtBuiltin.mjBUILTIN_CHECKER,
+        rgb1=[0.10, 0.105, 0.115],
+        rgb2=[0.15, 0.155, 0.165],
+        width=16,
+        height=16,
+    )
+    spec.add_material(
+        name="belt_vis", textures=["", "belt_tex"], texrepeat=[1, 60], specular=0.1
+    )
+    _box(world, [bx, cy, -0.0008], [hw, hl, 0.0012], None, "belt_vis")
+
+    # guard panels along the back and the far end (real library fence, scaled to the tabletop)
+    for i, p in enumerate(fr.get("guards", [])):
+        body = world.add_body(name=f"guard{i}", pos=p["pos"])
+        assets.attach(
+            body,
+            "chainlink_fence",
+            p.get("scale", 0.12),
+            yaw=math.radians(p.get("yaw", 0.0)),
+        )
+    # the same key and fill lights as sim/scene.py gives the first cell, repeated over each further arm
+    for k in range(1, fr.get("cells", 2)):
+        dy = PITCH * k
+        world.add_light(
+            name=f"key{k}",
+            pos=[0.4, -0.4 + dy, 1.4],
+            dir=[-0.3, 0.3, -1.0],
+            diffuse=[0.8] * 3,
+            specular=[0.2] * 3,
+            castshadow=True,
+        )
+        world.add_light(
+            name=f"fill{k}",
+            pos=[-0.3, 0.5 + dy, 1.2],
+            dir=[0.3, -0.4, -1.0],
+            diffuse=[0.35] * 3,
+            castshadow=False,
+        )
+    # walls and a back drop, so the room is lit and closed instead of a black void
+    wz = 1.25
+    for pos, half in (
+        ([-2.2, 0.6, wz], [0.05, 6.0, 2.0]),
+        ([4.0, 0.6, wz], [0.05, 6.0, 2.0]),
+        ([0.9, -3.0, wz], [4.5, 0.05, 2.0]),
+        ([0.9, 4.2, wz], [4.5, 0.05, 2.0]),
+    ):
+        _box(world, pos, half, None, "wall_mat")
+
+
+def _add_belt_items(spec: mujoco.MjSpec, assets: _Assets, cell: dict) -> None:
+    """Cassette players riding the belt: unassembled upstream of the cells, finished downstream (visual only)."""
+    items = (cell.get("frame") or {}).get("belt_items")
+    belt = next((b for b in spec.bodies if b.name == "belt"), None)
+    if not items or belt is None:
+        return
+    desc = cell["product"]
+    sc = desc["scale"]
+    parts = json.loads((LIB / "product.json").read_text())["parts"]
+    for i, it in enumerate(items):
+        holder = belt.add_body(
+            name=f"belt_item{i}",
+            pos=[0.0, it["y"], 0.003 + 0.0015 + it.get("z", 0.0)],
+            quat=_quat_z(math.radians(it.get("yaw", 0.0))),
+        )
+        for p in parts:
+            off = np.array(p["offset"], float)
+            if not it.get("done", True):
+                off = off + np.array(
+                    {"cassette": desc["cassette_lift"], "lid": desc["lid_lift"]}.get(
+                        p["role"], [0, 0, 0]
+                    ),
+                    float,
+                )
+            body = holder.add_body(name=f"belt_item{i}_{p['role']}", pos=list(off * sc))
+            assets.attach(body, p["id"], sc)
 
 
 def bind_product(scene, name: str) -> ProductDriver | None:
