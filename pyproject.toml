@@ -15,7 +15,6 @@ dependencies = [
     "pillow>=13.0.0",
     "torch>=2.15.0",
     "transformers>=5.22.1",
-    "uagents>=0.26.1",
     "uvicorn[standard]>=0.54.0",
 ]
 

@@ -1,4 +1,4 @@
-"""FastAPI server: the one-page UI, a JSON API and the server-sent event stream. Agents run in the same loop.
+"""FastAPI server: the one-page UI, a JSON API and the server-sent event stream. The pipeline runs in the same loop.
 
 VLA_FORGE_TIMED=1 HF_HUB_OFFLINE=1 scripts/heavy.sh uv run vla-forge     # http://127.0.0.1:8100
 """
@@ -9,7 +9,7 @@ import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,11 +18,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
 from . import agents_api, factory, optimizer_api, tiles
 from .agents import Forge as Agents
-from .agents import register_on_agentverse
+from .agents import describe_run_reply, run_once
 from .pipeline import FORGE
 from .sim import robots as R
 from .sim.scene import Layout
@@ -40,25 +39,13 @@ async def lifespan(app: FastAPI):
     FORGE.loop = loop
     AGENTS = Agents(loop)
     agents_api.HOLD["agents"] = AGENTS
-    task = loop.create_task(AGENTS.start())
     await asyncio.to_thread(FORGE.warm)
-    registered = await asyncio.to_thread(register_on_agentverse, AGENTS)
-    AGENTS.registered = list(registered)
-    FORGE.emit(
-        "",
-        "agents",
-        "",
-        agents={n: a.address for n, a in AGENTS.agents.items()},
-        agentverse=list(registered),
-    )
+    FORGE.emit("", "agents", "", models=await asyncio.to_thread(AGENTS.models))
     yield
-    task.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(
-    agents_api.router
-)  # first: its /api/optimizer/start goes through the agents
+app.include_router(agents_api.router)
 app.include_router(optimizer_api.router)
 
 
@@ -95,7 +82,6 @@ def state():
         "active": AGENTS.active,
         "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
         "skills": [s.__dict__ for s in FORGE.registry.ordered()],
-        "agents": {n: a.address for n, a in AGENTS.agents.items()},
     }
 
 
@@ -288,28 +274,10 @@ def rollout(rid: str, rnd: int, index: int):
 
 @app.post("/api/skills/{sid}/run")
 async def run_skill(sid: str):
-    """Call a published skill's own agent over the chat protocol, as any other agent would."""
-    assert AGENTS is not None
-    name = f"skill-{sid}"
-    if name not in AGENTS.agents:
-        _404()
-    fut = AGENTS.loop.create_future()
-    key = f"skill:{uuid4().hex[:8]}"
-    AGENTS.pending_skill[AGENTS.agents[name].address] = (key, fut)
-    gw = AGENTS.agents["gateway"]
-    await gw._build_context().send(
-        AGENTS.agents[name].address,
-        ChatMessage(
-            timestamp=datetime.now(UTC),
-            msg_id=uuid4(),
-            content=[TextContent(type="text", text="run")],
-        ),
-    )
-    try:
-        reply = await asyncio.wait_for(fut, 120)
-    except TimeoutError:
-        raise HTTPException(504, "skill agent did not answer") from None
-    return {"reply": reply}
+    """Run a saved skill once in a fresh random scene and say what happened."""
+    sk = _skill(sid)
+    res = await asyncio.to_thread(run_once, sk)
+    return {"reply": describe_run_reply(sk, res)}
 
 
 @app.post("/api/capture")
