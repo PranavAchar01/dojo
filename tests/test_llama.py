@@ -8,6 +8,12 @@ from vla_forge import llama, llm
 SCHEMA = {"type": "object", "properties": {"a": {"type": "string"}}}
 
 
+@pytest.fixture(autouse=True)
+def free_credit(monkeypatch, tmp_path):
+    monkeypatch.setenv("VLA_FORGE_META_CREDITS", "1")
+    monkeypatch.setattr(llama, "SPEND", tmp_path / "meta-spend.json")
+
+
 def test_client_sends_the_documented_request():
     seen = {}
 
@@ -177,3 +183,37 @@ def test_both_backends_failing_ends_on_the_stub(monkeypatch):
         "task", "s", "put the green block in the back-right slot of the tray", {}
     )
     assert backend == "stub"
+
+
+def test_meta_stays_off_without_the_free_credit_and_past_the_cap(monkeypatch):
+    calls = []
+
+    def meta(req: httpx.Request) -> httpx.Response:
+        calls.append("meta")
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": '{"a": "m"}'}}],
+                "usage": {"prompt_tokens": 1000, "completion_tokens": 1000},
+            },
+        )
+
+    monkeypatch.setattr(llama, "_DEAD", set())
+    monkeypatch.setattr(llama, "api_key", lambda: "ok")
+    monkeypatch.setattr(llama, "openai_key", lambda: None)
+    real_llama = llama.LlamaClient
+    monkeypatch.setattr(
+        llama, "LlamaClient", lambda key: real_llama(key, http=_mock(meta))
+    )
+    monkeypatch.delenv("VLA_FORGE_META_CREDITS")
+    assert llama.live_backends() == [] and calls == []
+    monkeypatch.setenv("VLA_FORGE_META_CREDITS", "1")
+    _raw, _model, backend = llama.chat_json_ex(
+        "plan", "s", "u", SCHEMA, backends=["meta"]
+    )
+    assert backend.startswith("meta:") and llama.meta_spent() == pytest.approx(0.002)
+    monkeypatch.setattr(llama, "CREDIT_CAP_USD", 0.001)
+    _raw, _model, backend = llama.chat_json_ex(
+        "plan", "s", "u", SCHEMA, backends=["meta"]
+    )
+    assert backend == "stub" and len(calls) == 1

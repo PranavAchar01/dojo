@@ -106,6 +106,7 @@ class LlamaClient:
         )
         r.raise_for_status()
         body = r.json()
+        _charge(body.get("usage") or {}, system + user)
         # OpenAI-compatible shape; the native /v1/chat/completions nests the text under completion_message
         if "choices" in body:
             text = body["choices"][0]["message"]["content"]
@@ -243,15 +244,45 @@ _DEAD: set[str] = (
 )  # backends that refused their key this process (tested once, not every call)
 
 
+# Meta runs on the hackathon's free $100 credit only. Calls stay off until VLA_FORGE_META_CREDITS=1 (set once the
+# credit shows under Billing > free credits), and stop for good once the estimated spend reaches the cap. Prices are
+# set above Llama 4 Maverick's list price so the estimate runs high.
+CREDIT_CAP_USD = float(os.environ.get("VLA_FORGE_META_CAP_USD", "80"))
+PRICE_IN, PRICE_OUT = 0.50 / 1e6, 1.50 / 1e6
+SPEND = RUNS / "meta-spend.json"
+
+
+def meta_spent() -> float:
+    try:
+        return float(json.loads(SPEND.read_text())["usd"])
+    except (OSError, ValueError, KeyError):
+        return 0.0
+
+
+def _charge(usage: dict, prompt: str) -> None:
+    tin = usage.get("prompt_tokens") or len(prompt) // 3
+    tout = usage.get("completion_tokens") or 1000
+    usd = meta_spent() + tin * PRICE_IN + tout * PRICE_OUT
+    SPEND.parent.mkdir(parents=True, exist_ok=True)
+    SPEND.write_text(json.dumps({"usd": round(usd, 4), "cap": CREDIT_CAP_USD}))
+
+
+def meta_allowed() -> bool:
+    return (
+        os.environ.get("VLA_FORGE_META_CREDITS") == "1"
+        and meta_spent() < CREDIT_CAP_USD
+    )
+
+
 def _meta_alive(key: str) -> bool:
-    """One cheap call to find out whether the Meta key works; a 401 or 403 retires the backend for this process."""
-    if "meta" in _DEAD:
+    """One cheap call to find out whether the Meta key works; a 401, 402 or 403 retires the backend for this process."""
+    if "meta" in _DEAD or not meta_allowed():
         return False
     try:
         LlamaClient(key).chat_json("Reply with JSON.", "ping", {"type": "object"})
         return True
     except httpx.HTTPStatusError as e:
-        if e.response.status_code in (401, 403):
+        if e.response.status_code in (401, 402, 403):
             _DEAD.add("meta")
             return False
         return True  # a transient server error is not a dead key
@@ -289,6 +320,8 @@ def chat_json_ex(
 ) -> tuple[dict, str, str]:
     """(parsed JSON, display model, backend that really answered). Live backends first, then the stub."""
     for name in backends or live_backends():
+        if name == "meta" and not meta_allowed():
+            continue
         try:
             c, label = _client(name)
             if images and name == "openai":
@@ -297,7 +330,7 @@ def chat_json_ex(
                 raw = c.chat_json(system, user, schema)
             return raw, MODEL, label
         except httpx.HTTPStatusError as e:
-            if name == "meta" and e.response.status_code in (401, 403):
+            if name == "meta" and e.response.status_code in (401, 402, 403):
                 _DEAD.add("meta")
         except (httpx.HTTPError, ValueError, KeyError, IndexError):
             pass
