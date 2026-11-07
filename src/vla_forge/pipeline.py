@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import re
 import threading
 import time
@@ -40,7 +41,8 @@ from .sim.scene import Layout, Scene
 from .sim.tasks import TIER, TaskSpec, sample_layout
 from .viz import export_scene, preview
 
-DEADLINE = 172.0  # seconds from prompt to published skill (the brief's budget is 180)
+# seconds from prompt to published skill (the brief's budget is 180); VLA_FORGE_DEADLINE overrides it for long-budget runs
+DEADLINE = float(os.environ.get("VLA_FORGE_DEADLINE", "172"))
 TARGET = 0.8
 EVAL_N = 20
 FIRST_DEMOS = 60
@@ -398,9 +400,9 @@ class Forge:
         if run.parent:
             return step_layout(self.runs[run.parent].steps, run.step_index, rng)
         if run.station:
-            from .sim.line import station_layout
+            from . import factory
 
-            return station_layout(run.spec.obj, run.spec.target or "gray", rng)
+            return factory.train_layout(run.station, rng)
         return sample_layout(run.spec, rng)
 
     def scene(self, run: Run) -> dict:

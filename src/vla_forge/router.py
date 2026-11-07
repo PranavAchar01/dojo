@@ -28,6 +28,7 @@ import numpy as np
 from .compose import MAX_STEPS, Step
 from .compose import sample_layout as compose_layout
 from .registry import BASE_PATH, ROBOT, Registry
+from .sim.props import PROP_COLORS
 from .sim.robots import is_default, robot_feasibility
 from .sim.robots import label as robot_label
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS, Layout, Scene
@@ -42,7 +43,14 @@ CHAIN_BUDGET_S = 400.0  # a chain that needs longer than this is split into tile
 REACH_LAYOUTS = 4  # sampled scenes the reachability check solves IK in
 REACH_TOL = 0.008  # metres: IK residual that still counts as reached
 
-PALETTE = {"block": BLOCK_COLORS, "bowl": BOWL_COLORS, "square": PAD_COLORS}
+PALETTE = {
+    "block": BLOCK_COLORS,
+    "bowl": BOWL_COLORS,
+    "square": PAD_COLORS,
+    "tray": PROP_COLORS,
+    "socket": PROP_COLORS,
+    "slot": {},
+}
 # words the offline parser recognises as colours or as the scene's objects (the LLM path reports them itself)
 COLOR_WORDS = set(BLOCK_COLORS) | set(BOWL_COLORS) | set(PAD_COLORS) | {
     "brown", "grey", "gray", "cyan", "magenta", "violet", "teal", "gold", "silver", "beige", "navy",
@@ -51,7 +59,8 @@ COLOR_WORDS = set(BLOCK_COLORS) | set(BOWL_COLORS) | set(PAD_COLORS) | {
 NOUNS = {
     "block": "block", "blocks": "block", "cube": "block", "cubes": "block", "brick": "block",
     "bowl": "bowl", "bowls": "bowl", "square": "square", "squares": "square", "pad": "square",
-    "pads": "square", "tape": "square",
+    "pads": "square", "tape": "square", "tray": "tray", "trays": "tray", "socket": "socket",
+    "sockets": "socket", "slot": "slot", "slots": "slot",
 }  # fmt: skip
 FILLER = {
     "and",
@@ -203,6 +212,7 @@ def check_reach(parsed: TaskSpec | list[Step], seed: int = 0) -> Check:
         pts = [(x, y, HOVER_Z) for _c, x, y, _yaw in lay.blocks.values()]
         pts += [(x, y, RELEASE_Z) for _c, x, y in {**lay.bowls, **lay.bins}.values()]
         pts += [(x, y, PUSH_Z) for _c, x, y in lay.pads.values()]
+        pts += [(v[2], v[3], RELEASE_Z) for v in lay.props.values()]
         for x, y, z in pts:
             _q, err = ik.solve(np.array([x, y, z]), q0, iters=150)
             worst = max(worst, err)
@@ -347,6 +357,9 @@ SKILL_VERB = {
     "lift": "pick up a block",
     "pick_place": "pick and place a block",
     "stack": "stack blocks",
+    "kit": "put a block in a tray slot",
+    "insert": "insert a block into a socket",
+    "rotate": "rotate a block into a diamond socket",
 }
 
 
