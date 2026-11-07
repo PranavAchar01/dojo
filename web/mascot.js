@@ -36,7 +36,7 @@ const $ = (s) => document.querySelector(s);
 
 // ---------------------------------------------------------------- what each stage looks like
 // [state, activity, line while it runs, line when it finishes]
-const STAGE = {
+export const STAGE = {
   task: ["thinking", "think", "Reading the task", "Task parsed"],
   router: ["thinking", "think", "Routing the task", "Routed"],
   planner: ["thinking", "think", "Planning the steps", "Plan ready"],
@@ -75,8 +75,40 @@ export const TARGET = {
 export const roamer = createRoamer({ mountBot, slot: document.querySelector(".ag-pill-eyes") });
 let visitSeq = 0;
 export function goTo(sel, o = {}) { visitSeq++; return roamer.visit(sel, o); }
+
+// ---------------------------------------------------------------- the loading screen: reps in empty space
+// While a stage runs and the area it will fill is still empty (the sim floor before the scene, the loss chart before
+// the first step), the bot trains there instead of pointing at nothing. The caption is the stage's own words and the
+// rail's real metric, nothing else. As soon as content lands, it leaves.
+let optAt = 0; // the last optimizer event from the stream: a saved run that is not running must not look live
+const optLive = () => (optAt > 0 && performance.now() - optAt < 20000) || !!document.querySelector("#optimizer-root .opt-live, #optimizer-root [data-live='1']");
+const shown = (n) => { if (!n || !n.isConnected) return false; const r = n.getBoundingClientRect(); return r.width > 40 && r.height > 40 && !n.closest(".hidden"); };
+function workspaceFor(k) {
+  const sim = $("#view-sim"), loss = $("#loss"), lossSec = $("#loss-sec");
+  const phone = innerWidth < 760;
+  const simFree = sim && sim.classList.contains("blank") && shown(sim) && !$("#boot:not(.gone)");
+  const lossFree = loss && lossSec && lossSec.dataset.empty === "1" && shown(loss) && !$(".app.no-right, .app.immersive");
+  if (k === "trainer" && lossFree) return { el: loss, inset: { l: 2, r: 2, t: 2, b: 2 } };
+  if (simFree && (k === "task" || k === "router" || k === "planner" || k === "scene" || k === "data" || k === "trainer"))
+    return { el: sim, inset: phone ? { l: 10, r: 10, t: 40, b: 272 } : { l: 64, r: 104, t: 56, b: 96 } };
+  return null;
+}
+function captionFor(k) {
+  const m = ($(`#rail li[data-stage="${k}"] .m`)?.textContent || "").trim();
+  return STAGE[k] ? STAGE[k][2] + (m ? ` · ${m}` : "") : "";
+}
+function updateWork() {
+  const k = liveStage();
+  const ws = k && workspaceFor(k);
+  if (!ws) { if (roamer.working) { roamer.stopWork(); if (k && TARGET[k]) goTo(TARGET[k], { dwell: 0 }); } return false; }
+  if (roamer.working && roamer.working !== ws.el) roamer.stopWork(true);
+  if (!roamer.working) { visitSeq++; dropBubble(0); }
+  roamer.work(ws.el, { caption: captionFor(k), inset: ws.inset });
+  return true;
+}
+setInterval(updateWork, 900);
 export function say(text, ms = 3200) { showBubble(text, { id: "say", done: true }); dropBubble(ms); }
-export function goHomeSoon(ms = 1800) { const n = ++visitSeq; setTimeout(() => { if (n === visitSeq) roamer.home(); }, ms); }
+export function goHomeSoon(ms = 1800) { const n = ++visitSeq; setTimeout(() => { if (n === visitSeq && !roamer.working) roamer.home(); }, ms); }
 
 // a still of the idle face as markup, for places that cannot run script
 export function mascotSVG() {
@@ -138,7 +170,7 @@ function holdState(state, ms) {
 }
 function liveStage() {
   let key = null;
-  for (const li of document.querySelectorAll("#rail li.live")) { const k = li.dataset.stage; if (k && ORDER.indexOf(k) >= ORDER.indexOf(key)) key = k; }
+  for (const li of document.querySelectorAll("#rail li.live")) { const k = li.dataset.stage; if (k === "optimizer" && !optLive()) continue; if (k && ORDER.indexOf(k) >= ORDER.indexOf(key)) key = k; }
   return key;
 }
 function compute() {
@@ -176,7 +208,7 @@ const ICON_DONE = '<svg viewBox="0 0 16 16"><path d="m4.2 8.4 2.5 2.5 5.1-5.6" f
 const ICON_FAIL = '<svg viewBox="0 0 16 16"><path d="m5 5 6 6M11 5l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 let layer = null, bub = null, bubT = 0;
 function anchorBot() {
-  const vis = (b) => { const r = b.host.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; };
+  const vis = (b) => { if (getComputedStyle(b.host.closest(".rb") || b.host).visibility === "hidden") return false; const r = b.host.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; };
   const f = followers().filter(vis);
   return f.find((b) => b.host === roamer.host) || f.find((b) => b.host.matches(".lg, .xl")) || f[0] || null;
 }
@@ -200,7 +232,7 @@ function showBubble(text, { id = null, done = false, failed = false } = {}) {
   const below = r.top < 110, H = 64, W = 360;
   const left = Math.max(8, Math.min(r.left + r.width / 2 - 30, innerWidth - W - 8));
   L.root.style.left = left + "px";
-  L.root.style.top = (below ? r.bottom + 8 : r.top - 8 - H) + "px";
+  L.root.style.top = (below ? r.bottom + 8 : r.top - 22 - H) + "px"; // Dojo: clear the antenna and headband
   if (!bub) {
     const c = document.createElement("div");
     L.bubs.append(c);
@@ -238,7 +270,15 @@ tick(() => {
     const r = bub.bot.host.getBoundingClientRect();
     const L0 = parseFloat(layer.root.style.left) || 0;
     const tx = Math.max(8 - L0, Math.min(innerWidth - 368 - L0, r.left - bub.base.x));
-    layer.root.style.translate = `${tx.toFixed(1)}px ${(r.top - bub.base.y).toFixed(1)}px`;
+    // Dojo: slide left off anything marked keep-clear (the stage rail, badges) instead of covering it
+    const c = bub.c.getBoundingClientRect(), x0 = c.left + (bub.kx || 0), x1 = x0 + c.width;
+    let kx = 0;
+    if (c.width) for (const k of document.querySelectorAll("[data-keepclear]")) {
+      const q = k.getBoundingClientRect();
+      if (q.width && c.top < q.bottom && c.bottom > q.top && x1 > q.left && x0 < q.right) kx = Math.max(kx, Math.min(x1 - q.left + 8, x0 - 8));
+    }
+    bub.kx = kx;
+    layer.root.style.translate = `${(tx - kx).toFixed(1)}px ${(r.top - bub.base.y).toFixed(1)}px`;
   }
   return true;
 });
@@ -258,6 +298,9 @@ function watchRail() {
     prev[k] = st;
     if (!STAGE[k]) continue;
     if (st === "live") {
+      // a saved optimizer run reported as running is not live unless the stream says so
+      if (k === "optimizer" && !optLive()) continue;
+      if (updateWork()) continue;
       showBubble(STAGE[k][2], { id: k });
       if (TARGET[k]) goTo(TARGET[k], { dwell: 0 });
     } else if (st === "done" && was === "live") {
@@ -265,7 +308,8 @@ function watchRail() {
       showBubble(line, { id: k, done: true }); dropBubble(650);
       each((b) => b.eyes.react("nod"));
       goHomeSoon(k === "registry" ? 2600 : 2200);
-      if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); }
+      if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); setTimeout(() => roamer.bow(), 500); setTimeout(rankBelt, 1500); }
+      if (k === "optimizer" && !optLive()) continue;
       if (k === "critic" && /retrain/i.test(m)) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); }
     } else if (st === "fail") {
       failAt = performance.now();
@@ -347,6 +391,7 @@ $("#prompt-form")?.addEventListener("submit", () => {
 // ---------------------------------------------------------------- the SSE stream the app re-broadcasts
 addEventListener("forge:event", (ev) => {
   const e = ev.detail || {};
+  if (typeof e.kind === "string" && e.kind.startsWith("opt_")) optAt = performance.now();
   if (e.kind === "error" && !e.child) { each((b) => b.eyes.react("squish")); holdState("error", 0); showBubble("Something broke", { id: "err", failed: true }); dropBubble(1600); }
   else if (e.kind === "rejected" || (e.kind === "route" && e.refused)) { each((b) => b.eyes.emote("wince")); holdState("confused", 4000); }
   else if (e.kind === "reused") { each((b) => { b.eyes.emote("pleased"); b.wobble(0.8); }); holdState("success", 2500); }
@@ -378,6 +423,23 @@ function showreel() {
   };
   setTimeout(step, 2800);
 }
+
+// ---------------------------------------------------------------- the belt: white to black as the library's skills pass
+const BELT_AT = [0, 1, 3, 6, 10, 20, 40];
+let beltRank = -1;
+async function rankBelt() {
+  if (!$("#rail")) return;
+  try {
+    const lib = await (await fetch("/api/library")).json();
+    const n = (lib.tiles || []).length;
+    const rank = BELT_AT.reduce((r, at, i) => (n >= at ? i : r), 0);
+    if (beltRank >= 0 && rank > beltRank) { roamer.bow(); say("Belt up", 2600); }
+    beltRank = rank;
+    roamer.setBelt(rank);
+    roamer.root.title = `${n} skill${n === 1 ? "" : "s"} passed`;
+  } catch { /* the server is still warming up; the belt stays white */ }
+}
+setTimeout(rankBelt, 1200);
 
 // ---------------------------------------------------------------- go
 decorate(document);
