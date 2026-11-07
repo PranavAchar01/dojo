@@ -294,5 +294,5 @@ def for_spec(spec, robot_id: str) -> dict:
         robot_id,
         list(toolbox.ALL_TOOLS),
         toolbox.TOOLBOX,
-        container_xy=toolbox.BOX_CENTRE,
+        container_xy=toolbox.box_centre(),
     )
