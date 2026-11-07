@@ -12,9 +12,10 @@
 Every published skill becomes its own agent (skill-<name>) that speaks the chat protocol: send it "run" and it
 executes its policy in a fresh random scene and answers with the measured outcome.
 
-Agentverse: everything runs locally. When AGENTVERSE_API_KEY and VLA_FORGE_PUBLIC_URL (a public https URL that
-forwards to the bureau port) are set, `register_on_agentverse` registers the task agent and each skill agent
-with the chat protocol so ASI:One can reach them. No key is created or stored by this code.
+Agentverse: everything runs locally. When AGENTVERSE_API_KEY is set, `register_on_agentverse` registers the task agent
+("VLA Forge") and the optimizer ("VLA Forge Optimizer") through the uAgents mailbox, so nothing on this machine is exposed to
+the internet; with VLA_FORGE_PUBLIC_URL set instead, they register at that endpoint. The skill agents stay local.
+No key is created or stored by this code.
 """
 
 from __future__ import annotations
@@ -208,6 +209,10 @@ class Forge:
         self.pending_skill: dict[str, tuple[str, asyncio.Future]] = {}
         self.pending_opt: dict[str, asyncio.Future] = {}
         self.registered: list[str] = []
+        self.av_names: dict[str, str] = {}
+        self.av_error = ""
+        # with his key set and no public URL, the gateway-facing agents are reached through the Agentverse mailbox
+        self.mailbox = bool(os.environ.get("AGENTVERSE_API_KEY")) and not public
         self.run_lock = asyncio.Lock()
         self.active = ""
         patch_send()
@@ -254,6 +259,7 @@ class Forge:
         a = Agent(
             name=name,
             seed=_seed(name),
+            mailbox=self.mailbox and name in AGENTVERSE_AGENTS,
             loop=self.loop,
             log_level="WARNING",
             enable_agent_inspector=False,
@@ -1104,9 +1110,13 @@ class Forge:
             "agentverse": {
                 "registered": sorted(self.registered),
                 "note": "registered on Agentverse: "
-                + ", ".join(sorted(self.registered))
+                + ", ".join(
+                    f"{self.av_names[n]} {self.agents[n].address}"
+                    for n in sorted(self.registered)
+                )
                 if self.registered
-                else "local Bureau, not registered on Agentverse",
+                else "local Bureau, not registered on Agentverse"
+                + (f" (error: {self.av_error})" if self.av_error else ""),
             },
         }
 
@@ -1177,29 +1187,69 @@ def run_once(skill: Skill) -> dict:
     return {"success": r.success, "failure": r.failure, "steps": r.steps}
 
 
-def register_on_agentverse(forge: Forge) -> list[str]:
-    """Register the task agent and every skill agent on Agentverse (needs his key and a public URL)."""
+AGENTVERSE_README = (
+    "# {name}\n\n"
+    "{what} It turns a sentence into a trained robot skill in MuJoCo simulation, "
+    "with orchestration by Fetch.ai uAgents and reasoning by Llama.\n\n"
+    "## Chat\n\n{how}\n"
+)
+# internal agent name -> (Agentverse name, what it is, how to talk to it)
+AGENTVERSE_AGENTS = {
+    "task": (
+        "VLA Forge",
+        "Send a short natural-language request such as 'have a robot pick up the red cube'.",
+        "Message this agent over the Agentverse chat protocol with the task in plain language.",
+    ),
+    "optimizer": (
+        "VLA Forge Optimizer",
+        "Improves a simulated manipulation policy one change per round, scored on held-out simulated scenes.",
+        "Message this agent over the Agentverse chat protocol to ask for an optimization run.",
+    ),
+}
+
+
+def register_on_agentverse(forge: Forge) -> dict[str, str]:
+    """Register the task agent and the optimizer on Agentverse through the mailbox.
+
+    Returns {internal name: address} for what registered; on failure sets forge.av_error instead.
+    """
     key = os.environ.get("AGENTVERSE_API_KEY")
-    if not key or not forge.endpoint:
-        return []
+    if not key or not (forge.mailbox or forge.endpoint):
+        return {}
+    from uagents_core.config import AgentverseConfig
+    from uagents_core.contrib.protocols.chat import chat_protocol_spec
+    from uagents_core.protocol import ProtocolSpecification
     from uagents_core.utils.registration import (
+        AgentverseRegistrationRequest,
         RegistrationRequestCredentials,
-        register_chat_agent,
+        register_agent,
     )
 
-    done = []
-    for name, ag in forge.agents.items():
-        if name != "task" and not name.startswith("skill-"):
-            continue
-        ok = register_chat_agent(
-            name=f"vla-forge-{name}",
-            endpoint=forge.endpoint[0],
-            active=True,
-            credentials=RegistrationRequestCredentials(
-                agentverse_api_key=key, agent_seed_phrase=_seed(name)
-            ),
-            description=ag._description if hasattr(ag, "_description") else None,
-        )
-        if ok:
-            done.append(name)
+    cfg = AgentverseConfig()
+    digest = ProtocolSpecification.compute_digest(chat_protocol_spec.manifest())
+    done: dict[str, str] = {}
+    for name, (title, what, how) in AGENTVERSE_AGENTS.items():
+        ag = forge.agents[name]
+        try:
+            req = AgentverseRegistrationRequest(
+                name=title,
+                endpoint=cfg.mailbox_endpoint if forge.mailbox else forge.endpoint[0],
+                type="mailbox" if forge.mailbox else "uagent",
+                protocols=[digest],
+                active=True,
+                description=what,
+                readme=AGENTVERSE_README.format(name=title, what=what, how=how),
+            )
+            register_agent(
+                req,
+                cfg,
+                RegistrationRequestCredentials(
+                    agentverse_api_key=key, agent_seed_phrase=_seed(name)
+                ),
+            )
+            done[name] = ag.address
+        except Exception as e:  # noqa: BLE001 - surfaced in the Agents view footer
+            forge.av_error = f"{title}: {e}".replace(key, "***")
+            break
+    forge.av_names = {n: AGENTVERSE_AGENTS[n][0] for n in done}
     return done

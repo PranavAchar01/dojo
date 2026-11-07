@@ -43,13 +43,13 @@ async def lifespan(app: FastAPI):
     task = loop.create_task(AGENTS.start())
     await asyncio.to_thread(FORGE.warm)
     registered = await asyncio.to_thread(register_on_agentverse, AGENTS)
-    AGENTS.registered = registered
+    AGENTS.registered = list(registered)
     FORGE.emit(
         "",
         "agents",
         "",
         agents={n: a.address for n, a in AGENTS.agents.items()},
-        agentverse=registered,
+        agentverse=list(registered),
     )
     yield
     task.cancel()
