@@ -29,9 +29,9 @@ CUES = [
     ("twoarm", "twoarm", 0.3),
     ("armsresult", "armsresult", 0.3),
     ("optimize", "optimize", 0.3),
-    ("montage", "montage", 2.3),
-    ("ticker", "ticker", 8.8),
-    ("replay", "replay", 0.3),
+    ("montage", "montage", 3.3),
+    ("ticker", "ticker", 6.1),
+    ("held", "held", 0.6),
     ("close", "close", 0.5),
 ]
 
@@ -45,7 +45,7 @@ DROPS = [
 
 
 def has_retry() -> bool:
-    return json.loads((ROOT / "demo/v7-results.json").read_text())["retry"]
+    return json.loads((ROOT / "demo/v8-results.json").read_text())["retry"]
 
 
 def main() -> None:

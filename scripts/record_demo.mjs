@@ -5,7 +5,7 @@
 //
 //   PPTR_DIR=~/helloworld/hyperframes-trial/node_modules node scripts/record_demo.mjs
 //
-// The tour (v7): the landing page at / scrolled once, then into the editor at /app, which opens on a blank canvas.
+// The tour (v8): the landing page at / scrolled once, then into the editor at /app, which opens on a blank canvas.
 // A new kitting skill for the SO-101 is forged live from a typed task (success check, demos, fine-tune, 20
 // held-out scenes, sped up); "add another SO-101" grows the scene in place; a two-arm task fills the Arms list and
 // runs; then the Optimize step opens the montage of a saved real optimizer run, round by round, and its
@@ -13,7 +13,7 @@
 // The page cannot record across a navigation, so the landing page is its own capture
 // (<webm>.marks.json holds its length under "landing_len"); the editor capture's marks file names it under
 // "landing". Every segment start is written to the editor's marks under "at" for the narration cues, and the
-// numbers shown are written to demo/v7-results.json.
+// numbers shown are written to demo/v8-results.json.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -23,7 +23,7 @@ const puppeteer = require("puppeteer-core");
 const BASE = process.env.BASE || "http://127.0.0.1:8100";
 const TASK = process.env.TASK || "put the blue block in the front-left slot of the tray";
 const TWO = "two arms: one seats the housing in the pallet, the other inserts it into the socket";
-const OPT_RUN = process.env.OPT_RUN || "234442-a649"; // a saved real optimizer run in runs/opt-<id>
+const OPT_RUN = process.env.OPT_RUN || "064106-9ad6"; // a saved real optimizer run in runs/opt-<id>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -137,6 +137,7 @@ async function sped(until, isWait) {
 const J = (u) => page.evaluate((x) => fetch(x).then((r) => r.json()), u);
 
 await mark("intro");
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-blank.png` });
 await sleep(3500);
 
 // 2. type a task: the agents write the success check, collect demos, fine-tune and test on 20 held-out scenes
@@ -157,6 +158,7 @@ p.published = await now();
 p.seconds = (Date.now() - t0) / 1000;
 console.log(`"${TASK}" settled after ${p.seconds.toFixed(1)} s`);
 await mark("trained");
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-trained.png` });
 const st = await J("/api/state");
 const run = await J(`/api/runs/${st.runs[st.runs.length - 1].id ?? st.runs[st.runs.length - 1]}`);
 const sk = st.skills.reduce((a, b) => (b.created > a.created ? b : a));
@@ -176,6 +178,7 @@ await page.click("#go");
 await page.waitForFunction(() => document.querySelectorAll("#arms .arm").length >= 2, { timeout: 60000, polling: 100 });
 await sleep(6500);
 await mark("twoarm");
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-two-arms.png` });
 await page.click("#prompt");
 await page.type("#prompt", TWO, { delay: 22 });
 const before = new Set(((x) => (Array.isArray(x) ? x : x.lines))(await J("/api/lines")).map((l) => l.id));
@@ -215,23 +218,26 @@ await page.evaluate(() => [...document.querySelectorAll("#optimizer-root .opt-bt
 await sleep(3000);
 const chipCount = await page.evaluate(() => document.querySelectorAll(".opt-overlay .opt-chip").length);
 await mark("ticker");
+const SHOT = `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-`;
 for (let i = 0; i < chipCount; i++) {
   await page.evaluate((k) => document.querySelectorAll(".opt-overlay .opt-chip")[k].click(), i);
-  await sleep(i === 0 ? 3600 : 2700);
+  await sleep(i === 0 ? 4000 : 3200);
+  if (i === 2 || i === 5) await page.screenshot({ path: `${SHOT}rec-round${i}.png` });
 }
-await page.evaluate(() => document.querySelectorAll(".opt-overlay .opt-chip")[3].click());
-await sleep(2200);
-await mark("replay");
-await page.evaluate(() => document.querySelector(".opt-overlay").scrollTo({ top: 99999, behavior: "smooth" }));
-await sleep(9000);
+await mark("held");
+await page.evaluate(() => document.querySelector(".opt-overlay .opt-held").scrollIntoView({ block: "center", behavior: "smooth" }));
+await sleep(1500);
+await page.screenshot({ path: `${SHOT}rec-held-out.png` });
+await sleep(15500);
 const orun = await J(`/api/optimizer/runs/${OPT_RUN}`);
 const optimizer = {
   run: OPT_RUN, skill: orun.skill.instruction, n_scenes: orun.n_scenes, best_round: orun.best_round,
+  test: { n: orun.test.compare.n, r0: orun.test.compare.before, final: orun.test.compare.after, delta: orun.test.compare.delta, mcnemar: orun.test.compare.mcnemar, random_control: orun.control.vs_r0, llm: orun.llm },
   rounds: orun.rounds.map((r, i) => ({ round: i, success: r.success, n: r.n, status: r.status ?? "start", ci: r.ci, change: r.change?.text ?? null })),
 };
 const results = { recorded: new Date().toISOString(), sim_skill: sim, arms: { line_id: lid, prompt: TWO, arms, text: armsText, tries: ln.result?.n_parts, completed: ln.result?.completed, seed: ln.result?.seed }, optimizer, retry: sim.rounds.length > 1 };
 mkdirSync("demo", { recursive: true });
-writeFileSync("demo/v7-results.json", JSON.stringify(results, null, 1));
+writeFileSync("demo/v8-results.json", JSON.stringify(results, null, 1));
 console.log("results:", JSON.stringify(results).slice(0, 600));
 
 // 5. close on the montage's before and after

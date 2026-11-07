@@ -1,7 +1,7 @@
 """Demo narration: one gpt-realtime-2.1 take per script line (voice cedar), acted, checked, trimmed, sped up.
 
 Reads demo/narration.tsv (name<TAB>mood<TAB>line). Numbers in a line are {placeholders} filled from the run
-measured for this cut (demo/v7-results.json), spelled out as words; the
+measured for this cut (demo/v8-results.json), spelled out as words; the
 "round2" line is only voiced when a station really needed a second round. Each take's own transcript must match the line word for
 word (case and punctuation aside) or it is voiced again. Writes demo/narration/1x/<name>.wav (as spoken) and
 demo/narration/<name>.wav (sped to SPEED), 48 kHz mono. Adapted from meta-sight's narration script.
@@ -101,7 +101,7 @@ def decimal(x: float) -> str:  # 7.2 -> "seven point two"
 
 
 def fills() -> dict[str, str] | None:
-    f = ROOT / "demo/v7-results.json"
+    f = ROOT / "demo/v8-results.json"
     if not f.exists():
         return None
     r = json.loads(f.read_text())
@@ -115,6 +115,10 @@ def fills() -> dict[str, str] | None:
         "an": words(arms["tries"]),
         "o0": words(opt["rounds"][0]["success"]),
         "ob": words(best["success"]),
+        "h0": words(opt["test"]["r0"]["k"]),
+        "hf": words(opt["test"]["final"]["k"]),
+        "c0": words(opt["test"]["random_control"]["before"]["k"]),
+        "cf": words(opt["test"]["random_control"]["after"]["k"]),
     }
     if r["retry"]:
         first = sim["rounds"][0]
