@@ -89,11 +89,7 @@ def pool(workers: int | None = None) -> ProcessPoolExecutor:
     """A persistent spawn pool; warmed once so a run never pays process start-up."""
     global _POOL
     if _POOL is None:
-        n = (
-            workers
-            or int(os.environ.get("VLA_FORGE_DATA_WORKERS", "0"))
-            or 4
-        )
+        n = workers or int(os.environ.get("VLA_FORGE_DATA_WORKERS", "0")) or 4
         _POOL = ProcessPoolExecutor(n, mp_context=mp.get_context("spawn"))
         list(_POOL.map(_warm, range(n)))
     return _POOL

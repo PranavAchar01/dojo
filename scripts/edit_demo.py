@@ -90,13 +90,26 @@ def main() -> None:
 
     anchors = {
         "zero": 0.0,
-        **({} if ui else {"mid": (spans[0][0] + max(b for _a, b in spans if b <= at["trained"] + 0.5)) / 2}),
+        **(
+            {}
+            if ui
+            else {
+                "mid": (
+                    spans[0][0] + max(b for _a, b in spans if b <= at["trained"] + 0.5)
+                )
+                / 2
+            }
+        ),
         **({"ladder": marks["ladder"]} if "ladder" in marks else {}),
         **marks.get("at", {}),
         **{f"speed{i}": a for i, (a, _b) in enumerate(spans)},
         **{f"speed{i}_end": b for i, (_a, b) in enumerate(spans)},
         **{f"start{i}": p["start"] for i, p in enumerate(marks["prompts"])},
-        **{f"published{i}": p["published"] for i, p in enumerate(marks["prompts"]) if "published" in p},
+        **{
+            f"published{i}": p["published"]
+            for i, p in enumerate(marks["prompts"])
+            if "published" in p
+        },
     }
     # tab capture can open on a frame of a different size before the page settles: size every cut like the
     # frame one second in
@@ -149,7 +162,9 @@ def main() -> None:
     free = 0.0  # a line never starts before the one before it has finished
     for k, (name, anchor, off) in enumerate(cues):
         wav = ROOT / "demo/narration" / f"{name}.wav"
-        at = max(to_out(anchors[anchor]) + off + (0.0 if name == "hook" else lead), free)
+        at = max(
+            to_out(anchors[anchor]) + off + (0.0 if name == "hook" else lead), free
+        )
         with wave.open(str(wav)) as w:
             free = at + w.getnframes() / w.getframerate() + 0.3
         inputs += ["-i", str(ROOT / "demo/narration" / f"{name}.wav")]

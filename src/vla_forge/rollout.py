@@ -334,6 +334,23 @@ def env_pool() -> EnvPool:
 
 
 def evaluate(
+    model, spec, n: int = 20, seed0: int = EVAL_SEED0, layouts=None, **kw
+) -> list[Rollout]:
+    """Episodes in chunks of VLA_FORGE_EVAL_CHUNK (0 = all at once): every live episode holds a GL context, about 90 MB."""
+    chunk = int(os.environ.get("VLA_FORGE_EVAL_CHUNK", "0")) or n
+    out: list[Rollout] = []
+    for c0 in range(0, n, chunk):
+        m = min(chunk, n - c0)
+        part = _evaluate(
+            model, spec, m, seed0 + c0, layouts[c0 : c0 + m] if layouts else None, **kw
+        )
+        for r in part:
+            r.index += c0
+        out += part
+    return out
+
+
+def _evaluate(
     model,
     spec,
     n: int = 20,
