@@ -327,22 +327,26 @@ def packed(scene, tools: list[str] | None = None, box: str = "goal") -> bool:
 # ------------------------------------------------------------------ placement (derived from IK probes)
 
 BOX_YAW = math.pi  # the cavity opens toward +y (the tools' side); the tall back and lid face away from the arm
-SLOT_LY = -0.08  # box-frame y the tools are lowered to: the near half of the cavity, clear of the shelf at the back
-CARRY_TILT = 0.1  # weight of the top-down term while carrying (1 = strict top-down): the wrist may tilt over the wall
-CLEAR = 0.015  # bottom of a carried tool over the front wall's top
+SLOT_LY = -0.075  # box-frame y the tools are lowered to: the near half of the cavity, clear of the shelf at the back
+PACK_HOVER = 0.14  # approach height: the open jaws clear the other tools lying on the table
+CARRY_TILT = 1.0
+LEAN = 0.6  # rad the gripper leans back over the open side while the tool is lowered in, so its body clears the lid
+LEAN_DOWN = np.array([0.0, -math.sin(LEAN), -math.cos(LEAN)])  # approach axis for BOX_YAW = pi (open side +y)
+UPRIGHT = 0.12  # orientation error (rad) the carry pose may have, so the gripper body clears the lid
+CLEAR = 0.004
 FRONT_TOP = 0.138  # measured: top of the toolbox's front wall (hull bbox)
 FINGER_BELOW = 0.006  # jaw tips sit this far under the tool's bottom while it is held
 
 
-@lru_cache(maxsize=1)
-def placement() -> dict:
+@lru_cache(maxsize=8)
+def placement(robot_id: str = "so101") -> dict:
     """Where the toolbox goes, chosen by IK probes of the SO-101 (robots.solve_topdown, carry pose with the
     top-down weight lowered): a grid of box origins is scored by the worst position error over the points the
     tools are released at (cavity slots along its length, at carry height and just above); the first origin on
     the grid (nearest the base first) whose worst error is below 1 mm wins, else the best one."""
     from . import robots as R
 
-    rid = R.make_id("so101")
+    rid = robot_id
     r = R.calibrate(rid)
     m = R.robot_spec(rid).compile()
     R.fix_qpos0(m)
@@ -358,10 +362,10 @@ def placement() -> dict:
             -0.26,
         ):  # keeps the box's open side clear of the arm's home pose (y ~ 0)
             worst = 0.0
-            for lx in (-0.045, 0.0, 0.045):
+            for lx in (-0.09, 0.0, 0.09):
                 xy = np.array([ox - lx, oy - SLOT_LY])
                 for z in (z0, z0 + 0.02):
-                    ep = R.solve_topdown(
+                    _q, ep, eo = R.solve_topdown(
                         m,
                         d,
                         site,
@@ -370,10 +374,12 @@ def placement() -> dict:
                         np.array([*xy, z]),
                         np.array([0.0, 1.0, 0.0]),
                         seeds,
-                        w_ori=0.1 * CARRY_TILT,
+                        w_ori=1.0,
+                        down=LEAN_DOWN,
                         iters=200,
-                    )[1]
-                    worst = max(worst, float(ep))
+                    )
+                    # the gripper body stands ~0.12 m above the tool: it has to stay near upright to clear the lid
+                    worst = max(worst, float(ep) + max(0.0, float(eo) - UPRIGHT))
             cand = {"x": float(ox), "y": float(oy), "ik_err": worst}
             if best is None or worst < best["ik_err"] - 1e-3:
                 best = cand
@@ -388,27 +394,29 @@ def placement() -> dict:
 # ------------------------------------------------------------------ held-out sampling
 
 
-def box_centre() -> tuple[float, float]:
+def box_centre(robot_id: str = "so101") -> tuple[float, float]:
     """World xy of the cavity centre at the derived placement."""
-    pl = placement()
+    pl = placement(robot_id)
     cx, cy = cavity()["centre"]
     return (pl["x"] - cx, pl["y"] - cy)  # BOX_YAW = pi
 
 
-def packable() -> list[str]:
+def packable(robot_id: str = "so101") -> list[str]:
     """The candidate tools the feasibility engine (sim/feasibility.py) says the SO-101 can pack into the toolbox."""
     from .feasibility import feasibility
 
-    return feasibility("so101", list(ALL_TOOLS), TOOLBOX, container_xy=box_centre())[
+    return feasibility(
+        robot_id, list(ALL_TOOLS), TOOLBOX, container_xy=box_centre(robot_id)
+    )[
         "included"
     ]
 
 
-def sample(rng: np.random.Generator, tools=None) -> tuple[dict, dict]:
+def sample(rng: np.random.Generator, tools=None, robot_id: str = "so101") -> tuple[dict, dict]:
     """(toolbox prop, tools) for one scene: the box origin jittered a little; the tools lie on the table on the
     cavity's open side, along the radial direction (the jaws close across the width), apart from each other."""
-    tools = tuple(tools or packable())
-    pl = placement()
+    tools = tuple(tools or packable(robot_id))
+    pl = placement(robot_id)
     ox, oy = pl["x"] + rng.uniform(-0.01, 0.01), pl["y"] + rng.uniform(-0.01, 0.01)
     box = {"goal": ("toolbox", "gray", float(ox), float(oy), BOX_YAW)}
     front = max(oy + 0.137 + 0.015, 0.065)  # the open side's wall, plus a hand's width
@@ -427,7 +435,7 @@ def sample(rng: np.random.Generator, tools=None) -> tuple[dict, dict]:
         a = rng.uniform(-0.1, 0.1) + math.pi * rng.integers(
             0, 2
         )  # along x, head either way
-        x = rng.uniform(0.10, 0.18)
+        x = rng.uniform(0.17, 0.22)
         out["target" if i == 0 else f"tool{i}"] = (t, float(x), float(ys[i]), float(a))
     return box, out
 
@@ -442,9 +450,9 @@ OUT_DIST = 0.10  # the tool swings to this far out from the slot, on the box's o
 GRASP_FRAC: float | None = None
 SQUEEZE: float | None = None  # jaw command while carrying; None = the stock squeeze
 SLOT = (
-    (0.0, -0.08),
-    (0.0, -0.05),
-    (0.0, -0.065),
+    (0.0, SLOT_LY),
+    (0.0, SLOT_LY),
+    (0.0, SLOT_LY),
 )  # box-frame (x, y) each tool is released over
 
 
@@ -463,7 +471,7 @@ def run_pack(ex) -> None:
     """Pack every tool: grasp at the centre of mass with the jaws across the width (top-down), lift, then carry with
     the wrist free to tilt (reach), over the front wall and release just above the rim; the tool falls the last
     centimetres and settles. Built on the stock Expert's IK and motion helpers (goto / grip)."""
-    from .expert import APPROACH_SPEED, HOVER_Z, LIFT_SPEED, TRANSIT_SPEED
+    from .expert import APPROACH_SPEED, DOWN, HOVER_Z, LIFT_SPEED, TRANSIT_SPEED
 
     sc, r = ex.sc, ex.r
     box = sc.model.body("goal").id
@@ -478,7 +486,11 @@ def run_pack(ex) -> None:
         along = (pts[:, :2] - com[:2]) @ np.array([math.cos(yaw), math.sin(yaw)])
         near = pts[np.abs(along) < 0.025]
         near = near if len(near) > 2 else pts
-        hw = float(np.ptp(near @ np.array([-math.sin(yaw), math.cos(yaw), 0.0]))) / 2
+        across = np.array([-math.sin(yaw), math.cos(yaw), 0.0])
+        hw = float(np.ptp(near @ across)) / 2
+        # the jaws close on the middle of the width there, not on the centre of mass (which sits off-centre on pliers)
+        mid = (float((near @ across).min()) + float((near @ across).max())) / 2
+        com = com + (mid - float(com @ across)) * across
         radial = com[:2] / max(np.linalg.norm(com[:2]), 1e-9)
         cands = [
             np.array([-math.sin(yaw), math.cos(yaw), 0.0]),
@@ -487,8 +499,10 @@ def run_pack(ex) -> None:
         heading = max(cands, key=lambda n: float(n[:2] @ radial))
         ex.ik.heading = heading
         ex.ik.tilt = 1.0
-        c_open = r.centre_open - 0.015 + hw
-        c_grasp = r.centre_grasp - 0.015 + hw
+        # one moving jaw against a fixed one (SO-101): the fixed jaw goes to the tool's face. Two moving jaws: centred
+        shift = (hw - 0.015) if abs(r.centre_open) + abs(r.centre_grasp) > 1e-6 else 0.0
+        c_open = r.centre_open + shift
+        c_grasp = r.centre_grasp + shift
         bottom = pts[:, 2].min()
         gz = (
             GRASP_SITE_Z
@@ -500,17 +514,18 @@ def run_pack(ex) -> None:
             return np.array([*xy, z]) - c * heading
 
         ex.g_goal = r.g_open
-        ex.goto([*site(com[:2], HOVER_Z, c_open)[:2], HOVER_Z], TRANSIT_SPEED)
+        ex.goto([*site(com[:2], HOVER_Z, c_open)[:2], PACK_HOVER], TRANSIT_SPEED)
         ex.goto(site(com[:2], bottom + gz, c_open), APPROACH_SPEED)
         ex.calm = True
         ex.goto(site(com[:2], bottom + gz, c_grasp), APPROACH_SPEED * 0.5, settle=0.05)
-        ex.grip(SQUEEZE if SQUEEZE is not None else r.g_squeeze, settle=0.5)
+        ex.grip(SQUEEZE if SQUEEZE is not None else r.g_closed, settle=0.5)
         ex.calm = False
         lift_goal = site(com[:2], bottom + gz + CARRY_UP, c_grasp)
         ex.goto(lift_goal, LIFT_SPEED, settle=0.1)
         # carry: the wrist may tilt. Rise and swing toward the open side of the box in one sweep, until the tool's
         # bottom clears the front wall, then push in over the wall to the slot
         ex.ik.tilt = CARRY_TILT
+        ex.ik.down = LEAN_DOWN
         clear_z = FRONT_TOP + CLEAR
         bx, by = SLOT[k % len(SLOT)]
         goal_xy = bp[:2] + Rb[:2, :2] @ np.array([bx, by])
@@ -533,9 +548,9 @@ def run_pack(ex) -> None:
             """goto, then correct for the arm's sag under the tool's weight (a P-controlled joint hangs low):
             the commanded point is shifted by what the measured tool-centre point fell short."""
             goal = np.asarray(goal, float)
-            ex.goto(goal + sag[0], speed, settle)
+            ex.goto(goal + sag[0], speed, max(settle, 0.8))
             sag[0] = np.clip(sag[0] + (goal - sc.ee_pos()), -0.05, 0.05)
-            ex.goto(goal + sag[0], speed, 0.1)
+            ex.goto(goal + sag[0], speed, 0.8)
 
         go(lift_goal, LIFT_SPEED, 0.3)
         go(lift_goal, LIFT_SPEED, 0.3)
@@ -552,6 +567,7 @@ def run_pack(ex) -> None:
         ex.goto([*sc.ee_pos()[:2], z + 0.03], LIFT_SPEED, settle=0.0)
         ex.calm = False
     ex.ik.tilt = 1.0
+    ex.ik.down = DOWN
     ex.ik.heading = None
     ex.home()
     ex.hold(3.0)  # the last tool settles in the cavity
