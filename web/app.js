@@ -363,28 +363,34 @@ async function startPlayback(payload, auto = false) {
 let playTok = 0;
 
 // ---------------------------------------------------------------- welcome: with nothing picked, the floor is never blank; it loops real recorded rollouts
-let welcomeOn = false;
-const WELCOME_TASKS = [[0, "touch the yellow block"], [2.13, "put the blue block in the blue bowl"], [10.07, "push the green block onto the blue square"], [16.1, "stack the yellow block on the red block"]];
+let welcomeOn = false, welcomeTimer = 0, welcomeTiles = null;
+// a frame from each published model's own rollout, with its measured score, one after another
+async function welcomeStep(k) {
+  if (!welcomeTiles) {
+    try { welcomeTiles = (await (await fetch("/api/library")).json()).tiles.filter((t) => t.thumb && t.replay && t.n_eval > 0).slice(-6); } catch { welcomeTiles = []; }
+  }
+  if (!welcomeOn || !welcomeTiles.length) return;
+  const t = welcomeTiles[k % welcomeTiles.length];
+  const img = $("#welcome-img");
+  img.src = `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent(t.replay_source || "")}`;
+  img.hidden = false;
+  $("#welcome-now").textContent = `${t.instruction}: ${Math.round(t.success_rate * t.n_eval)} / ${t.n_eval} on held-out scenes`;
+  welcomeTimer = setTimeout(() => welcomeStep(k + 1), 4000);
+}
 function startWelcome() {
   if (welcomeOn || (current && !runDone) || selSkill || !$("#sim-load").hidden || $("#app").dataset.view !== "sim") return;
   welcomeOn = true;
   $("#welcome").hidden = false;
   $("#view-sim").classList.add("welcoming");
-  $("#welcome-video").play().catch(() => {});
+  welcomeStep(0);
 }
 function stopWelcome() {
   if (!welcomeOn) return;
   welcomeOn = false;
+  clearTimeout(welcomeTimer);
   $("#welcome").hidden = true;
   $("#view-sim").classList.remove("welcoming");
-  $("#welcome-video").pause();
 }
-$("#welcome-video").addEventListener("timeupdate", (ev) => {
-  let k = 0;
-  WELCOME_TASKS.forEach(([t], i) => { if (ev.target.currentTime >= t) k = i; });
-  const n = $("#welcome-now");
-  if (n.textContent !== WELCOME_TASKS[k][1]) n.textContent = WELCOME_TASKS[k][1];
-});
 
 // ---------------------------------------------------------------- new model window
 // One window holds the whole prompt: the text, the robot (its builder opens inline), an attached reference (an image
@@ -433,11 +439,12 @@ $("#nm-form").addEventListener("submit", async (ev) => {
   if (!text || $("#go").disabled) return;
   const go = $("#nm-go");
   go.disabled = true;
-  if (ref && window.forgePlan && !(await window.forgePlan.use())) { go.disabled = false; return; } // the plan's build becomes the table task first
+  if (ref && ref.kind !== "model" && window.forgePlan && !(await window.forgePlan.use())) { go.disabled = false; return; } // the plan's build becomes the table task first
+  const reference = ref ? { kind: ref.kind, id: ref.id || "" } : null;
   $("#nm-prompt").value = "";
   setRef(null);
   closeNew();
-  submit(text);
+  submit(text, reference);
 });
 $("#nm-arm").addEventListener("click", () => setPane("robot"));
 $("#robot-open").addEventListener("click", () => { openNew(); setPane("robot"); });
@@ -453,10 +460,12 @@ function setRef(r) {
   img.hidden = !src;
   if (src) img.src = src;
   if (r) $("#nm-ref-name").textContent = r.name;
-  nmCard.classList.toggle("has-plan", !!r);
-  $("#nm-plan").hidden = !r;
-  if (!r) return window.forgePlan?.close();
-  const note = r.kind === "model" ? `Reference: the 3D model "${r.name}". The plan below is the brick bridge.` : r.kind === "image" ? `Reference: your image "${r.name}". Read it into steps below.` : "";
+  const plan = !!r && r.kind !== "model"; // a 3D model goes into the scene itself; only an image or the bridge opens the plan
+  nmCard.classList.toggle("has-plan", plan);
+  $("#nm-plan").hidden = !plan;
+  if (r && r.kind === "model") $("#nm-ref-name").textContent = `${r.name} (shown in the scene)`;
+  if (!plan) return window.forgePlan?.close();
+  const note = r.kind === "image" ? `Reference: your image "${r.name}". Read it into steps below.` : "";
   window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note });
 }
 $("#nm-attach").addEventListener("click", () => {
@@ -484,7 +493,7 @@ async function openModels() {
   const { mountAssets } = await import("/static/assets.js");
   host.replaceChildren();
   assetsPanel = mountAssets(host, {
-    onUse(m) { setRef({ kind: "model", name: m.name, thumb: m.has_thumb ? m.thumb : "" }); setPane("main"); },
+    onUse(m) { setRef({ kind: "model", id: m.id, name: m.name, thumb: m.has_thumb ? m.thumb : "" }); setPane("main"); },
   });
 }
 nm.querySelectorAll(".mx").forEach((b) => b.addEventListener("click", () => {
@@ -884,8 +893,8 @@ $("#round-pick").onclick = () => {
 async function ensureScene(rid) {
   if (world || window.forgeArms?.active()) return;
   let res = await fetch(`/api/runs/${rid}/scene`);
-  if (!res.ok) res = await fetch("/api/preview");
-  const sc = await res.json();
+  let sc = res.ok ? await res.json() : { pending: true };
+  if (sc.pending) sc = await (await fetch("/api/preview")).json();
   play = null;
   await buildWorld(sc);
   applyFrame(sc.frame);
@@ -894,6 +903,7 @@ async function showPreview(rid) {
   const res = await fetch(`/api/runs/${rid}/scene`);
   if (!res.ok) return;
   const sc = await res.json();
+  if (sc.pending) return;
   play = null;
   await buildWorld(sc);
   applyFrame(sc.frame);
@@ -1253,7 +1263,7 @@ function handle(e) {
 
 // ---------------------------------------------------------------- prompt
 let lastPrompt = "";
-async function submit(text) {
+async function submit(text, reference = null) {
   if (!text) return;
   lastPrompt = text;
   if ($("#app").dataset.view !== "sim") setView("sim");
@@ -1267,7 +1277,7 @@ async function submit(text) {
     await window.forgeArms.handle(text);
     return;
   }
-  const res = await fetch("/api/prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text, ...how }) });
+  const res = await fetch("/api/prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: text, ...how, ...(reference ? { reference } : {}) }) });
   if (!res.ok) $("#go").disabled = false;
 }
 $("#prompt-form").addEventListener("submit", (ev) => { ev.preventDefault(); submit($("#prompt").value.trim()); });

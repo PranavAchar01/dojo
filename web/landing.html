@@ -43,29 +43,21 @@
           <a class="cta ghost big" href="#how">How it works</a>
         </div>
       </div>
-      <figure class="lp-robot rv" style="--d:200ms" aria-label="An SO-101 arm doing four tasks in turn, replayed from recorded runs in simulation">
-        <video id="hero-video" class="lp-robot-media" poster="/static/landing-rollout.jpg" muted loop playsinline preload="metadata" autoplay disablepictureinpicture tabindex="-1" aria-hidden="true">
-          <source src="/static/landing-rollout.mp4" type="video/mp4">
-          <source src="/static/landing-rollout.webm" type="video/webm">
-        </video>
+      <figure class="lp-robot rv" style="--d:200ms" aria-label="Published models in turn: a frame from each one's own simulated rollout">
+        <img id="hero-img" class="lp-robot-media" alt="" width="880" height="690" hidden>
         <span class="hero-mascot" aria-hidden="true">
           <span class="mascot lg" data-follow></span>
           <span class="bb-thought on"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
         </span>
-        <figcaption><span id="hero-task">touch the yellow block</span><i>Recorded rollouts, replayed in simulation</i></figcaption>
+        <figcaption><span id="hero-task"></span><i id="hero-sub"></i></figcaption>
       </figure>
     </div>
   </section>
 
   <section class="proof">
     <div class="wrap">
-      <dl class="numbers rv">
-        <div><dt>Parts through every arm</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
-        <div><dt>Arm 1, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
-        <div><dt>Arm 2, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
-        <div><dt>Scripted ViperX, in the full run</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
-      </dl>
-      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Success is measured on 20 layouts the policy never trained on. The full run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
+      <dl class="numbers rv" id="proof-nums"></dl>
+      <p class="fine rv" id="proof-fine"></p>
     </div>
   </section>
 
@@ -113,55 +105,19 @@
       <p class="kicker rv">Model library</p>
       <h2 class="rv">Every prompt <em>grows</em> the library.</h2>
       <p class="sub rv">Each published skill is saved with its measured score and starts the next prompt. The nearest skill is the starting point, so later skills train faster.</p>
-      <ul class="tiles">
-        <li class="tile rv"><img src="/static/assets/skill-touch.jpg" alt="Simulator view: the SO-101 arm reaching a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>touch the red block</h3><p class="res"><b class="num">20 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block toward a blue square" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a blue block in a blue bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
-        <li class="tile rv"><img src="/static/assets/skill-kit.jpg" alt="Simulator view: the SO-101 arm placing a red block in a slot of the tray" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the red block in the back-right slot of the tray</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-insert.jpg" alt="Simulator view: the SO-101 arm inserting a red block into a square socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>insert the red block into the socket</h3><p class="res"><b class="num">13 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-rotate.jpg" alt="Simulator view: the SO-101 arm setting a rotated blue block in a diamond socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>pick up the blue block, rotate it and set it in the diamond socket</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
-      </ul>
+      <ul class="tiles" id="tile-list"></ul>
       <p class="fine rv">Kitting into a tray slot, insertion into a socket and rotate-and-place are the hardest skills and score lowest. Scores are measured on 20 held-out scenes each, trained inside the 3 minute budget.</p>
     </div>
   </section>
 
   <!-- ------------------------------------------------------------ several arms -->
-  <section class="band tint" id="arms">
+  <section class="band tint" id="arms" hidden>
     <div class="wrap">
       <p class="kicker rv">Several arms</p>
       <h2 class="rv">One chat, <em>one arm or several</em>.</h2>
       <p class="sub rv">Ask for "another SO-101", or describe a task that needs more than one arm. The planner gives each arm a sub-task and the router checks the robot can do it. Each arm is either a trained VLA or a script, and they run in order.</p>
 
-      <blockquote class="prompt rv">
-        <span class="q">Prompt</span>
-        Two arms: one seats the housing in the pallet, the other inserts it into the socket, then a ViperX crates the assembly.
-      </blockquote>
-
-      <div class="chain rv" id="chain">
-        <div class="belt" aria-hidden="true"><i class="blk r"></i><i class="blk y"></i><i class="blk r"></i><i class="blk y"></i><i class="blk b"></i></div>
-        <article class="st">
-          <header><span class="idx">01</span><span class="kind vla">VLA</span></header>
-          <h3>Pallet seating</h3>
-          <p>SO-101 seats the housing in a pallet slot. Trained in 94.5 s.</p>
-          <div class="meter"><b style="--w:80%"></b></div>
-          <p class="res"><b class="num">16 / 20</b> on held-out scenes, in simulation</p>
-        </article>
-        <article class="st">
-          <header><span class="idx">02</span><span class="kind vla">VLA</span></header>
-          <h3>Socket insertion</h3>
-          <p>SO-101 inserts the part into the socket. Trained in 107.5 s.</p>
-          <div class="meter"><b style="--w:80%"></b></div>
-          <p class="res"><b class="num">16 / 20</b> on held-out scenes, in simulation</p>
-        </article>
-        <article class="st">
-          <header><span class="idx">03</span><span class="kind script">Scripted</span></header>
-          <h3>Crating</h3>
-          <p>A ViperX with a fixed script moves the finished assembly into the crate. No training.</p>
-          <div class="meter off"><b></b></div>
-          <p class="res"><b class="num">22 / 22</b> in the full run, in simulation</p>
-        </article>
-      </div>
-      <p class="fine rv">In simulation: 30 parts, 22 through all three arms. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each arm is simulated on its own and the part is re-staged for the next one.</p>
+      <div class="chain rv" id="chain"></div>
     </div>
   </section>
 

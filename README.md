@@ -68,7 +68,7 @@ Expert demos for random (skill, colour, target) tasks with domain randomization 
 feature shards under `models/base_data/`, then the head is trained and measured per skill (`models/base.json`).
 This is the root of the skill library and the replay buffer for every later fine-tune.
 
-## The scaling ladder
+## The scaling ladder (the RSI tab)
 
 Prompts come in three tiers, and the page tags each one.
 
@@ -152,11 +152,11 @@ Libre. Etch's blue accent is swapped for one safety orange. The mascot is an ori
 one SVG in `web/mascot.js`. HeyPCB was checked as a source and has no open interface code, so nothing of
 theirs is used. Details and other credits in `NOTICE`.
 
-## Custom robots (the Robot tab)
+## Custom robots (the robot chip in the prompt)
 
-The Robot tab builds the embodiment before a skill is trained, in the spirit of Etch's part picker: pick an arm,
+The robot chip in the prompt window opens the builder inline. It builds the embodiment before a skill is trained, in the spirit of Etch's part picker: pick an arm,
 a wrist option and an end effector, see each part as a 3D preview and the assembled robot live, read the checks,
-then press "Train the next skill on this robot". Every part is a published open-source MuJoCo model; sources,
+then press "Use this robot"; the next run is trained on it (`/api/robot/use` sets the robot every run copies). Every part is a published open-source MuJoCo model; sources,
 licences and the pinned Menagerie commit are in `SOURCES.md`. Code: `src/vla_forge/sim/robots.py`.
 
 - **Robot id.** `<arm>.<wrist>.<effector>`, for example `vx300s.native.native` or `wx250s.native.robotiq_2f85`.
@@ -166,7 +166,7 @@ licences and the pinned Menagerie commit are in `SOURCES.md`. Code: `src/vla_for
   when another effector replaces it, the effector is mounted on the last wrist link, a locked wrist drops its roll
   joint and actuator, and a `tcp` site marks the tool centre. `calibrate(id)` then measures in sim: finger opening
   at the fingertips (mm), gripper command range, a top-down home pose.
-- **Checks** (`report(id)`, shown in the tab): the model compiles; every arm joint has sane limits with home
+- **Checks** (`report(id)`, shown in the prompt window): the model compiles; every arm joint has sane limits with home
   inside; the action size; fingers open wider than a 3 cm block and close below it; top-down reach over the table
   workspace (7 x 9 grid, r 0.125-0.285 m, +/-38 deg) at grasp, push and hover height; gravity torque with a 30 g
   block at full reach against the source model's actuator limits; no self-collision at home.
@@ -315,6 +315,6 @@ src/vla_forge/
   sim/line.py    conveyor and totes for a station cell (sourced: see SOURCES.md)
   viz.py         scene export for three.js
   sim/robots.py  robot builder: part catalog, MJCF assembly, calibration, checks, robot_feasibility
-web/             one page: three.js renderer, chat, stage rail, loss, success, ladder, skill library, robot builder (builder.js), multi-arm cells (arms.js)
+web/             one page: three.js renderer, docked prompt bar and conversation, stage rail, loss, success, RSI, skill library, robot builder (builder.js, inline in the prompt window), build plan (plan.js, inline when a reference is attached), multi-arm cells (arms.js)
 scripts/         pretrain_base.py, experiment.py, ladder.py, record_demo.mjs, narrate.py, edit_demo.py, heavy.sh
 ```

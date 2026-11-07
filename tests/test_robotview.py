@@ -1,4 +1,4 @@
-"""The Robot tab's cache key, the stored payloads and the thumbnail endpoint."""
+"""The robot builder's cache key, the stored payloads and the thumbnail endpoint."""
 
 import gzip
 import json

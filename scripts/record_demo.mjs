@@ -51,8 +51,8 @@ const ready = () => page.waitForFunction(() => document.querySelector("#ready-do
 await ready();
 // start on the stock arm, whatever the last session left active
 await page.evaluate(() => fetch("/api/robot/use", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ robot: "so101" }) }));
-// warm the Robot tab's part renders so the recording does not sit on spinners
-await page.evaluate(() => window.setView("robot"));
+// warm the robot builder's part renders (it opens inline from the robot chip) so the recording does not sit on spinners
+await page.click("#robot-open");
 await page.waitForFunction(() => document.querySelector(".part-fig img") && [...document.querySelectorAll(".part-fig img")].every((i) => i.classList.contains("in")), { timeout: 600000 });
 
 // 0. the landing page: its own capture, a few seconds, scrolled once, then the click into the editor

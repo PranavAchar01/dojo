@@ -219,7 +219,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
 /* ------------------------------------------------ the first screen (Bara's rhythm: one plate, the robot working, one call)
    Copy on the left, the recorded rollout on the right with no frame and no app chrome; the whole plate is one viewport
-   tall under the nav. The video is a pre-rendered loop (web/landing-render.py), so the page idles. */
+   tall under the nav. The picture is a frame from a published model rollout (/api/skills/ID/thumb.png). */
 .hero { height: calc(100svh - 64px); min-height: 560px; max-height: 860px; display: flex; align-items: center; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); align-items: center; gap: clamp(16px, 3vw, 48px); height: 100%; }
 .hero-copy { max-width: 560px; }

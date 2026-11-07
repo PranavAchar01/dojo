@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from . import (
     agents_api,
     assets_api,
+    assets_scene,
     factory,
     hero_api,
     optimizer_api,
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI):
     agents_api.HOLD["agents"] = AGENTS
     if await asyncio.to_thread(
         thumbs.warm_needed
-    ):  # fill the Robot tab's thumbnails and caches in a quiet process
+    ):  # fill the robot builder's thumbnails and caches in a quiet process
         await asyncio.create_subprocess_exec(
             "nice", "-n", "19", sys.executable, "-m", "vla_forge.thumbs"
         )
@@ -68,10 +69,18 @@ app.include_router(assets_api.router)
 app.include_router(hero_api.router)
 
 
+class Reference(BaseModel):
+    kind: str  # image | model | bridge
+    id: str = ""  # the library model id, for kind "model"
+
+
 class Prompt(BaseModel):
     prompt: str
     mode: str = "auto"  # auto | train (never reuse) | scratch (from the base) | remix (from from_skill)
     from_skill: str = ""
+    # what the prompt window had attached: "image" (read into the build plan), "model" (a library 3D model id, shown in the
+    # scene) or "bridge" (the brick bridge plan)
+    reference: Reference | None = None
 
 
 class TestReq(BaseModel):
@@ -114,7 +123,16 @@ async def prompt(p: Prompt):
         raise HTTPException(400, "mode is auto, train, scratch or remix")
     if p.mode == "remix" and p.from_skill not in FORGE.registry.skills:
         raise HTTPException(404, "no such tile to remix")
-    run = await AGENTS.submit(text, p.mode, p.from_skill if p.mode == "remix" else "")
+    scenery = ""
+    if p.reference and p.reference.kind not in ("image", "model", "bridge"):
+        raise HTTPException(400, "reference is image, model or bridge")
+    if p.reference and p.reference.kind == "model":
+        scenery = assets_api.entry(p.reference.id)["id"]  # 404s for an id the library does not have
+        if not (assets_scene.model_folder(scenery) / "model.xml").exists():
+            raise HTTPException(404, "that 3D model has no simulation file yet")
+    run = await AGENTS.submit(
+        text, p.mode, p.from_skill if p.mode == "remix" else "", scenery=scenery
+    )
     return {"run": run.id}
 
 
@@ -215,7 +233,7 @@ def run_summary(rid: str):
 def run_scene(rid: str):
     run = FORGE.runs.get(rid) or _404()
     if not run.layouts:
-        raise HTTPException(409, "scene not built yet")
+        return {"pending": True}  # the page falls back to the default scene until the task has parsed
     return preview(Layout.from_json(run.layouts[0]), run.robot)
 
 

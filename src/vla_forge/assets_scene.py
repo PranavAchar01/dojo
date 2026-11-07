@@ -30,6 +30,11 @@ from .assets_sources import REPO
 from .sim.display import CONCRETE, FLOOR, STEEL
 
 LIB = REPO / "assets" / "library"
+USER = REPO / "assets" / "user"  # the user's own imports
+
+
+def model_folder(model_id: str):
+    return USER / model_id if (USER / model_id / "model.xml").exists() else LIB / model_id
 SCENES = REPO / "scenes"
 VIS_GROUP = 1
 
@@ -64,7 +69,7 @@ class _Assets:
         key = (model_id, round(scale, 5))
         if key in self.done:
             return self.done[key]
-        folder = LIB / model_id
+        folder = model_folder(model_id)
         root = ET.parse(folder / "model.xml").getroot()
         tag = f"{model_id}@{scale:g}"
         asset = root.find("asset")
@@ -138,6 +143,14 @@ class _Assets:
                 conaffinity=0,
                 density=0,
             )
+
+
+def add_scenery(spec: mujoco.MjSpec, model_id: str) -> None:
+    """Show one library model beside the arm (visual only, no contacts), scaled to about 14 cm on its longest side."""
+    meta = json.loads((model_folder(model_id) / "meta.json").read_text())
+    scale = 0.14 / max(meta["size_m"])
+    body = spec.worldbody.add_body(name=f"ref_{model_id}", pos=[0.05, 0.32, 0.0])
+    _Assets(spec).attach(body, model_id, scale)
 
 
 # ---------------------------------------------------------------- the hero product

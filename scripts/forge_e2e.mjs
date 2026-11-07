@@ -1,8 +1,8 @@
-// End-to-end check of the merged forge (Sim, Ladder, Library, Robot) against a running server, in a real browser.
+// End-to-end check of the merged forge (Sim, RSI, Library, and the robot builder inside the prompt window) against a running server, in a real browser.
 //
 //   PW_DIR=~/helloworld/qloo-inspo/node_modules node scripts/forge_e2e.mjs http://localhost:8100
 //
-// Robot tab: a WidowX fails the finger check with its reason but can still be made active (reach and push fit);
+// Robot builder (the chip in the prompt bar): a WidowX fails the finger check with its reason but can still be made active (reach and push fit);
 // the router then refuses a pick on it with the robot check's reason. A Koch cannot be made active at all.
 // Back on the SO-101: an out-of-reach prompt is refused, a short real skill trains and lands as a tile.
 // Screenshots: SHOTS (default ~/Pictures/Screenshots) as <date>-vla-forge-merged-*.png, 1920x934 and 400 wide.
@@ -40,6 +40,10 @@ async function prompt(page, text) {
   await page.fill("#prompt", text);
   await page.click("#go");
 }
+async function openRobot(page) {
+  await page.click("#robot-open");
+  await page.waitForSelector("#nm-card[data-pane=robot]");
+}
 async function pickArm(page, id) {
   await page.click(`.part[data-slot="arm"][data-id="${id}"]`);
   await page.waitForFunction(() => /passed$/.test(document.querySelector("#asm-sum")?.textContent || ""), null, { timeout: 120_000 });
@@ -48,7 +52,7 @@ async function pickArm(page, id) {
 async function useRobot(page) {
   await page.waitForSelector("#use-robot:not([disabled])");
   await page.click("#use-robot");
-  await page.waitForFunction(() => document.querySelector("#use-robot")?.textContent.startsWith("Skills train"));
+  await page.waitForFunction(() => document.querySelector("#robot-chip")?.textContent.length > 0 && !document.querySelector("#use-robot")?.offsetParent);
 }
 const refusals = (page) => page.locator(".route-card.is-refused").count();
 
@@ -56,9 +60,9 @@ const page = await open(1920, 934);
 log("agents online");
 await page.waitForTimeout(2500);
 await shot(page, "01-sim");
-await view(page, "ladder");
+await view(page, "rsi");
 await page.waitForTimeout(1200);
-await shot(page, "02-ladder");
+await shot(page, "02-rsi");
 await view(page, "skills");
 await page.waitForSelector(".tile:not(.is-loading)");
 await page.waitForTimeout(1200);
@@ -66,7 +70,7 @@ await shot(page, "03-library");
 const robots = await page.locator(".tile-robot").allTextContents();
 log("tile robots:", [...new Set(robots)].join(" | "));
 
-await view(page, "robot");
+await openRobot(page);
 await page.waitForSelector(".part");
 await page.waitForFunction(() => /passed$/.test(document.querySelector("#asm-sum")?.textContent || ""), null, { timeout: 120_000 });
 await page.waitForFunction(() => [...document.querySelectorAll(".part-fig img")].every((i) => i.classList.contains("in")), null, { timeout: 180_000 });
@@ -106,7 +110,7 @@ if (!/38 mm/.test(why)) throw new Error(`robot refusal without the finger reason
 await page.waitForTimeout(800);
 await shot(page, "09-refused-robot");
 
-await view(page, "robot");
+await openRobot(page);
 await pickArm(page, "so101");
 await useRobot(page);
 await view(page, "sim");
@@ -148,7 +152,7 @@ await view(phone, "skills");
 await phone.waitForSelector(".tile:not(.is-loading)");
 await phone.waitForTimeout(1000);
 await shot(phone, "15-phone-library");
-await view(phone, "robot");
+await openRobot(phone);
 await phone.waitForFunction(() => /passed$/.test(document.querySelector("#asm-sum")?.textContent || ""), null, { timeout: 120_000 });
 await phone.waitForTimeout(2500);
 await shot(phone, "16-phone-robot");
