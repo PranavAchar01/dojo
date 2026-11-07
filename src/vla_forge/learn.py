@@ -156,6 +156,14 @@ def scoped_params(model: VLA, scope: str) -> list[torch.nn.Parameter]:
     return out
 
 
+def quiet_frozen_layers(model: VLA) -> None:
+    """A frozen layer does not drop activations (and MPS attention has no dropout path without gradients)."""
+    for mod in model.head.modules():
+        own = list(mod.parameters(recurse=False))
+        if own and not any(q.requires_grad for q in own):
+            mod.eval()
+
+
 def train(
     model: VLA,
     data: Demos,
@@ -177,6 +185,12 @@ def train(
     dev = device()
     model.to(dev).train()
     params = scoped_params(model, scope)
+    for mod in (
+        model.head.modules()
+    ):  # a frozen layer does not drop activations (MPS attention has no dropout path)
+        own = list(mod.parameters(recurse=False))
+        if own and not any(q.requires_grad for q in own):
+            mod.eval()
     p = data.pack(dev)
     n = p["vis"].shape[0]
     r = replay.pack(dev) if replay is not None and replay.episodes else None

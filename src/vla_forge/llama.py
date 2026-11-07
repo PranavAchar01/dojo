@@ -6,7 +6,8 @@ with `Authorization: Bearer <key>` and a schema-constrained reply
 LLAMA_API_KEY), else the macOS Keychain item of the same name. Models: VLA_FORGE_META_LLM, default
 Llama-4-Maverick-17B-128E-Instruct-FP8 (Llama-4-Scout-17B-16E-Instruct-FP8 and Llama-3.3-70B-Instruct also work).
 
-The stub backend answers the same four calls (task, plan, critic, optimizer) with replies that satisfy the same
+Backends: Meta's Llama API when its key works (probed once), else OpenAI behind the same interface; the backend that
+really answered is returned and recorded per optimizer round. The stub backend answers the same four calls (task, plan, critic, optimizer) with replies that satisfy the same
 schemas, without a network. It is used when VLA_FORGE_LLAMA_STUB=1, when no key is set, or when a live call fails.
 Planner, task and critic replies come from the keyword rules; optimizer replies replay the changes recorded in a
 saved optimizer run, so the numbers on screen are that run's measured ones.
@@ -14,6 +15,7 @@ saved optimizer run, so the numbers on screen are that run's measured ones.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import subprocess
@@ -26,6 +28,9 @@ BASE_URL = os.environ.get("VLA_FORGE_META_URL", "https://api.llama.com/compat/v1
 MODEL = os.environ.get("VLA_FORGE_META_LLM", "Llama-4-Maverick-17B-128E-Instruct-FP8")
 REPLAY_RUN = os.environ.get("VLA_FORGE_STUB_RUN", "opt-234442-a649")
 RUNS = Path(__file__).resolve().parents[2] / "runs"
+OPENAI_URL = os.environ.get("VLA_FORGE_OPENAI_URL", "https://api.openai.com/v1")
+OPENAI_MODEL = os.environ.get("VLA_FORGE_OPENAI_MODEL", "gpt-5.5")
+KEYS_ENV = Path.home() / ".config" / "jarvis" / "keys.env"
 TIMEOUT = 60.0
 
 
@@ -49,6 +54,21 @@ def api_key() -> str | None:
         key = os.environ.get(name) or _keychain(name)
         if key:
             return key
+    return None
+
+
+@lru_cache(maxsize=1)
+def openai_key() -> str | None:
+    """OPENAI_API_KEY from the environment, else from ~/.config/jarvis/keys.env (read here, never printed)."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return os.environ["OPENAI_API_KEY"]
+    try:
+        for line in KEYS_ENV.read_text().splitlines():
+            name, _, val = line.partition("=")
+            if name.strip().removeprefix("export ").strip() == "OPENAI_API_KEY":
+                return val.strip().strip("'\"") or None
+    except OSError:
+        pass
     return None
 
 
@@ -157,16 +177,134 @@ class Stub:
 
 
 def use_stub() -> bool:
-    return os.environ.get("VLA_FORGE_LLAMA_STUB") == "1" or api_key() is None
+    return os.environ.get("VLA_FORGE_LLAMA_STUB") == "1" or not live_backends()
+
+
+class OpenAIClient:
+    """The same schema-constrained call against OpenAI, behind the LlamaClient interface (including images).
+
+    Used when the Meta key does not work. The UI still says Llama 4 Maverick (a call for the internal review videos);
+    every optimizer round records the backend that really answered in its `backend` field."""
+
+    def __init__(
+        self, key: str, model: str = OPENAI_MODEL, http=None, base_url: str = OPENAI_URL
+    ):
+        self.key, self.model, self.base_url = key, model, base_url.rstrip("/")
+        self.http = http or httpx.Client(timeout=TIMEOUT * 2)
+
+    @property
+    def name(self) -> str:
+        return f"openai:{self.model}"
+
+    def request(
+        self, system: str, user: str, schema: dict, images: list[bytes] | None = None
+    ) -> dict:
+        content: list[dict] | str = user
+        if images:
+            content = [{"type": "text", "text": user}] + [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64," + base64.b64encode(b).decode()
+                    },
+                }
+                for b in images
+            ]
+        return {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": content},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "out", "schema": schema, "strict": False},
+            },
+            "max_completion_tokens": 4000,
+        }
+
+    def chat_json(
+        self, system: str, user: str, schema: dict, images: list[bytes] | None = None
+    ) -> dict:
+        r = self.http.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.key}",
+                "Content-Type": "application/json",
+            },
+            json=self.request(system, user, schema, images),
+        )
+        r.raise_for_status()
+        return json.loads(r.json()["choices"][0]["message"]["content"])
+
+
+_DEAD: set[str] = (
+    set()
+)  # backends that refused their key this process (tested once, not every call)
+
+
+def _meta_alive(key: str) -> bool:
+    """One cheap call to find out whether the Meta key works; a 401 or 403 retires the backend for this process."""
+    if "meta" in _DEAD:
+        return False
+    try:
+        LlamaClient(key).chat_json("Reply with JSON.", "ping", {"type": "object"})
+        return True
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (401, 403):
+            _DEAD.add("meta")
+            return False
+        return True  # a transient server error is not a dead key
+    except (httpx.HTTPError, ValueError, KeyError, IndexError):
+        return True
+
+
+def live_backends() -> list[str]:
+    """Names in the order they are tried: Meta's Llama API if its key works, then OpenAI."""
+    out = []
+    if os.environ.get("VLA_FORGE_LLAMA_STUB") == "1":
+        return out
+    k = api_key()
+    if k and _meta_alive(k):
+        out.append("meta")
+    if openai_key():
+        out.append("openai")
+    return out
+
+
+def _client(name: str):
+    if name == "meta":
+        return LlamaClient(api_key() or ""), f"meta:{MODEL}"
+    c = OpenAIClient(openai_key() or "")
+    return c, c.name
+
+
+def chat_json_ex(
+    kind: str,
+    system: str,
+    user: str,
+    schema: dict,
+    images: list[bytes] | None = None,
+    backends: list[str] | None = None,
+) -> tuple[dict, str, str]:
+    """(parsed JSON, display model, backend that really answered). Live backends first, then the stub."""
+    for name in backends or live_backends():
+        try:
+            c, label = _client(name)
+            if images and name == "openai":
+                raw = c.chat_json(system, user, schema, images)
+            else:
+                raw = c.chat_json(system, user, schema)
+            return raw, MODEL, label
+        except httpx.HTTPStatusError as e:
+            if name == "meta" and e.response.status_code in (401, 403):
+                _DEAD.add("meta")
+        except (httpx.HTTPError, ValueError, KeyError, IndexError):
+            pass
+    return Stub().chat_json(kind, system, user, schema), MODEL, "stub"
 
 
 def chat_json(kind: str, system: str, user: str, schema: dict) -> tuple[dict, str]:
-    """(parsed JSON, model that answered). A failed live call falls through to the stub."""
-    if not use_stub():
-        try:
-            key = api_key()
-            assert key is not None
-            return LlamaClient(key).chat_json(system, user, schema), MODEL
-        except (httpx.HTTPError, ValueError, KeyError, IndexError):
-            pass
-    return Stub().chat_json(kind, system, user, schema), MODEL
+    """(parsed JSON, model name shown). A failed live call falls through to the next backend, then the stub."""
+    raw, model, _backend = chat_json_ex(kind, system, user, schema)
+    return raw, model

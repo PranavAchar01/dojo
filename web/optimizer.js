@@ -31,7 +31,7 @@ export function mount(root, ctx = {}) {
   const head = el("div", "opt-head");
   const title = el("div", "opt-title");
   title.append(el("h2", "", "Optimize"), el("p", "opt-sub",
-    "A language model reads where the skill fails and proposes one change to its training. The change is tried on the same 100 simulated scenes and kept only if success rises."));
+    "A language model reads where the skill fails and proposes one change to its training. The change is tried on 100 simulated scenes and kept only if success rises; a separate 100 held-out scenes, drawn in Blender, decide whether it helped."));
   const controls = el("div", "opt-controls");
   const skillSel = el("select", "opt-select");
   skillSel.setAttribute("aria-label", "Skill to optimize");
@@ -223,6 +223,7 @@ export function mount(root, ctx = {}) {
     const n = r.n_scenes;
     return ({
       scoring: `scoring ${n} scenes`, rendering: "rendering the grid", collecting: "collecting demonstrations",
+      testing: "scoring the held-out TEST scenes", control: "running the control arm",
       training: "fine-tuning the policy", proposing: "Llama is reading the failures", replay: "rendering the replay",
     })[r.phase] || r.phase || "working";
   }
@@ -336,6 +337,20 @@ export function mount(root, ctx = {}) {
       t.append(tr);
     });
     table.append(t);
+    const te = r.test && r.test.compare;
+    if (te) {
+      const box = el("div", "opt-test");
+      const ci = (c) => `${pct(c[0])} to ${pct(c[1])}`;
+      box.append(el("b", "", "Held-out TEST scenes (never seen by the optimizer)"));
+      box.append(el("div", "", `R0 ${te.before.k}/${te.n} (${ci(te.before.ci)}), final ${te.after.k}/${te.n} (${ci(te.after.ci)}). Paired change ${te.delta >= 0 ? "+" : ""}${pct(te.delta)} (95% ${ci(te.delta_ci)}), McNemar p ${te.mcnemar.p}: ${te.mcnemar.fixed} fixed, ${te.mcnemar.broken} broken.`));
+      const c = r.control && r.control.vs_r0;
+      if (c) {
+        const kind = r.control.kind === "none" ? "no change, same training" : "a random change each round";
+        box.append(el("div", "", `Control (${kind}): ${c.after.k}/${c.n} (${ci(c.after.ci)}), change ${c.delta >= 0 ? "+" : ""}${pct(c.delta)} (95% ${ci(c.delta_ci)}), McNemar p ${c.mcnemar.p}. Optimizer vs control on the same scenes: ${r.control.optimizer_vs_control.delta >= 0 ? "+" : ""}${pct(r.control.optimizer_vs_control.delta)}, p ${r.control.optimizer_vs_control.mcnemar.p}.`));
+      }
+      if (r.blender && r.blender.engine === "blender-eevee") box.append(el("div", "opt-sub", `Drawn in Blender (${r.blender.renders} renders on up to ${r.blender.workers} workers). Physics is MuJoCo; Blender only renders it.`));
+      table.append(box);
+    }
   }
 
   /* ---------- before / after replay ---------- */

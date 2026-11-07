@@ -48,6 +48,7 @@ def test_client_reads_the_native_reply_shape():
 
 def test_stub_is_used_without_a_key(monkeypatch):
     monkeypatch.setattr(llama, "api_key", lambda: None)
+    monkeypatch.setattr(llama, "openai_key", lambda: None)
     assert llama.use_stub()
     raw, model = llm._chat_json(
         "s", "put the green block in the back-right slot of the tray", {}, "task"
@@ -61,6 +62,8 @@ def test_stub_is_used_without_a_key(monkeypatch):
 
 def test_failed_live_call_falls_back_to_the_stub(monkeypatch):
     monkeypatch.setattr(llama, "api_key", lambda: "k")
+    monkeypatch.setattr(llama, "openai_key", lambda: None)
+    monkeypatch.setattr(llama, "_DEAD", set())
     monkeypatch.delenv("VLA_FORGE_LLAMA_STUB", raising=False)
 
     def boom(self, *a):
@@ -104,3 +107,73 @@ def test_stub_plan_and_critic_are_schema_shaped():
 def test_unknown_call_kind_is_rejected():
     with pytest.raises(ValueError):
         llama.Stub().chat_json("nope", "s", "u", {})
+
+
+def _mock(handler):
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_a_dead_meta_key_falls_back_to_openai(monkeypatch):
+    calls = []
+
+    def meta(req: httpx.Request) -> httpx.Response:
+        calls.append("meta")
+        return httpx.Response(401, json={"error": "invalid_api_key"})
+
+    seen = {}
+
+    def openai(req: httpx.Request) -> httpx.Response:
+        seen["url"], seen["body"] = str(req.url), json.loads(req.content)
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": '{"a": "z"}'}}]}
+        )
+
+    monkeypatch.setattr(llama, "_DEAD", set())
+    monkeypatch.setattr(llama, "api_key", lambda: "dead")
+    monkeypatch.setattr(llama, "openai_key", lambda: "ok")
+    real_llama, real_openai = llama.LlamaClient, llama.OpenAIClient
+    monkeypatch.setattr(
+        llama, "LlamaClient", lambda key: real_llama(key, http=_mock(meta))
+    )
+    monkeypatch.setattr(
+        llama, "OpenAIClient", lambda key: real_openai(key, http=_mock(openai))
+    )
+    assert llama.live_backends() == ["openai"]  # probed once, then retired
+    assert llama.live_backends() == ["openai"] and calls == ["meta"]
+    raw, model, backend = llama.chat_json_ex("optimizer", "s", "u", SCHEMA, [b"png"])
+    assert raw == {"a": "z"} and backend == f"openai:{llama.OPENAI_MODEL}"
+    assert model == llama.MODEL  # the UI keeps the Llama name
+    assert seen["url"].endswith("/chat/completions")
+    parts = seen["body"]["messages"][1]["content"]
+    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_a_working_meta_key_is_used_first(monkeypatch):
+    def meta(req):
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": '{"a": "m"}'}}]}
+        )
+
+    monkeypatch.setattr(llama, "_DEAD", set())
+    monkeypatch.setattr(llama, "api_key", lambda: "good")
+    monkeypatch.setattr(llama, "openai_key", lambda: "ok")
+    real = llama.LlamaClient
+    monkeypatch.setattr(llama, "LlamaClient", lambda key: real(key, http=_mock(meta)))
+    assert llama.live_backends() == ["meta", "openai"]
+    raw, _model, backend = llama.chat_json_ex("optimizer", "s", "u", SCHEMA)
+    assert raw == {"a": "m"} and backend == f"meta:{llama.MODEL}"
+
+
+def test_both_backends_failing_ends_on_the_stub(monkeypatch):
+    def boom(req):
+        return httpx.Response(500)
+
+    monkeypatch.setattr(llama, "_DEAD", set())
+    monkeypatch.setattr(llama, "api_key", lambda: None)
+    monkeypatch.setattr(llama, "openai_key", lambda: "ok")
+    real = llama.OpenAIClient
+    monkeypatch.setattr(llama, "OpenAIClient", lambda key: real(key, http=_mock(boom)))
+    _raw, _m, backend = llama.chat_json_ex(
+        "task", "s", "put the green block in the back-right slot of the tray", {}
+    )
+    assert backend == "stub"
