@@ -58,6 +58,7 @@ CHUNK = 25
 KEEP_FRAMES = 32
 START_DEMOS = 60  # fresh demonstrations every fine-tune starts from, before any change
 RUNS = ROOT / "runs"
+DEFAULT_RUN = "064106-9ad6"  # the run the Optimize panel opens on (a running one wins)
 
 DEFAULTS = {
     "lr": 1e-4,
@@ -953,20 +954,21 @@ def new_opt(skill: Skill, n_rounds: int) -> Opt:
 
 def list_runs() -> list[dict]:
     out = []
-    for p in sorted(RUNS.glob("opt-*/run.json"), reverse=True):
+    for p in RUNS.glob("opt-*/run.json"):
         d = json.loads(p.read_text())
         out.append(
             {
                 k: d.get(k)
                 for k in ("id", "skill", "status", "n_rounds", "started", "best_round")
             }
+            | {"default": d.get("id") == DEFAULT_RUN}
             | {
                 "rounds_done": sum(
                     1 for r in d["rounds"] if r.get("success") is not None
                 )
             }
         )
-    return out
+    return sorted(out, key=lambda r: (not r["default"], -(r["started"] or 0)))
 
 
 def load_run(oid: str) -> dict | None:

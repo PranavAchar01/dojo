@@ -389,7 +389,7 @@ export function mount(root, ctx = {}) {
   }
 
   loadLists().then(async () => {
-    const live = S.runs.find((r) => r.status === "running") || S.runs[0];
+    const live = S.runs.find((r) => r.status === "running") || S.runs.find((r) => r.default) || S.runs[0];
     if (live) open(live.id);
   });
 }
