@@ -36,32 +36,21 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .nav-links a:hover { color: var(--ink); }
 
 /* ------------------------------------------------ hero */
-.hero { position: relative; padding: 44px 0 72px; overflow: hidden; }
+.hero { position: relative; overflow: hidden; }
 .plane { position: absolute; inset: 0; z-index: -1; background:
   linear-gradient(var(--plane-line) 1px, transparent 1px) 0 0 / 24px 24px,
   linear-gradient(90deg, var(--plane-line) 1px, transparent 1px) 0 0 / 24px 24px,
   linear-gradient(rgba(72, 152, 204, .13) 1px, transparent 1px) 0 0 / 120px 120px,
   linear-gradient(90deg, rgba(72, 152, 204, .13) 1px, transparent 1px) 0 0 / 120px 120px, var(--plane-bg);
   -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
-.hero-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
-.hero-copy { max-width: 900px; }
 .eyebrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; font-weight: 500; color: var(--ink2); margin-bottom: 22px; }
 .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent-700); box-shadow: inset 0 0 0 1px var(--accent-200); }
 .lp h1 { font: 700 clamp(38px, 5.2vw, 68px)/1.04 var(--serif); letter-spacing: -.015em; color: var(--ink); text-wrap: balance; }
 .lede { margin-top: 22px; max-width: 620px; font-size: clamp(16.5px, 1.5vw, 19px); line-height: 1.55; color: var(--ink2); }
 .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
-.hero-mascot { position: relative; flex: none; width: 96px; height: 96px; margin: 0 40px 6px 0; animation: none; }
-.hero-mascot .mascot { width: 122px; margin-top: 18px; }
 
-.stage { margin: 52px 0 0; background: #fff; border-radius: 22px; box-shadow: var(--ring-up), 0 30px 60px -24px rgba(16, 24, 32, .22); overflow: hidden; }
-.stage-bar { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink3); }
-.dots { display: flex; gap: 6px; } .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line2); }
-.stage-t { color: var(--ink2); font-weight: 600; } .stage-r { margin-left: auto; }
-.stage-media { aspect-ratio: 1200 / 406; background: #eceef0; }
-.stage-media video { display: block; width: 100%; height: 100%; object-fit: cover; }
-.stage figcaption { padding: 12px 18px 14px; font-size: 13.5px; color: var(--ink3); border-top: 1px solid var(--line); }
 
-.numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 40px 0 0; border-top: 1px solid var(--line2); }
+.numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border-top: 1px solid var(--line2); }
 .numbers > div { padding: 18px 20px 0 0; }
 .numbers > div + div { padding-left: 20px; border-left: 1px solid var(--line); }
 .numbers dt { font-size: 13px; color: var(--ink3); font-weight: 500; order: 2; }
@@ -176,8 +165,6 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 }
 @media (max-width: 760px) {
   .band { padding: 72px 0; }
-  .hero { padding: 32px 0 56px; }
-  .hero-mascot { display: none; }
   .numbers { grid-template-columns: 1fr 1fr; }
   .numbers > div { padding: 16px 12px 16px 0; border-bottom: 1px solid var(--line); }
   .numbers > div + div { padding-left: 0; border-left: 0; }
@@ -189,8 +176,6 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   .mrow { grid-template-columns: 1fr; gap: 12px; }
   .m { grid-template-columns: 1fr auto; }
   .m span { grid-column: 1 / -1; grid-row: 2; }
-  .stage { margin-top: 36px; border-radius: 16px; }
-  .stage-r { display: none; }
 }
 @media (max-width: 520px) {
   .pipe { gap: 10px; }
@@ -223,25 +208,41 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .agt .llm i { color: #0064e0; }
 @media (max-width: 900px) { .agt { grid-template-columns: 1fr; } }
 
-/* ------------------------------------------------ the first screen fits the viewport (round 10)
-   Headline, copy, CTAs and the app preview share one screen; the preview takes what height is left and, when that is
-   less than the screenshot, fades out at the bottom (landing.js sets .cropped) instead of being cut by the fold. */
-.hero { padding: clamp(18px, 4.2vh, 44px) 0 72px; }
-.hero-fold { display: flex; flex-direction: column; height: calc(100svh - 64px - clamp(18px, 4.2vh, 44px) - 14px); min-height: 460px; }
-.hero-top { flex: none; }
 .lp .hero h1 { font-size: clamp(32px, min(5.2vw, 7.4vh), 68px); }
 .hero .lede { max-width: 700px; margin-top: clamp(10px, 2.2vh, 22px); font-size: clamp(15px, min(1.5vw, 2.3vh), 19px); }
 .hero .eyebrow { margin-bottom: clamp(10px, 2.2vh, 22px); }
 .hero-cta { margin-top: clamp(14px, 3vh, 30px); }
-.hero .stage { flex: 0 1 auto; min-height: 120px; margin-top: clamp(16px, 4vh, 52px); display: flex; flex-direction: column; }
-.hero .stage-media { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; overflow: hidden; }
-.hero .stage-media img { display: block; width: 100%; height: auto; }
-.hero .stage.cropped .stage-media { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
-.hero .stage.cropped figcaption { border-top-color: transparent; }
-@media (max-width: 760px) {
-  .hero-fold { height: calc(100svh - 64px - 20px); min-height: 0; }
-  .hero .lede { font-size: 15px; line-height: 1.5; }
-}
+
 /* one mascot at a time: on the landing page the roaming bot only shows while it is out touring a section; resting, it
    is out of sight and the hero's own bot is the one on screen */
 .lp .rb[data-mode="home"] { opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; }
+
+/* ------------------------------------------------ the first screen (Bara's rhythm: one plate, the robot working, one call)
+   Copy on the left, the recorded rollout on the right with no frame and no app chrome; the whole plate is one viewport
+   tall under the nav. The video is a pre-rendered loop (web/landing-render.py), so the page idles. */
+.hero { height: calc(100svh - 64px); min-height: 560px; max-height: 860px; display: flex; align-items: center; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); align-items: center; gap: clamp(16px, 3vw, 48px); height: 100%; }
+.hero-copy { max-width: 560px; }
+.lp .hero h1 { font-size: clamp(34px, min(4.6vw, 7.4vh), 64px); }
+.hero .lede { max-width: 500px; margin-top: clamp(10px, 2.2vh, 22px); font-size: clamp(15.5px, min(1.4vw, 2.3vh), 18px); }
+.hero .eyebrow { margin-bottom: clamp(10px, 2.2vh, 22px); }
+.hero-cta { margin-top: clamp(16px, 3.4vh, 32px); }
+.lp-robot { position: relative; margin: 0; align-self: center; min-width: 0; }
+.lp-robot-media { display: block; width: 100%; height: auto; max-height: calc(100svh - 64px - 72px); aspect-ratio: 880 / 690; object-fit: cover; margin-inline: auto;
+  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); }
+.lp-robot figcaption { position: absolute; left: 4%; bottom: 6px; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; color: var(--ink3); }
+.lp-robot figcaption span { font-size: 14px; font-weight: 600; color: var(--ink2); }
+.lp-robot figcaption i { font-style: normal; }
+.hero-mascot { position: absolute; right: 6%; bottom: 12%; width: 96px; height: 96px; animation: none; }
+.hero-mascot .mascot { width: 104px; }
+.proof { padding: 44px 0 40px; border-block: 1px solid var(--line); background: #fff; }
+@media (max-width: 900px) {
+  .hero { height: auto; max-height: none; min-height: 0; padding: 20px 0 8px; }
+  .hero-grid { grid-template-columns: 1fr; height: auto; gap: 4px; }
+  .hero-copy { max-width: none; }
+  .lp-robot { align-self: auto; }
+  .lp-robot-media { max-height: min(300px, 38svh); }
+  .hero-mascot { display: none; }
+  .lp .hero h1 { font-size: clamp(30px, 8.4vw, 44px); }
+  .hero .lede { font-size: 15px; line-height: 1.5; }
+}

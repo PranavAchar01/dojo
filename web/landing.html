@@ -20,13 +20,12 @@
     <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>Dojo</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#how">How it works</a>
-      <a href="#agents">Agents</a>
+      <a href="#agents">The duel</a>
+      <a href="#skills">Library</a>
       <a href="#arms">Several arms</a>
-      <a href="#skills">Skills</a>
       <a href="#robots">Robots</a>
-      <a href="#models">Models</a>
     </nav>
-    <a class="cta dark sm" href="/app">Open the app<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+    <a class="cta dark sm" href="/app">Open Dojo<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
   </div>
 </header>
 
@@ -34,37 +33,32 @@
   <!-- ------------------------------------------------------------ hero -->
   <section class="hero">
     <div class="plane" aria-hidden="true"></div>
-    <div class="wrap">
-      <div class="hero-fold">
-      <div class="hero-top">
-        <div class="hero-copy">
-          <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
-          <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
-          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here that is Meta's Muse Spark, running in parallel with SubQ. Say what the arm should do, and Dojo trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
-          <div class="hero-cta rv" style="--d:220ms">
-            <a class="cta big" href="/app">Start training<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
-            <a class="cta ghost big" href="#watch">See several arms</a>
-          </div>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
+        <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
+        <p class="lede rv" style="--d:140ms">Dojo plans the task with Meta's Muse Spark, trains a policy for it on one Mac and measures it on scenes it never trained on. Need a second arm? Ask for another SO-101 in the same chat.</p>
+        <div class="hero-cta rv" style="--d:220ms">
+          <a class="cta big" href="/app">Open Dojo<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+          <a class="cta ghost big" href="#how">How it works</a>
         </div>
-        <div class="hero-mascot rv" style="--d:300ms" aria-hidden="true">
+      </div>
+      <figure class="lp-robot rv" style="--d:200ms" aria-label="An SO-101 arm doing four tasks in turn, replayed from recorded runs in simulation">
+        <video id="hero-video" class="lp-robot-media" poster="/static/landing-rollout.jpg" muted loop playsinline preload="metadata" autoplay disablepictureinpicture tabindex="-1" aria-hidden="true">
+          <source src="/static/landing-rollout.mp4" type="video/mp4">
+          <source src="/static/landing-rollout.webm" type="video/webm">
+        </video>
+        <span class="hero-mascot" aria-hidden="true">
           <span class="mascot lg" data-follow></span>
           <span class="bb-thought on"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
-        </div>
-      </div>
-
-      <figure class="stage rv" id="watch" style="--d:200ms">
-        <div class="stage-bar">
-          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="stage-t">Dojo <span class="sep">/</span> app</span>
-          <span class="stage-r">Screenshot of the app, in simulation</span>
-        </div>
-        <div class="stage-media">
-          <img id="hero-video" src="/static/assets/multi-arm.jpg" width="1600" height="778" alt="The app with two SO-101 arms sharing one work area on a concrete floor, the arms list on the right showing each arm's sub-task">
-        </div>
-        <figcaption>Two SO-101 arms on one task, each with its own sub-task, in simulation. The panel lists what the simulator measured.</figcaption>
+        </span>
+        <figcaption><span id="hero-task">touch the yellow block</span><i>Recorded rollouts, replayed in simulation</i></figcaption>
       </figure>
-      </div>
+    </div>
+  </section>
 
+  <section class="proof">
+    <div class="wrap">
       <dl class="numbers rv">
         <div><dt>Parts through every arm</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
         <div><dt>Arm 1, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
@@ -113,6 +107,24 @@
     </div>
   </section>
 
+  <!-- ------------------------------------------------------------ skills -->
+  <section class="band" id="skills">
+    <div class="wrap">
+      <p class="kicker rv">Skill library</p>
+      <h2 class="rv">Every prompt <em>grows</em> the library.</h2>
+      <p class="sub rv">Each published skill is saved with its measured score and starts the next prompt. The nearest skill is the starting point, so later skills train faster.</p>
+      <ul class="tiles">
+        <li class="tile rv"><img src="/static/assets/skill-touch.jpg" alt="Simulator view: the SO-101 arm reaching a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>touch the red block</h3><p class="res"><b class="num">20 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block toward a blue square" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a blue block in a blue bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
+        <li class="tile rv"><img src="/static/assets/skill-kit.jpg" alt="Simulator view: the SO-101 arm placing a red block in a slot of the tray" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the red block in the back-right slot of the tray</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-insert.jpg" alt="Simulator view: the SO-101 arm inserting a red block into a square socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>insert the red block into the socket</h3><p class="res"><b class="num">13 / 20</b> in simulation</p></div></li>
+        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-rotate.jpg" alt="Simulator view: the SO-101 arm setting a rotated blue block in a diamond socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>pick up the blue block, rotate it and set it in the diamond socket</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
+      </ul>
+      <p class="fine rv">Kitting into a tray slot, insertion into a socket and rotate-and-place are the hardest skills and score lowest. Scores are measured on 20 held-out scenes each, trained inside the 3 minute budget.</p>
+    </div>
+  </section>
+
   <!-- ------------------------------------------------------------ several arms -->
   <section class="band tint" id="arms">
     <div class="wrap">
@@ -153,26 +165,8 @@
     </div>
   </section>
 
-  <!-- ------------------------------------------------------------ skills -->
-  <section class="band" id="skills">
-    <div class="wrap">
-      <p class="kicker rv">Skill library</p>
-      <h2 class="rv">Every prompt <em>grows</em> the library.</h2>
-      <p class="sub rv">Each published skill is saved with its measured score and starts the next prompt. The nearest skill is the starting point, so later skills train faster.</p>
-      <ul class="tiles">
-        <li class="tile rv"><img src="/static/assets/skill-touch.jpg" alt="Simulator view: the SO-101 arm reaching a red block" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>touch the red block</h3><p class="res"><b class="num">20 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-push.jpg" alt="Simulator view: the SO-101 arm pushing a green block toward a blue square" width="480" height="360" loading="lazy"><div class="tb"><span class="t1">Tier 1</span><h3>push the green block onto the blue square</h3><p class="res"><b class="num">15 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-bowl.jpg" alt="Simulator view: the SO-101 arm placing a blue block in a blue bowl" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the blue block in the blue bowl</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
-        <li class="tile rv"><img src="/static/assets/skill-kit.jpg" alt="Simulator view: the SO-101 arm placing a red block in a slot of the tray" width="480" height="360" loading="lazy"><div class="tb"><span class="t2">Tier 2</span><h3>put the red block in the back-right slot of the tray</h3><p class="res"><b class="num">17 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:60ms"><img src="/static/assets/skill-insert.jpg" alt="Simulator view: the SO-101 arm inserting a red block into a square socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>insert the red block into the socket</h3><p class="res"><b class="num">13 / 20</b> in simulation</p></div></li>
-        <li class="tile rv" style="--d:120ms"><img src="/static/assets/skill-rotate.jpg" alt="Simulator view: the SO-101 arm setting a rotated blue block in a diamond socket" width="480" height="360" loading="lazy"><div class="tb"><span class="t3">Tier 3</span><h3>pick up the blue block, rotate it and set it in the diamond socket</h3><p class="res"><b class="num">14 / 20</b> in simulation</p></div></li>
-      </ul>
-      <p class="fine rv">Kitting into a tray slot, insertion into a socket and rotate-and-place are the hardest skills and score lowest. Scores are measured on 20 held-out scenes each, trained inside the 3 minute budget.</p>
-    </div>
-  </section>
-
   <!-- ------------------------------------------------------------ robots -->
-  <section class="band tint" id="robots">
+  <section class="band" id="robots">
     <div class="wrap">
       <p class="kicker rv">Robot builder</p>
       <h2 class="rv">Pick an arm, a wrist and a gripper. <em>Every part is sourced.</em></h2>
@@ -206,38 +200,13 @@
     </div>
   </section>
 
-  <!-- ------------------------------------------------------------ models -->
-  <section class="band" id="models">
-    <div class="wrap">
-      <p class="kicker rv">Models</p>
-      <h2 class="rv">What runs <em>today</em>, and what is planned.</h2>
-      <p class="sub rv">The planner reads your sentence and the critic reads the failures. The policy itself sits on two frozen encoders and a small trained head.</p>
-      <div class="models rv">
-        <div class="mrow">
-          <div class="mrole">Planner and critic</div>
-          <div class="mlist">
-            <div class="m live"><b>Muse Spark by Meta</b><span>Muse Spark parses the task, writes the success check, plans the arms, reads the failures and proposes each optimizer change. SubQ reads the run history and picks among the options.</span><i class="status live">Live</i></div>
-          </div>
-        </div>
-        <div class="mrow">
-          <div class="mrole">Policy backbone</div>
-          <div class="mlist">
-            <div class="m live"><b>DINOv2-small</b><span>Meta AI. Frozen vision features from the front and wrist cameras.</span><i class="status live">Live</i></div>
-            <div class="m live"><b>SigLIP2 base</b><span>Frozen text tower for the instruction.</span><i class="status live">Live</i></div>
-            <div class="m live"><b>Action head</b><span>4.9 M parameters, trained here: FiLM, a Perceiver read-out and a small transformer.</span><i class="status live">Live</i></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ------------------------------------------------------------ closing -->
   <section class="closer">
     <div class="wrap">
       <span class="mascot lg" data-follow aria-hidden="true"></span>
       <h2 class="rv">What should the arm <em>learn</em>?</h2>
       <p class="sub rv">Type a task, or ask for more than one arm. Dojo shows its work as it goes.</p>
-      <a class="cta big rv" href="/app">Start training<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
+      <a class="cta big rv" href="/app">Open Dojo<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
     </div>
   </section>
 </main>
@@ -245,7 +214,7 @@
 <footer class="lp-foot">
   <div class="wrap">
     <span>Dojo. Everything robotic on this page is in simulation.</span>
-    <span class="fl"><span>Muse Spark + SubQ</span><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a></span>
+    <span class="fl"><span>Muse Spark + SubQ</span><a href="/app">Open Dojo</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a></span>
   </div>
 </footer>
 
