@@ -217,7 +217,7 @@ a.brand:hover { color: var(--accent); }
 .vc-btn.on { background: #fff; border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 
 /* agent rail: a floating card on the right (Etch's inspector card) */
-.rail { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 10; margin: 0; padding: 6px; list-style: none; display: flex; flex-direction: column; gap: 2px; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); animation: mk-in-r .5s var(--soft) .16s both; }
+.rail { max-height: calc(100% - 120px); overflow-y: auto; scrollbar-width: none; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 10; margin: 0; padding: 6px; list-style: none; display: flex; flex-direction: column; gap: 2px; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); animation: mk-in-r .5s var(--soft) .16s both; }
 .rail li { width: 62px; padding: 7px 0 6px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--ink3); position: relative; transition: background .26s, color .26s; }
 .rail li svg { width: 17px; height: 17px; }
 .rail li.live { background: var(--accent-bg); color: var(--accent-700); }
@@ -601,3 +601,5 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .rc-rows dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .rc-rows dd.none { color: var(--ink3); font-style: italic; }
 .rc-btn { margin-top: 10px; height: 30px; padding: 0 12px; border: 0; border-radius: 9px; background: var(--accent-bg); color: var(--accent-700); font: 600 12px var(--ui); cursor: pointer; }
+
+.rc-empty { margin: 2px 0 0; font-size: 12.5px; color: var(--ink2); line-height: 1.4; }

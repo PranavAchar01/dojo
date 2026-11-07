@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (
+    records,
     agents_api,
     assets_api,
     assets_scene,
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
     global AGENTS
     loop = asyncio.get_running_loop()
     FORGE.loop = loop
+    records.backfill()  # older skills get what the ladder log honestly holds; idempotent
     AGENTS = Agents(loop)
     agents_api.HOLD["agents"] = AGENTS
     if await asyncio.to_thread(
@@ -109,7 +111,7 @@ def state():
         "robot": FORGE.robot,
         "active": AGENTS.active,
         "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
-        "skills": [s.__dict__ for s in FORGE.registry.ordered()],
+        "skills": [{**s.__dict__, "record": records.load(s.id)} for s in FORGE.registry.ordered()],
     }
 
 
