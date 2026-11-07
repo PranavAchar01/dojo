@@ -31,7 +31,7 @@ export function mount(root, ctx = {}) {
   const head = el("div", "opt-head");
   const title = el("div", "opt-title");
   title.append(el("h2", "", "Optimize"), el("p", "opt-sub",
-    "A language model reads where the skill fails and proposes one change to its training. The change is tried on 100 simulated scenes and kept only if success rises; a separate 100 held-out scenes, drawn in Blender, decide whether it helped."));
+    "A language model reads where the skill fails and proposes one change to its training. Each change is tried on 100 selection scenes and kept only if success rises there; a separate 100 held-out test scenes, never used to choose, show whether it really helped."));
   const controls = el("div", "opt-controls");
   const skillSel = el("select", "opt-select");
   skillSel.setAttribute("aria-label", "Skill to optimize");
@@ -60,7 +60,7 @@ export function mount(root, ctx = {}) {
   wrap.append(canvas, veil);
   const legend = el("div", "opt-legend");
   legend.append(el("span", "opt-key ok", "succeeded"), el("span", "opt-key bad", "failed"),
-    el("span", "opt-note", "Each tile is one held-out scene, replayed from the recorded run."));
+    el("span", "opt-note", "Each tile is one selection scene, drawn in Blender from the recorded run"));
   gridCard.append(gridTop, wrap, legend);
 
   const stats = el("div", "opt-stats");
@@ -70,7 +70,8 @@ export function mount(root, ctx = {}) {
   const spark = el("div", "opt-spark");
   const fails = el("div", "opt-fails");
   const phase = el("div", "opt-phase");
-  stats.append(ticker, changeBox, metric, spark, fails, phase);
+  const heldCard = el("div", "opt-held");
+  stats.append(ticker, changeBox, metric, spark, fails, phase, heldCard);
   main.append(gridCard, stats);
 
   const replay = el("div", "opt-replay");
@@ -233,7 +234,7 @@ export function mount(root, ctx = {}) {
     const r = S.run;
     if (!r) return;
     setBadge("llama", "Llama 4 Maverick reads where the skill fails and proposes the change. Built with Llama.");
-    gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} held-out scenes`;
+    gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} selection scenes`;
 
     ticker.textContent = "";
     for (let i = 0; i <= r.n_rounds; i++) {
@@ -244,7 +245,7 @@ export function mount(root, ctx = {}) {
       b.classList.add(state);
       if (i === S.sel) b.classList.add("sel");
       b.disabled = !row || row.success == null;
-      b.onclick = () => { S.sel = i; S.follow = false; render(); };
+      b.onclick = () => { S.sel = i; S.follow = false; render(); window.dispatchEvent(new CustomEvent("forge:optround", { detail: { state } })); };
       ticker.append(b);
     }
 
@@ -283,9 +284,25 @@ export function mount(root, ctx = {}) {
       r.status === "done" ? `Finished in ${Math.round(r.seconds)} s. Best: round ${r.best_round}.` :
       r.status === "error" ? `Stopped: ${r.error}` : "";
 
+    renderHeld(r);
     renderTable(r);
     renderReplay(r);
     drawGrid();
+  }
+
+  function renderHeld(r) {
+    heldCard.textContent = "";
+    const te = r.test && r.test.compare;
+    if (!te) return;
+    const ci = (c) => `${pct(c[0])} to ${pct(c[1])}`;
+    const sg = (v) => (v > 0 ? "+" : v < 0 ? "-" : "") + Math.abs(Math.round(v * 100));
+    heldCard.append(el("div", "opt-held-h", "Held-out test"),
+      el("div", "opt-held-sub", `${te.n} scenes the optimizer never saw`),
+      el("div", "opt-held-row", `R0 ${te.before.k}/${te.n} (${ci(te.before.ci)}) to final ${te.after.k}/${te.n} (${ci(te.after.ci)})`));
+    const c = r.control && r.control.vs_r0;
+    if (c) heldCard.append(el("div", "opt-held-row", `Random changes, same rounds: ${c.before.k} to ${c.after.k}`));
+    const p = te.mcnemar.p;
+    heldCard.append(el("div", "opt-held-line", `${sg(te.delta)} on held-out, ${p < 0.05 ? "significant" : "not yet significant"} (p = ${p.toFixed(2)})`));
   }
 
   function drawSpark(r) {

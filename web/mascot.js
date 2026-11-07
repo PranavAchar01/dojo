@@ -255,6 +255,13 @@ function watchBadge() {
   else if (bad) { if (!liveStage()) holdState("confused", 4000); else each((b) => b.eyes.emote("wince")); }
 }
 
+// stepping through the rounds in the montage: the selected chip's verdict gets its reaction
+window.addEventListener("forge:optround", (e) => {
+  const st = e.detail && e.detail.state;
+  if (st === "kept") { each((b) => { b.eyes.emote("pleased"); b.eyes.react("nod"); }); showBubble("Round kept", { id: "opt", done: true }); dropBubble(900); }
+  else if (st === "reverted") { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); showBubble("Round reverted", { id: "opt", failed: true }); dropBubble(1200); }
+});
+
 function watchOptimizer() {
   const kept = document.querySelectorAll("#optimizer-root .opt-chip.kept").length;
   const bad = document.querySelectorAll("#optimizer-root .opt-chip.reverted").length;
