@@ -83,9 +83,9 @@ controls.maxPolarAngle = Math.PI * 0.47;
 controls.update();
 
 addStudioLights(scene3, { target: [0.2, 0, 0], extent: 1.1 });
-const lab = buildLab(scene3, renderer, { cell: [-0.34, -0.58, 0.74, 0.58] });
+const lab = buildLab(scene3, renderer, { cell: [-0.34, -0.58, 0.74, 0.58], joints: false });
 floorLabel(lab, "CELL 01  ·  SO-101", 0.5, -0.545, Math.PI / 2, 0.034);
-let plate = basePlate(0.23);
+let plate = basePlate(0.17);
 scene3.add(plate);
 const postStage = makeStage(renderer, scene3, camera);
 
@@ -248,7 +248,7 @@ async function buildWorld(sc) {
   if (!world || world.rid !== rid) {
     camFor(rid); // frame a new arm once; keep the viewer's orbit otherwise
     scene3.remove(plate);
-    plate = basePlate(0.23 * camScale);
+    plate = basePlate(0.17 * camScale);
     scene3.add(plate);
   }
   const root = new THREE.Group();
@@ -296,9 +296,9 @@ const CAMS = {
   front: { pos: [1.3, -0.02, 0.56], target: [0.16, 0.0, 0.06], rotate: false },
   top: { pos: [0.2, -0.06, 1.15], target: [0.2, 0.0, 0.0], rotate: false },
 };
-// Orbit starts in front of the arm (+x, the side the gripper works toward), a little to the right, and only sways
-// about 25 degrees either way, so the camera never swings round behind it.
-const SWAY = { az: (-42 * Math.PI) / 180, amp: (12 * Math.PI) / 180, period: 30, r: 1.2, h: 0.4, resume: 4000 };
+// Orbit starts in front of the arm (+x, the side the gripper works toward), 20 degrees to the right, so the arm faces
+// the camera, and only sways about 8 degrees either way, so the camera never swings round behind it.
+const SWAY = { az: (-20 * Math.PI) / 180, amp: (8 * Math.PI) / 180, period: 30, r: 1.2, h: 0.4, resume: 4000 };
 let userUntil = 0; // sway pauses while the user drags and for a few seconds after
 function swayPose(now) {
   const k = camScale;

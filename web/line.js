@@ -189,12 +189,12 @@ function render() {
   $(".ln-build").textContent = nTrain ? `Train ${nTrain} station${nTrain > 1 ? "s" : ""} and run` : "Run the line";
   $(".ln-cards").innerHTML = line.stations.map(stationCard).join("") ||
     `<p class="ln-refused">${esc(line.plan?.note || "No stations in that description.")}</p>`;
-  const planned = `Planned by ${esc(line.plan?.model || "the planner")}${line.plan?.note ? `. ${esc(line.plan.note)}` : ""}`;
+  const planned = `Planned by ${esc(line.plan?.model || "the planner")}.${line.plan?.note ? ` ${esc(line.plan.note)}` : ""}`;
   if (line.status === "building") setNote("Training the stations that need a skill, one agent run each.", "think");
   else if (line.status === "running") setNote("Running the line in simulation, zone by zone.", "think");
   else if (line.status === "failed") setNote(line.result?.error || "A station did not publish a skill; the line did not run.", "fail");
   else if (refused) setNote("A station is not feasible: see its card.", "fail");
-  else setNote(`${line.stations.length} stations on one conveyor. ${planned}`, line.status === "done" ? "ok" : "idle");
+  else setNote(`${line.stations.length} ${line.stations.length === 1 ? "station" : "stations"} on one conveyor. ${planned}`, line.status === "done" ? "ok" : "idle");
   renderResult();
 }
 
