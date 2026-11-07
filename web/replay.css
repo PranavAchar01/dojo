@@ -75,3 +75,14 @@ body.rsi-open #view-sim .caption { opacity: 0; transition: opacity .2s; }
 .rp-rsi .rsi-open:hover { background: var(--acc); color: #fff; }
 @media (max-width: 820px) { .rp-rsi .rsi-main { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .rp-rsi { animation: none; } }
+
+/* Replay easing: stage changes fade and slide in over ~300 ms instead of snapping (live runs are untouched) */
+@keyframes rp-ease { from { opacity: 0; transform: translateY(6px); } }
+@keyframes rp-fade { from { opacity: 0; } }
+body.rp-on #thread > *, body.rp-on .tools-list > *, body.rp-on .sub-thread, body.rp-on #chips > *, body.rp-on #plan > *, body.rp-on #critic > * { animation: rp-ease .32s cubic-bezier(.2, .7, .3, 1) both; }
+body.rp-on #vp-badge:not(.hidden), body.rp-on #step-badge:not(.hidden) { animation: rp-fade .3s ease both; }
+body.rp-on .rail li { transition: background .35s, color .35s, opacity .35s; }
+body.rp-on .rail li .m { transition: opacity .3s; }
+body.rp-on #view-sim .caption { transition: opacity .3s; }
+body.rp-on #view-sim canvas { animation: rp-fade .35s ease both; }
+@media (prefers-reduced-motion: reduce) { body.rp-on * { animation-duration: .01s !important; } }

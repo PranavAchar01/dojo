@@ -3,9 +3,8 @@
 // all move as they did. It reads /api/skills/<id>/replay-events and writes nothing.
 const $ = (s) => document.querySelector(s);
 const F = () => window.forge;
-const CAP = 4; // longest idle gap kept, in seconds: only waiting with nothing on screen is shortened, never an animation
-const LEAD = 0.5;
-const TAIL = 1.5;
+const LEAD = 0.4;
+const TAIL = 1;
 const STAGE_NAME = { task: "Task", router: "Route", scene: "Scene", data: "Demos", trainer: "Train", eval: "Eval", critic: "Critic", optimizer: "Optimize", registry: "Publish" };
 
 let bar = null;
@@ -33,16 +32,19 @@ function buildBar() {
   sc.addEventListener("input", () => R && seek((sc.value / 1000) * R.total));
 }
 
-// recording seconds -> playback seconds: the recording's own pacing, with idle gaps capped at CAP
-// (a rebuilt record is already paced for playback and is kept exactly)
-function compress(times, paced) {
-  const at = [];
-  let acc = LEAD;
-  times.forEach((t, i) => {
-    acc += i ? (paced ? Math.max(t - times[i - 1], 0) : Math.min(Math.max(t - times[i - 1], 0), CAP)) : 0;
-    at.push(acc);
-  });
-  return { at, total: acc + TAIL };
+// recording seconds -> playback seconds. Waiting is capped (nothing on screen changes while it runs), then the whole
+// timeline is time-remapped so a build plays in about GOAL seconds at 1x (a little longer for runs with very many events,
+// so every event still gets a beat). Every event keeps its order and is shown; 2x and 4x are relative to this pacing.
+const GOAL = 14;
+const GAP = 1.5;
+function compress(times) {
+  const raw = [0];
+  times.forEach((t, i) => { if (i) raw.push(raw[i - 1] + Math.min(Math.max(t - times[i - 1], 0), GAP)); });
+  const span = raw[raw.length - 1] || 1;
+  const goal = GOAL + Math.max(0, times.length - 120) * 0.05;
+  const k = Math.min(1, goal / span);
+  const at = raw.map((v) => LEAD + v * k);
+  return { at, total: at[at.length - 1] + TAIL };
 }
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -221,10 +223,11 @@ async function open(tile) {
   if (!bar) buildBar();
   F().setView("sim");
   const thread = $("#thread");
-  const { at, total } = compress(d.events.map((e) => e.ts), d.paced);
+  const { at, total } = compress(d.events.map((e) => e.ts));
   R = { sid: d.sid, d, at, total, pos: 0, next: 0, gen: 0, speed: 1, playing: true, raf: 0, last: 0, base: thread.children.length, thread };
   bar.querySelector(".rp-note").innerHTML = note(d);
   bar.hidden = false;
+  document.body.classList.add("rp-on");
   F().replay.begin(d.prompt);
   setSpeed(1);
   restart();
@@ -295,6 +298,7 @@ function close() {
   while (R.thread.children.length > R.base) R.thread.lastElementChild.remove();
   R = null;
   rsiClose();
+  document.body.classList.remove("rp-on");
   bar.hidden = true;
   F().replay.end();
 }
