@@ -369,7 +369,7 @@ function setMode(m, from, name) {
   chip.innerHTML = "";
   const show = m === "remix" || m === "scratch";
   chip.classList.toggle("hidden", !show);
-  if (!show) { $("#prompt").placeholder = "Tell Forge what the arm should do..."; return; }
+  if (!show) { $("#prompt").placeholder = "Tell Reps what the arm should do..."; return; }
   chip.append(el("span", "", m === "remix" ? `Remix · ${name}` : "From scratch"));
   const x = el("button", "", "×");
   x.setAttribute("aria-label", "Clear mode");
