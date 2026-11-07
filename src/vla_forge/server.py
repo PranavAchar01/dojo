@@ -6,8 +6,10 @@ VLA_FORGE_TIMED=1 HF_HUB_OFFLINE=1 scripts/heavy.sh uv run vla-forge     # http:
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
 import os
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -19,14 +21,14 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agents_api, factory, optimizer_api, tiles
+from . import agents_api, factory, optimizer_api, robotcache, thumbs, tiles
 from .agents import Forge as Agents
 from .agents import describe_run_reply, run_once
 from .pipeline import FORGE
 from .sim import robots as R
 from .sim.scene import Layout
 from .sim.tasks import TaskSpec, sample_layout
-from .viz import part_view, preview, robot_meshes, robot_view
+from .viz import preview, robot_meshes
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 AGENTS: Agents | None = None
@@ -39,6 +41,12 @@ async def lifespan(app: FastAPI):
     FORGE.loop = loop
     AGENTS = Agents(loop)
     agents_api.HOLD["agents"] = AGENTS
+    if await asyncio.to_thread(
+        thumbs.warm_needed
+    ):  # fill the Robot tab's thumbnails and caches in a quiet process
+        await asyncio.create_subprocess_exec(
+            "nice", "-n", "19", sys.executable, "-m", "vla_forge.thumbs"
+        )
     await asyncio.to_thread(FORGE.warm)
     FORGE.emit("", "agents", "", models=await asyncio.to_thread(AGENTS.models))
     yield
@@ -228,29 +236,62 @@ def robots():
     return {**R.catalog(), "active": FORGE.robot}
 
 
+def _blob(data: bytes, key: str, request: Request) -> Response:
+    """A stored gzip JSON payload: revalidated by its parts hash, so a reload costs a 304."""
+    headers = {
+        "ETag": f'"{key}"',
+        "Cache-Control": "no-cache",
+        "Vary": "Accept-Encoding",
+    }
+    if request.headers.get("if-none-match") == headers["ETag"]:
+        return Response(status_code=304, headers=headers)
+    if "gzip" in request.headers.get("accept-encoding", ""):
+        headers["Content-Encoding"] = "gzip"
+    else:
+        data = gzip.decompress(data)
+    return Response(data, media_type="application/json", headers=headers)
+
+
 @app.get("/api/robots/{robot}/report")
-async def robot_report(robot: str):
+async def robot_report(robot: str, request: Request):
     """Assemble the robot and run every check: MJCF compiles, joint limits, stroke, reach of the table."""
-    rid = _robot_id(robot)
-
-    def run() -> dict:
-        ok, why, feas = R.usable(rid)
-        return {**R.report(rid), "skills": feas, "usable": ok, "usable_reason": why}
-
-    return await asyncio.to_thread(run)
+    data, key = await asyncio.to_thread(robotcache.report_blob, _robot_id(robot))
+    return _blob(data, key, request)
 
 
 @app.get("/api/robots/{robot}/view")
-async def robot_preview(robot: str):
-    return await asyncio.to_thread(robot_view, _robot_id(robot))
+async def robot_preview(robot: str, request: Request):
+    data, key = await asyncio.to_thread(robotcache.view_blob, _robot_id(robot))
+    return _blob(data, key, request)
 
 
 @app.get("/api/parts/{slot}/{part}/view")
-async def part_preview(slot: str, part: str):
+async def part_preview(slot: str, part: str, request: Request):
     table = {"arm": R.ARMS, "wrist": R.WRISTS, "effector": R.EFFECTORS}.get(slot)
     if table is None or part not in table:
         _404()
-    return await asyncio.to_thread(part_view, slot, part)
+    if slot == "wrist" or (slot == "effector" and part == "native"):
+        data, key = await asyncio.to_thread(
+            robotcache.view_blob, R.part_robot_id(slot, part)
+        )
+    else:
+        data, key = await asyncio.to_thread(robotcache.part_blob, slot, part)
+    return _blob(data, key, request)
+
+
+@app.get("/api/thumbs/{slot}/{part}")
+def part_thumb(slot: str, part: str, arm: str | None = None):
+    """The card image of a part (a wrist or the native jaw as it sits on `arm`), rendered once and kept on disk."""
+    table = {"arm": R.ARMS, "wrist": R.WRISTS, "effector": R.EFFECTORS}.get(slot)
+    if table is None or part not in table or (arm is not None and arm not in R.ARMS):
+        _404()
+    on_arm = slot == "wrist" or (slot == "effector" and part == "native")
+    f = thumbs.DIR / thumbs.thumb_name(slot, part, (arm or "so101") if on_arm else None)
+    if not f.exists():
+        _404()
+    return FileResponse(
+        f, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 
 @app.post("/api/robot/use")

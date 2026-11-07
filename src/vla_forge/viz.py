@@ -185,6 +185,24 @@ def robot_meshes(robot: str = "so101") -> dict:
     return {str(k): v for k, v in _robot_meshes(robot).items()}
 
 
+def visual_bbox(m: mujoco.MjModel, d: mujoco.MjData) -> tuple[np.ndarray, np.ndarray]:
+    """Framing box: each visual mesh's vertices in the world frame (not just its origin)."""
+    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
+    for g in range(m.ngeom):
+        if (
+            m.geom_group[g] != VISUAL_GROUP
+            or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
+        ):
+            continue
+        mid = m.geom_dataid[g]
+        a, n = m.mesh_vertadr[mid], m.mesh_vertnum[mid]
+        w = m.mesh_vert[a : a + n] @ d.geom_xmat[g].reshape(3, 3).T + d.geom_xpos[g]
+        lo, hi = np.minimum(lo, w.min(0)), np.maximum(hi, w.max(0))
+    if not np.isfinite(lo).all():
+        lo, hi = np.zeros(3), np.zeros(3)
+    return lo, hi
+
+
 def _static_view(m: mujoco.MjModel, d: mujoco.MjData) -> dict:
     """Visual meshes posed in the world frame (no bodies to animate): what a Build-tab preview draws."""
     geoms = []
@@ -210,20 +228,7 @@ def _static_view(m: mujoco.MjModel, d: mujoco.MjData) -> dict:
                 "rgba": rgba.round(4).tolist(),
             }
         )
-    # framing box: each visual mesh's vertices in the world frame (not just its origin)
-    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
-    for g in range(m.ngeom):
-        if (
-            m.geom_group[g] != VISUAL_GROUP
-            or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
-        ):
-            continue
-        mid = m.geom_dataid[g]
-        a, n = m.mesh_vertadr[mid], m.mesh_vertnum[mid]
-        w = m.mesh_vert[a : a + n] @ d.geom_xmat[g].reshape(3, 3).T + d.geom_xpos[g]
-        lo, hi = np.minimum(lo, w.min(0)), np.maximum(hi, w.max(0))
-    if not np.isfinite(lo).all():
-        lo, hi = np.zeros(3), np.zeros(3)
+    lo, hi = visual_bbox(m, d)
     return {
         "meshes": {str(k): v for k, v in _mesh_buffers(m).items()},
         "geoms": geoms,
@@ -231,9 +236,8 @@ def _static_view(m: mujoco.MjModel, d: mujoco.MjData) -> dict:
     }
 
 
-@lru_cache(maxsize=32)
-def robot_view(robot_id: str) -> dict:
-    """The assembled robot at its home pose with the jaws open, its tool point and the reach map."""
+def robot_posed(robot_id: str):
+    """The robot at its home pose with the jaws open: its compiled model, state and calibration."""
     from .sim import robots as R
 
     r = R.calibrate(robot_id)
@@ -252,6 +256,15 @@ def robot_view(robot_id: str) -> dict:
     ):  # let the fingers open (they are driven, so step rather than set)
         mujoco.mj_step(m, d)
     mujoco.mj_forward(m, d)
+    return m, d, r
+
+
+@lru_cache(maxsize=32)
+def robot_view(robot_id: str) -> dict:
+    """The assembled robot at its home pose with the jaws open, its tool point and the reach map."""
+    from .sim import robots as R
+
+    m, d, r = robot_posed(robot_id)
     s = m.site(r.tcp_site).id
     return {
         "id": robot_id,
@@ -261,18 +274,27 @@ def robot_view(robot_id: str) -> dict:
     }
 
 
+def part_posed(slot: str, part: str):
+    """One catalog part on its own, straight from its source model: compiled model and state."""
+    from .sim import robots as R
+
+    if slot == "arm":
+        m = R._load_arm(R.ARMS[part]).compile()
+    else:
+        m = mujoco.MjModel.from_xml_path(str(R.REPO / R.EFFECTORS[part].source.path))
+    R.fix_qpos0(m)
+    d = mujoco.MjData(m)
+    mujoco.mj_forward(m, d)
+    return m, d
+
+
 @lru_cache(maxsize=32)
 def part_view(slot: str, part: str) -> dict:
     """One catalog part on its own, straight from its source model (an arm with its own jaw, or a gripper)."""
     from .sim import robots as R
 
-    if slot == "arm":
-        m = R._load_arm(R.ARMS[part]).compile()
-    elif slot == "effector" and part != "native":
-        m = mujoco.MjModel.from_xml_path(str(R.REPO / R.EFFECTORS[part].source.path))
-    else:  # the wrist options and the native jaw are shown on the stock SO-101
-        return robot_view(R.part_robot_id(slot, part))
-    R.fix_qpos0(m)
-    d = mujoco.MjData(m)
-    mujoco.mj_forward(m, d)
-    return {"id": f"{slot}:{part}", **_static_view(m, d)}
+    if slot == "arm" or (slot == "effector" and part != "native"):
+        m, d = part_posed(slot, part)
+        return {"id": f"{slot}:{part}", **_static_view(m, d)}
+    # the wrist options and the native jaw are shown on the stock SO-101
+    return robot_view(R.part_robot_id(slot, part))
