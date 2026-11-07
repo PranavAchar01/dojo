@@ -17,7 +17,8 @@ const post = (url, body) => api(url, { method: "POST", headers: { "content-type"
 const MAX_ARMS = 4;
 const SPEED = 4; // playback is sped up so a cell of recorded episodes plays in about a minute
 const N_PARTS = 12;
-const Y0 = 0.32; // first arm's y; the arms stand along y, one pitch apart
+const Y0 = 0.32;
+const GAP = 0.5; // arms stand close together around one work area // first arm's y; the arms stand along y, one pitch apart
 const ADD = /\b(add|bring in|put in|spawn|give me)\s+(another|a second|a third|an? extra|one more)\b[^.]{0,30}\b(so-?101|arms?|robots?)\b/i;
 const WANTS = new RegExp(
   [
@@ -33,7 +34,9 @@ const WANTS = new RegExp(
 
 let active = false;
 let line = null; // the planned cell as /api/line returns it
-let bare = 0; // arms with no task yet (an "add another SO-101" before anything is planned)
+let extra = 0; // arms that have no task yet (planned arms come from the line's stations)
+let prevN = 0; // arms already standing before the latest change, so only new ones build in
+let taskText = "";
 let grp = null;
 let cells = [];
 let layout = null; // { cy, n }
@@ -45,11 +48,12 @@ let saved = null; // what the single-arm view had before the cell took over
 
 // ------------------------------------------------------------------ entry points
 
-function wants(text) { return ADD.test(text) || WANTS.test(text); }
+function wants(text) { return ADD.test(text) || WANTS.test(text) || (active && extra > 0); }
+const total = () => (line ? line.stations.length : 0) + extra;
 
 async function handle(text) {
   if (ADD.test(text)) return addArm();
-  F().note("Splitting the task across arms.");
+  F().note("Working out what each arm does.");
   for (const k of ["task", "router", "planner", "scene", "data", "trainer", "eval", "critic", "executor", "registry"]) F().stage(k, "idle", "");
   try {
     const l = await post("/api/line/plan", { prompt: text });
@@ -57,31 +61,35 @@ async function handle(text) {
       F().note(l.plan?.note || "I could not find separate arm tasks in that. Try \"two arms: one seats the housing in the pallet, the other inserts it into the socket\".");
       return;
     }
+    taskText = text;
+    const had = total();
+    extra = Math.max(0, had - l.stations.length);
     await setCell(l);
   } catch (err) {
     F().note(err.message);
   }
 }
 
+// adds an arm to whatever is on the canvas, now: the new one builds in beside the arms already standing
 async function addArm() {
-  if (line) {
-    F().note(`This cell already has a plan for ${line.stations.length} arms. Describe what all the arms do together and I will plan it again.`);
-    return;
-  }
-  if (bare >= MAX_ARMS) { F().note(`A cell holds up to ${MAX_ARMS} arms.`); return; }
-  bare = bare ? bare + 1 : 2;
+  const n = total();
+  if (n >= MAX_ARMS) { F().note(`The canvas holds up to ${MAX_ARMS} arms.`); return; }
+  const first = !active;
+  prevN = first ? (F().hasWorld() ? 1 : 0) : n;
+  extra = first ? 2 : extra + 1;
   enter();
   await build3D();
   renderPanel();
   F().stage("scene", "done");
-  F().note(`Added an SO-101: ${bare} arms in the cell, no tasks yet. Say what each one does, for example "two arms: one seats the housing in the pallet, the other inserts it into the socket".`);
+  const k = total();
+  F().note(`Added an SO-101: arm ${k} has no task yet. Say what it should do, or describe the task the arms do together.`);
 }
 
 async function setCell(l) {
   const same = line && line.id === l.id;
   line = l;
-  bare = 0;
   if (!same) armRuns = {};
+  if (!same) prevN = 0;
   enter();
   renderPanel();
   for (const k of ["task", "router", "planner"]) F().stage(k, "done");
@@ -89,7 +97,7 @@ async function setCell(l) {
   F().stage("scene", "done");
   if (!same) {
     const names = line.stations.map((s, i) => `arm ${i + 1}: ${s.name}`).join("; ");
-    F().note(`${line.stations.length} arms in one cell. ${names}.`);
+    F().note(`${line.stations.length} arms working on one task. ${names}.`);
   }
   if (line.result?.playback) startClock();
 }
@@ -114,7 +122,7 @@ function exit() {
   token++;
   const f = F();
   clear();
-  line = null; bare = 0; armRuns = {};
+  line = null; extra = 0; prevN = 0; armRuns = {};
   f.setMulti(false);
   f.setSingleVisible(true);
   f.controls.maxDistance = saved.max;
@@ -160,17 +168,17 @@ async function build3D() {
   let data, rows;
   if (line) {
     data = await api(`/api/line/${line.id}/scene`);
-    rows = line.stations.map((st, k) => ({ sc: data.cells[k], st, belt: true }));
-  } else {
+    rows = line.stations.map((st, k) => ({ sc: data.cells[k], st }));
+  } else data = { block_colors: {} };
+  if (extra) {
     previewScene ||= await api("/api/preview");
     const sc = { ...previewScene, blocks: [], bowls: [], pads: [], props: [], bins: [], belt: null };
-    data = { pitch: 0.66, block_colors: {} };
-    rows = Array.from({ length: bare }, () => ({ sc, st: null, belt: false }));
+    rows = [...(rows || []), ...Array.from({ length: extra }, () => ({ sc, st: null }))];
   }
   if (my !== token || !active) return;
   clear();
   grp = new THREE.Group();
-  const pitch = data.pitch;
+  const pitch = GAP;
   const n = rows.length;
   layout = { n, pitch, cy: Y0 + ((n - 1) * pitch) / 2, data };
   cellBrackets(grp, [-0.3, Y0 - pitch / 2, 0.74, Y0 + n * pitch - pitch / 2]);
@@ -183,9 +191,8 @@ async function build3D() {
     const root = new THREE.Group();
     root.position.y = Y0 + k * pitch;
     grp.add(root);
-    const cut = rows[k].belt && sc.belt ? { ...sc, belt: { ...sc.belt, half: [sc.belt.half[0], pitch / 2, sc.belt.half[2]] } } : sc;
-    const { bodies, belt } = populate(cut, root, rid, meshes[rid], { belt: rows[k].belt });
-    root.children.filter((c) => c.geometry?.parameters?.height === pitch).forEach((c) => (c.position.y = (-0.32 + 0.34) / 2));
+    const { bodies } = populate(sc, root, rid, meshes[rid], { belt: false });
+    const belt = null; // no conveyor on screen: the arms share one work area
     root.add(basePlate(0.23 * (f.armScale ? f.armScale(rid) : 1)));
     let cube = null, partMat = null, partBody = -1;
     if (st && sc.blocks[0]) {
@@ -195,16 +202,17 @@ async function build3D() {
     }
     const tag = st ? `ARM ${k + 1}  ${st.controller === "vla" ? "VLA" : "SCRIPTED"}` : `ARM ${k + 1}`;
     floorLabel(grp, tag, 0.5, root.position.y - 0.2, Math.PI / 2, 0.042, st?.controller === "vla" ? "rgba(8,102,255,0.9)" : "rgba(44,56,66,0.9)");
-    const cell = { root, bodies, belt, cube, partMat, partBody, home: sc.home || sc.frame, done: [], born: performance.now() + k * 160 };
+    const cell = { root, bodies, belt, cube, partMat, partBody, home: sc.home || sc.frame, done: [], born: k < prevN ? 0 : performance.now() + (k - prevN) * 160 };
     cells.push(cell);
     applyCell(cell, sc.home || sc.frame, false);
-    root.scale.z = 0.02;
+    root.scale.z = k < prevN ? 1 : 0.02;
   }
   f.scene3.add(grp);
+  prevN = n;
   fit();
   $("#view-sim").classList.toggle("noplay", !line?.result?.playback);
-  $("#vp-caption").textContent = line ? `${n} arms · MuJoCo` : `${n} × SO-101 · MuJoCo`;
-  $("#crumb-run").textContent = line ? line.name : "multi-arm task";
+  $("#vp-caption").textContent = `${n} arms · MuJoCo`;
+  $("#crumb-run").textContent = taskText || "multi-arm task";
 }
 
 function applyCell(cell, frame, showPart) {
@@ -238,7 +246,7 @@ function startClock() {
 function tick(now) {
   if (!active || !cells.length) return;
   for (const c of cells) { // each arm rises from the floor in turn
-    const k = Math.min(1, Math.max(0, (now - c.born) / 700));
+    const k = c.born === 0 ? 1 : Math.min(1, Math.max(0, (now - c.born) / 700));
     c.root.scale.z = Math.max(0.02, 1 - Math.pow(1 - k, 4) * (1 + 1.6 * (1 - k)));
   }
   if (!clock.playing || !line?.result?.playback) return;
@@ -253,7 +261,7 @@ function tick(now) {
       const i = Math.min(e.frames.length - 1, Math.floor((clock.t - e.start) * pb.fps));
       if (cell.partMat) cell.partMat.color.copy(F().srgb(colorOf(e.color)));
       applyCell(cell, e.frames[i], true);
-      if (!badge) badge = `Part ${e.part + 1} of ${line.result.n_parts} · arm ${k + 1}`;
+      if (!badge) badge = `Try ${e.part + 1} of ${line.result.n_parts} · arm ${k + 1}`;
     } else applyCell(cell, cell.home, false);
   });
   for (const e of pb.episodes) {
@@ -301,8 +309,8 @@ function armRow(st, i) {
   const busy = line.status === "building" || line.status === "running";
   const facts = [];
   if (isVla) facts.push(held != null && nEval ? `${Math.round(held * nEval)}/${nEval} on held-out scenes` : "held-out score after training");
-  else facts.push("scripted cell, no training");
-  if (ps) facts.push(`${ps.succeeded}/${ps.parts} in the cell run`);
+  else facts.push("scripted, no training");
+  if (ps) facts.push(`${ps.succeeded}/${ps.parts} in the run`);
   const why = tr?.from ? `fine-tuned from '${tr.from.replace(/-[0-9a-f]{4}$/, "").replaceAll("-", " ")}'` : st.route?.reason || "";
   return `<li class="arm ${isVla ? "vla" : "scripted"} st-${st.status}" data-i="${i}">
     <div class="arm-h"><span class="arm-n">${i + 1}</span><b>${esc(st.name)}</b><span class="arm-st">${esc(STATUS[st.status] || st.status)}</span></div>
@@ -314,39 +322,40 @@ function armRow(st, i) {
     <button type="button" class="arm-toggle" ${busy ? "disabled" : ""}>${isVla ? "Use a script" : "Use a VLA"}</button>
   </li>`;
 }
+const noTask = (from) => Array.from({ length: extra }, (_, i) => `<li class="arm bare"><div class="arm-h"><span class="arm-n">${from + i + 1}</span><b>SO-101</b><span class="arm-st">No task yet</span></div><div class="arm-meta">Say what it should do, or describe the task the arms do together.</div></li>`).join("");
 function renderPanel() {
   const list = $("#arms");
   const go = $("#arms-go");
   if (!active) { list.innerHTML = ""; $("#arms-result").innerHTML = ""; return; }
   if (!line) {
-    list.innerHTML = Array.from({ length: bare }, (_, i) => `<li class="arm bare"><div class="arm-h"><span class="arm-n">${i + 1}</span><b>SO-101</b><span class="arm-st">No task</span></div><div class="arm-meta">Describe what each arm does in the chat.</div></li>`).join("");
-    $("#arms-note").textContent = `${bare} arms`;
+    list.innerHTML = noTask(0);
+    $("#arms-note").textContent = `${extra} arms`;
     $("#arms-model").textContent = "";
     $("#arms-result").innerHTML = "";
     go.disabled = true;
-    go.textContent = "Train arms and run";
+    go.textContent = "Train and run";
     return;
   }
   const nTrain = line.stations.filter((s) => s.status === "train").length;
   const refused = line.stations.some((s) => s.status === "refused");
   const busy = line.status === "building" || line.status === "running";
-  $("#arms-note").textContent = `${line.stations.length} arms`;
+  $("#arms-note").textContent = `${total()} arms`;
   const model = line.plan?.model;
   $("#arms-model").textContent = model ? `Planner: ${F().modelTag(model)}` : "";
-  list.innerHTML = line.stations.map(armRow).join("");
+  list.innerHTML = line.stations.map(armRow).join("") + noTask(line.stations.length);
   go.disabled = busy || refused || !line.stations.length;
-  go.textContent = busy ? (line.status === "building" ? "Training" : "Running") : nTrain ? `Train ${nTrain} arm${nTrain > 1 ? "s" : ""} and run` : "Run the cell";
+  go.textContent = busy ? (line.status === "building" ? "Training" : "Running") : nTrain ? `Train ${nTrain} arm${nTrain > 1 ? "s" : ""} and run` : "Run";
   renderResult();
 }
 function renderResult() {
   const r = line.result;
   const box = $("#arms-result");
-  if (line.status === "failed") { box.innerHTML = `<p class="arms-bad">${esc(r?.error || "An arm did not publish a skill, so the cell did not run.")}</p>`; return; }
+  if (line.status === "failed") { box.innerHTML = `<p class="arms-bad">${esc(r?.error || "An arm did not publish a skill, so the run did not happen.")}</p>`; return; }
   if (!r || !r.n_parts) { box.innerHTML = ""; return; }
   const fails = (r.fate || []).filter((f) => !f.ok);
   const colors = Object.entries(r.parts.reduce((c, p) => ({ ...c, [p]: (c[p] || 0) + 1 }), {})).map(([k, v]) => `${v} ${k}`).join(", ");
-  box.innerHTML = `<p class="arms-line"><b class="num">${r.completed}/${r.n_parts}</b> parts completed by every arm, in simulation.</p>
-    <p class="arms-fine">${r.n_parts} parts (${esc(colors)}), seed ${r.seed}.${fails.length ? ` Not completed: ${fails.map((f) => `part ${f.part + 1} (${f.color}) at ${f.station == null ? "the end" : `arm ${f.station + 1}`}${f.why ? `, ${esc(f.why)}` : ""}`).join("; ")}.` : ""}</p>`;
+  box.innerHTML = `<p class="arms-line"><b class="num">${r.completed} of ${r.n_parts}</b> tries finished by ${line.stations.length === 2 ? "both arms" : "all arms"}, in simulation.</p>
+    <p class="arms-fine">${r.n_parts} tries (${esc(colors)}), seed ${r.seed}.${fails.length ? ` Not finished: ${fails.map((f) => `try ${f.part + 1} (${f.color}) at ${f.station == null ? "the end" : `arm ${f.station + 1}`}${f.why ? `, ${esc(f.why)}` : ""}`).join("; ")}.` : ""}</p>`;
 }
 
 $("#arms").addEventListener("click", async (e) => {
@@ -369,7 +378,7 @@ $("#arms-go").addEventListener("click", async () => {
   try {
     await post(`/api/line/${line.id}/build`, { n_parts: N_PARTS, seed: 7 });
     line.status = "building";
-    F().note(nTrain ? `Training ${nTrain} arm${nTrain > 1 ? "s" : ""} that need a skill, then running the cell in simulation.` : "Running the cell in simulation.");
+    F().note(nTrain ? `Training ${nTrain} arm${nTrain > 1 ? "s" : ""} that need a skill, then running the task in simulation.` : "Running the task in simulation.");
     F().stage("data", "live"); F().stage("trainer", "live");
     renderPanel();
   } catch (err) {
@@ -379,7 +388,7 @@ $("#arms-go").addEventListener("click", async () => {
 
 // ------------------------------------------------------------------ live events from the server
 
-const STAGE = { scene: "Building the arm's cell", demos: "Scripted demos", init: "Starting from the nearest skill", train_start: "Fine-tuning", loss: "Fine-tuning", eval_progress: "Held-out eval", saving: "Saving", saved: "Saved" };
+const STAGE = { scene: "Building the arm's scene", demos: "Scripted demos", init: "Starting from the nearest skill", train_start: "Fine-tuning", loss: "Fine-tuning", eval_progress: "Held-out eval", saving: "Saving", saved: "Saved" };
 window.addEventListener("forge:event", async (ev) => {
   const e = ev.detail;
   if (!line || !active) return;
@@ -399,8 +408,8 @@ window.addEventListener("forge:event", async (ev) => {
         for (const k of ["data", "trainer", "eval"]) F().stage(k, ok ? "done" : "fail");
         if (ok) {
           F().stage("registry", "done", `${l.result.completed}/${l.result.n_parts}`);
-          F().note(`Ran ${l.result.n_parts} parts in simulation: ${l.result.completed} completed by every arm.`);
-        } else F().note(l.result?.error || "An arm did not publish a skill, so the cell did not run.");
+          F().note(`${l.result.completed} of ${l.result.n_parts} tries finished by ${l.stations.length === 2 ? "both arms" : "all arms"}, in simulation.`);
+        } else F().note(l.result?.error || "An arm did not publish a skill, so the run did not happen.");
         return;
       }
     }

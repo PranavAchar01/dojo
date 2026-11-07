@@ -56,18 +56,18 @@
           <span class="stage-r">Screenshot of the app, in simulation</span>
         </div>
         <div class="stage-media">
-          <img id="hero-video" src="/static/assets/multi-arm.jpg" width="1600" height="778" alt="The app with two SO-101 arms in one cell on a concrete floor, the arms list on the right showing each arm's sub-task">
+          <img id="hero-video" src="/static/assets/multi-arm.jpg" width="1600" height="778" alt="The app with two SO-101 arms sharing one work area on a concrete floor, the arms list on the right showing each arm's sub-task">
         </div>
-        <figcaption>Two SO-101 arms in one cell, each with its own sub-task, in simulation. The panel lists what the simulator measured.</figcaption>
+        <figcaption>Two SO-101 arms on one task, each with its own sub-task, in simulation. The panel lists what the simulator measured.</figcaption>
       </figure>
 
       <dl class="numbers rv">
         <div><dt>Parts through every arm</dt><dd class="num">22<span class="of"> / 30</span></dd></div>
         <div><dt>Arm 1, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
         <div><dt>Arm 2, held-out scenes</dt><dd class="num">16<span class="of"> / 20</span></dd></div>
-        <div><dt>Scripted ViperX, in the cell run</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
+        <div><dt>Scripted ViperX, in the full run</dt><dd class="num">22<span class="of"> / 22</span></dd></div>
       </dl>
-      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Success is measured on 20 layouts the policy never trained on. The cell run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
+      <p class="fine rv">One recorded run, in simulation (demo/realism-results.json). Success is measured on 20 layouts the policy never trained on. The full run is 30 further parts: pallet seating 26 / 30, insertion 22 / 26, crating 22 / 22.</p>
     </div>
   </section>
 
@@ -96,7 +96,7 @@
     <div class="wrap">
       <p class="kicker rv">Several arms</p>
       <h2 class="rv">One chat, <em>one arm or several</em>.</h2>
-      <p class="sub rv">Ask for "another SO-101", or describe a task that needs more than one arm. The planner gives each arm a sub-task and the router checks the robot can do it. Each arm is either a trained VLA or a script, and the cell runs them in order.</p>
+      <p class="sub rv">Ask for "another SO-101", or describe a task that needs more than one arm. The planner gives each arm a sub-task and the router checks the robot can do it. Each arm is either a trained VLA or a script, and they run in order.</p>
 
       <blockquote class="prompt rv">
         <span class="q">Prompt</span>
@@ -122,12 +122,12 @@
         <article class="st">
           <header><span class="idx">03</span><span class="kind script">Scripted</span></header>
           <h3>Crating</h3>
-          <p>A ViperX with a programmed cell moves the finished assembly into the crate. No training.</p>
+          <p>A ViperX with a fixed script moves the finished assembly into the crate. No training.</p>
           <div class="meter off"><b></b></div>
-          <p class="res"><b class="num">22 / 22</b> in the cell run, in simulation</p>
+          <p class="res"><b class="num">22 / 22</b> in the full run, in simulation</p>
         </article>
       </div>
-      <p class="fine rv">In simulation: 30 parts, 22 through all three arms. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each arm is its own simulated cell and the part is re-staged for the next one.</p>
+      <p class="fine rv">In simulation: 30 parts, 22 through all three arms. Parts were lost to drops on the way, jams on the socket rim and landing on a divider. Each arm is simulated on its own and the part is re-staged for the next one.</p>
     </div>
   </section>
 
