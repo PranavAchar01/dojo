@@ -119,14 +119,14 @@ def lying_pos(tool: str, xy, yaw: float) -> tuple[np.ndarray, np.ndarray]:
     return pos, _quat(R)
 
 
-@lru_cache(maxsize=1)
-def cavity() -> dict:
-    """The toolbox's open cavity in the box's body frame, measured from the collision hulls.
+@lru_cache(maxsize=16)
+def cavity(container: str = TOOLBOX) -> dict:
+    """A container asset's open cavity in its body frame (the toolbox by default), measured from the collision hulls.
 
     The hulls are voxelised (5 mm); the cavity is the free space not reachable from outside by a flood fill in the
     horizontal slices below the rim. The rim height is the lowest slice at which the cavity leaks to the outside.
     """
-    hs = hulls(TOOLBOX)
+    hs = hulls(container)
     from scipy.spatial import ConvexHull
 
     eqs = [ConvexHull(h).equations for h in hs]
@@ -193,7 +193,7 @@ def cavity() -> dict:
         "rim": rim,
         "size": (float(x1 - x0), float(y1 - y0), float(rim - floor)),
         "centre": (float((x0 + x1) / 2), float((y0 + y1) / 2)),
-        "visual_bbox": tuple(float(a) for a in meta(TOOLBOX)["size_m"]),
+        "visual_bbox": tuple(float(a) for a in meta(container)["size_m"]),
     }
 
 
