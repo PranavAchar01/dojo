@@ -33,6 +33,9 @@ from . import (
     thumbs,
     tiles,
 )
+from . import (
+    replay as replay_mod,
+)
 from .agents import Forge as Agents
 from .agents import describe_run_reply, run_once
 from .pipeline import FORGE
@@ -111,7 +114,10 @@ def state():
         "robot": FORGE.robot,
         "active": AGENTS.active,
         "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
-        "skills": [{**s.__dict__, "record": records.load(s.id)} for s in FORGE.registry.ordered()],
+        "skills": [
+            {**s.__dict__, "record": records.load(s.id)}
+            for s in FORGE.registry.ordered()
+        ],
     }
 
 
@@ -129,7 +135,9 @@ async def prompt(p: Prompt):
     if p.reference and p.reference.kind not in ("image", "model", "bridge"):
         raise HTTPException(400, "reference is image, model or bridge")
     if p.reference and p.reference.kind == "model":
-        scenery = assets_api.entry(p.reference.id)["id"]  # 404s for an id the library does not have
+        scenery = assets_api.entry(p.reference.id)[
+            "id"
+        ]  # 404s for an id the library does not have
         if not (assets_scene.model_folder(scenery) / "model.xml").exists():
             raise HTTPException(404, "that 3D model has no simulation file yet")
     run = await AGENTS.submit(
@@ -190,6 +198,33 @@ def replay(sid: str, index: int):
     )
 
 
+def _replay_args(sid: str) -> tuple[dict, str]:
+    sk = _skill(sid)
+    parent = FORGE.registry.skills.get(sk.parent or "")
+    return sk.__dict__, parent.instruction if parent else ""
+
+
+@app.get("/api/skills/{sid}/replay-events")
+def replay_events(sid: str):
+    """The whole development of a saved skill as the page's own event list; read-only, nothing is trained or written."""
+    skill, parent = _replay_args(sid)
+    return replay_mod.build(skill, parent_instruction=parent)
+
+
+@app.get("/api/replays/{sid}/scene")
+def replay_scene(sid: str):
+    sc = replay_mod.media(_replay_args(sid)[0])["scene"]
+    return sc or {"pending": True}
+
+
+@app.get("/api/replays/{sid}/rollout/{rnd}/{index}")
+def replay_rollout(sid: str, rnd: int, index: int):
+    rolls = replay_mod.media(_replay_args(sid)[0])["rollouts"].get(str(rnd)) or _404()
+    if not 0 <= index < len(rolls):
+        _404()
+    return rolls[index]
+
+
 @app.patch("/api/skills/{sid}")
 def rename(sid: str, r: Rename):
     _skill(sid)
@@ -235,7 +270,9 @@ def run_summary(rid: str):
 def run_scene(rid: str):
     run = FORGE.runs.get(rid) or _404()
     if not run.layouts:
-        return {"pending": True}  # the page falls back to the default scene until the task has parsed
+        return {
+            "pending": True
+        }  # the page falls back to the default scene until the task has parsed
     return preview(Layout.from_json(run.layouts[0]), run.robot)
 
 
@@ -578,7 +615,16 @@ def _404():
     raise HTTPException(404, "not found")
 
 
-app.mount("/static", StaticFiles(directory=WEB), name="static")
+class _FreshStatic(StaticFiles):
+    """Browsers revalidate every page file, so a reload always picks up the latest CSS and JS (the ETag keeps it cheap)."""
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/static", _FreshStatic(directory=WEB), name="static")
 
 
 def main():
