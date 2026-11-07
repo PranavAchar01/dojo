@@ -42,6 +42,23 @@ def add_brick_visual(spec, body, brick: db.Brick, tag: str, rgba=None) -> None:
     )
 
 
+def add_eyes(body) -> None:
+    """The printed eye of the kit's 2x2 head, as two thin discs on each side face (a decal, no physics)."""
+    half = db.STUD  # the 2x2 head is 16 mm wide in y, so its side faces sit at y = +-8 mm
+    for side in (-1, 1):
+        for r, rgba, dy in ((0.0030, (1, 1, 1, 1), 0.00005), (0.0016, (0.02, 0.02, 0.02, 1), 0.0001)):
+            body.add_geom(
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                size=[r, 0.00005, 0],
+                pos=[0.0025, side * (half + dy), 0.0050],
+                euler=[90, 0, 0],
+                rgba=list(rgba),
+                contype=0,
+                conaffinity=0,
+                mass=0,
+            )
+
+
 def scene(
     poses: dict[str, tuple[np.ndarray, np.ndarray]],
     tint: dict | None = None,
@@ -72,6 +89,8 @@ def scene(
     for name, (pos, quat) in poses.items():
         b = w.add_body(name=name, pos=list(pos), quat=list(quat))
         add_brick_visual(spec, b, bm[name], name, (tint or {}).get(name))
+        if name == "head":
+            add_eyes(b)
     return spec.compile()
 
 
@@ -118,12 +137,12 @@ def photo(path, size: int = 1024) -> None:
 def exploded(path, panel: int = 640) -> None:
     """Six panels, one per build step: the placed bricks in colour, the new brick lifted above its slot and tinted."""
     labels = {
-        "base": "Lay the 2x4 flat",
-        "body": "Second 2x4, one stud back",
-        "neck": "2x3 on the front of the body",
-        "head": "2x2 head on the neck",
-        "beak": "1x2 orange on the neck's front studs",
-        "tail": "2x2 slope on the tail, high edge rear",
+        "foot": "Red 2x3 plate flat on the table",
+        "leg": "2x2 on the front studs of the plate",
+        "body": "2x4 across the leg, rear hangs out",
+        "beak": "Red plate, one stud past the body",
+        "head": "2x2 head (eye) on the beak plate",
+        "tail": "1x2 flat on the rear studs",
     }
     sheet = Image.new(
         "RGB", (panel * 3, int(panel * 2 + 40)), tuple(int(c * 255) for c in BG)
