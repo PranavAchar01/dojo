@@ -88,7 +88,9 @@ function metaNote() {
   return `<div class="wf-l bad"><b>Meta unavailable</b><span>${esc(m.why || "no reason given")}${m.fallback ? `. Answering: ${esc(m.fallback)}` : ""}</span></div>`;
 }
 
-function slot(i) {
+// the library calls everything a model; ids and any event text lose the word skill
+const slot = (i) => slotRaw(i).replace(/\bskill-/gi, "").replace(/\bskills\b/gi, "models").replace(/\bskill\b/gi, "model");
+function slotRaw(i) {
   const d = D, s = d.stat[i];
   const none = `<span class="wf-none">${s === "live" ? "Working..." : d.live ? "Waiting" : d.skill || d.prompt ? "Not recorded for this run" : "Runs on your next prompt."}</span>`;
   switch (i) {
@@ -187,7 +189,16 @@ function caption(n) {
     if (D.calls.opt && D.stat[7] === "live") return "proposing";
     return "Optional";
   }
-  return plain(slot(n.s));
+  // never raw error or guard text in a node: the popover carries that
+  const t = document.createElement("template");
+  t.innerHTML = slot(n.s);
+  t.content.querySelectorAll(".bad").forEach((x) => x.remove());
+  const txt = plain(t.innerHTML);
+  if (txt) return txt;
+  if (D.stat[n.s] === "live") return "Working...";
+  if (n.s === 1) return "Muse Spark reads the prompt";
+  if (D.error) return "Stopped";
+  return plain(`<span>${D.live ? "Waiting" : D.skill || D.prompt ? "Not recorded for this run" : "Runs on your next prompt."}</span>`);
 }
 
 function nodeHTML(n) {
@@ -237,9 +248,12 @@ function drawEdges() {
   let out = "";
   for (const [a, b, sa0, sb0, sa1, sb1, kind] of EDGES) {
     const sa = narrow ? sa1 : sa0, sb = narrow ? sb1 : sb0;
-    const [x0, y0] = pt(rect(a), sa), [x1, y1] = pt(rect(b), sb);
+    let [x0, y0] = pt(rect(a), sa), [x1, y1] = pt(rect(b), sb);
     const same = sa === sb;
-    const k = same ? 46 : Math.min(90, Math.max(28, Math.hypot(x1 - x0, y1 - y0) * 0.45));
+    // the wide retrain arc stays inside the gap between the rows: it leaves Critic's top and lands on Train's bottom-left
+    const gapArc = kind === "retry" && !narrow;
+    if (gapArc) { const ra = rect(a), rb = rect(b); x0 = ra.x + ra.w * 0.62; x1 = rb.x + rb.w * 0.28; }
+    const k = gapArc ? Math.min(22, Math.abs(y1 - y0) * 0.4) : same ? 46 : Math.min(90, Math.max(28, Math.hypot(x1 - x0, y1 - y0) * 0.45));
     const [ax, ay] = SIDE[sa], [bx, by] = SIDE[sb];
     const c0 = [x0 + ax * k, y0 + ay * k], c1 = [x1 + bx * k, y1 + by * k];
     const d = `M${x0} ${y0}C${c0[0]} ${c0[1]} ${c1[0]} ${c1[1]} ${x1} ${y1}`;
