@@ -15,6 +15,7 @@ const API = "/api/assets";
 const MAX_MB = 50;
 const ACCEPT = ".glb,.gltf,.obj,.stl,.zip";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const cap = (s) => String(s ?? "").charAt(0).toUpperCase() + String(s ?? "").slice(1);
 const cm = (m) => (m >= 1 ? `${m.toFixed(2)} m` : `${(m * 100).toFixed(m < 0.1 ? 1 : 0)} cm`);
 const NICE = { conveyor: "Conveyors", pallet: "Pallets", container: "Totes and bins", shelving: "Shelving", workbench: "Benches and carts", handling: "Handling", machine: "Machines", part: "Parts", tool: "Tools", lighting: "Lighting", safety: "Safety", utility: "Utility", structure: "Structure", mine: "Imported", product: "Products" };
 const SOURCE_SHORT = { "Poly Haven": "Poly Haven", "Gazebo Fuel": "Gazebo Fuel", user: "Your file" };
@@ -75,7 +76,7 @@ export function mountAssets(root, opts = {}) {
       const mine = m.origin === "user";
       return `<button class="as-card" data-id="${esc(m.id)}" type="button">
         <span class="as-thumb">${m.has_thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="">` : `<span class="as-nothumb">no preview yet</span>`}
-          <span class="as-kind">${esc(m.kind)}</span>${mine ? `<span class="as-mine">My model</span>` : ""}</span>
+          <span class="as-kind">${esc(cap(m.kind))}</span>${mine ? `<span class="as-mine">My model</span>` : ""}</span>
         <span class="as-meta"><b>${esc(m.name)}</b>
           <span class="as-sub">${esc(NICE[m.category] || m.category)} &middot; ${m.size_m ? esc(m.size_m.map((v) => cm(v)).join(" x ")) : ""}</span>
           <span class="as-row">${licenceChip(m)}<span class="as-src">${esc(SOURCE_SHORT[m.source.name] || m.source.name)}</span></span></span>
@@ -108,7 +109,7 @@ export function mountAssets(root, opts = {}) {
           <dt>Author</dt><dd>${esc(s.author || "you")}</dd>
           <dt>Licence</dt><dd>${link(s.license_url, s.license || "user import")}</dd>
           <dt>Size</dt><dd>${m.size_m ? esc(m.size_m.map(cm).join(" x ")) : "-"}</dd>
-          <dt>Physics</dt><dd>${esc(m.kind)}${m.mass_kg ? `, ${m.mass_kg.toFixed(2)} kg` : ""}, ${m.hulls ?? "?"} convex hulls</dd>
+          <dt>Physics</dt><dd>${esc(cap(m.kind))}${m.mass_kg ? `, ${m.mass_kg.toFixed(2)} kg` : ""}, ${m.hulls ?? "?"} convex hulls</dd>
           <dt>Files</dt><dd><a href="${esc(m.glb)}" download="${esc(m.id)}.glb">GLB</a> &middot; <a href="${API}/${esc(m.id)}/mjcf" target="_blank">MJCF</a></dd>
         </dl>
         <div class="as-tags">${(m.tags || []).map((t) => `<span>${esc(t)}</span>`).join("")}</div>

@@ -8,26 +8,6 @@
  "lights": [],
  "frame": {
   "cells": 2,
-  "guards": [
-   {
-    "pos": [
-     -0.23,
-     0.0,
-     0.0
-    ],
-    "yaw": 90,
-    "scale": 0.14
-   },
-   {
-    "pos": [
-     -0.23,
-     1.14,
-     0.0
-    ],
-    "yaw": 90,
-    "scale": 0.14
-   }
-  ],
   "belt_items": [
    {
     "y": -0.5,
@@ -54,7 +34,11 @@
     "yaw": 0,
     "done": true
    }
-  ]
+  ],
+  "guard": {
+   "height": 0.28,
+   "panel": 0.3
+  }
  },
  "scenery": [
   {
