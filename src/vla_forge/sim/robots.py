@@ -1274,7 +1274,7 @@ def holding_torque(robot_id: str) -> dict:
     }
 
 
-GRASP_SKILLS = ("lift", "pick_place", "stack")
+GRASP_SKILLS = ("lift", "pick_place", "stack", "kit", "insert", "rotate")
 
 
 def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
@@ -1310,6 +1310,12 @@ def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
                 False,
                 f"the fingers close only to {w_lo:.0f} mm, so they cannot squeeze a 3 cm block",
             )
+    n_arm = calibrate(robot_id).n_arm
+    if skill in ("insert", "rotate") and n_arm < 5:
+        return (
+            False,
+            f"turning the block to match the socket needs a wrist roll joint; this arm has {n_arm} arm joints",
+        )
     f = rep["reach"]["fraction"]
     need = {"reach": "hover", "push": "push"}.get(skill, "grasp")
     for h in (need, "hover"):
@@ -1330,7 +1336,7 @@ def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
     )
 
 
-SKILLS = ("reach", "push", "lift", "pick_place", "stack")
+SKILLS = ("reach", "push", "lift", "pick_place", "stack", "kit", "insert", "rotate")
 # checks that only matter for some skills: a robot failing them can still train the skills it can do,
 # and the router refuses the rest with robot_feasibility's reason
 TASK_CHECKS = ("Fingers fit a 3 cm block", "Reaches the table workspace")

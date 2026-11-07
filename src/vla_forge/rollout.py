@@ -19,8 +19,26 @@ from dataclasses import dataclass, field
 import numpy as np
 
 EVAL_SEED0 = 1_000_000  # eval layouts never overlap training seeds
-HOLD_STEPS = {"reach": 5, "lift": 10, "pick_place": 5, "push": 5, "stack": 5}
-MAX_STEPS = {"reach": 80, "pick_place": 150, "push": 150, "lift": 100, "stack": 150}
+HOLD_STEPS = {
+    "reach": 5,
+    "lift": 10,
+    "pick_place": 5,
+    "push": 5,
+    "stack": 5,
+    "kit": 5,
+    "insert": 5,
+    "rotate": 5,
+}
+MAX_STEPS = {
+    "reach": 80,
+    "pick_place": 150,
+    "push": 150,
+    "lift": 100,
+    "stack": 150,
+    "kit": 170,
+    "insert": 200,
+    "rotate": 200,
+}
 ENSEMBLE_M = 0.1
 
 
@@ -47,7 +65,7 @@ def _named(spec) -> tuple[str, str | None]:
     p = spec.success[0]
     return p.get("block", "target"), p.get("bowl") or p.get("pad") or p.get(
         "bin"
-    ) or p.get("base")
+    ) or p.get("base") or p.get("slot") or p.get("socket")
 
 
 def _new_stats(sc, spec) -> dict:
@@ -115,6 +133,10 @@ def _classify(skill: str, st: dict) -> str:
         return "dropped the block"
     if st["final_goal_dist"] > 0.06:
         return "dropped it on the way"
+    if skill == "kit":
+        return "landed on a divider"
+    if skill in ("insert", "rotate"):
+        return "jammed on the socket rim"
     return "missed the target"
 
 
@@ -421,10 +443,11 @@ def summarize(rolls: list[Rollout]) -> dict:
 
 
 def _goal_xy(lay: dict):
-    for kind in ("bowls", "pads", "bins", "blocks"):
+    for kind in ("bowls", "pads", "bins", "blocks", "props"):
         if "goal" in lay.get(kind, {}):
             v = lay[kind]["goal"]
-            return [round(v[1], 3), round(v[2], 3)]
+            i = 2 if kind == "props" else 1
+            return [round(v[i], 3), round(v[i + 1], 3)]
     return None
 
 

@@ -26,9 +26,10 @@ import numpy as np
 from . import llm
 from .router import Check, Route
 from .sim import line as L
+from .sim.props import KIT_SLOTS
 from .sim.robots import is_default, label, robot_feasibility
 from .sim.scene import BLOCK_COLORS, CUBE_HALF, Layout, Look, Scene
-from .sim.tasks import TaskSpec, check
+from .sim.tasks import TaskSpec, canonical_instruction, check
 
 ROOT = L.REPO
 LINES_DIR = ROOT / "runs" / "lines"
@@ -38,6 +39,12 @@ HOME_S = 1.2  # scripted return to home after a station finishes (industrial arm
 PART_COLORS = ("red", "blue", "green", "yellow", "orange", "purple")
 ROBOTS = ("so101", "vx300s.native.native")
 ANY = "any"  # a catch-all station takes every part that reaches it
+# assembly fixtures: where the pallet (a 2 x 2 tray) and the socket stand in a station's cell, off the belt
+TRAY_AT = (0.135, 0.11)
+SOCKET_AT = (0.145, 0.095)
+ASSEMBLY_SKILLS = ("kit", "insert")
+# a station skill is only reused in the cell it was trained in; moving a fixture changes this tag
+CELL_TAG = hashlib.sha1(repr((TRAY_AT, SOCKET_AT)).encode()).hexdigest()[:6]
 
 
 @dataclass
@@ -53,14 +60,27 @@ class Station:
     status: str = (
         "planned"  # planned | reuse | train | training | ready | scripted | refused
     )
+    task: str = "pick_place"  # pick_place (sorting), kit (seat in a pallet slot) or insert (into a socket)
+    slot: str = ""  # kit only: which pallet slot, e.g. "front-left"
 
     @property
     def instruction(self) -> str:
+        if self.task != "pick_place":
+            return self.spec().instruction
         what = "the block" if self.part == ANY else f"the {self.part} block"
         return f"put {what} in the {self.bin} bin"
 
     def spec(self, part: str | None = None) -> TaskSpec:
         color = part or (self.part if self.part != ANY else "red")
+        if self.task != "pick_place":
+            target = (self.slot or "front-left") if self.task == "kit" else None
+            return TaskSpec(
+                self.task,
+                color,
+                target,
+                distractors=0,
+                instruction=canonical_instruction(self.task, color, target),
+            )
         return TaskSpec(
             "pick_place",
             color,
@@ -100,6 +120,7 @@ class Line:
     training: list[dict] = field(
         default_factory=list
     )  # [{station, run, seconds, success_rate}]
+    assembly: bool = False  # every part visits every station in order (else: each part goes to one station)
 
     def to_json(self, full: bool = False) -> dict:
         d = {
@@ -112,6 +133,7 @@ class Line:
             "created": self.created,
             "status": self.status,
             "training": self.training,
+            "assembly": self.assembly,
             "result": {k: v for k, v in self.result.items() if full or k != "playback"},
         }
         return d
@@ -129,14 +151,23 @@ the description asks for a fixed, programmed or scripted cell (use "scripted" fo
 unless the text asks otherwise, and "vla" otherwise). Keep stations in the order parts meet them. At most 4
 stations. parts: the colours the line receives (2 to 4 colours). name: a short name for the line. note: one
 short sentence on anything in the description you could not map (empty if none). If the description is not a
-conveyor sorting/kitting line at all, return no stations and say why in note."""
+conveyor sorting/assembly line at all, return no stations and say why in note.
+
+Assembly lines: when the description is about building or assembling something (a housing, a pallet, a part
+inserted into a socket, a finished assembly into a crate), set assembly = true. Then every part visits every
+station in order (parts: one colour, "red"), each station has a task: "kit" (seat the part in a slot of a
+2 x 2 pallet; slot = front-left, front-right, back-left or back-right), "insert" (press it into a square
+socket) or "pick_place" (move it into a tote; the crate is the tote "gray"). Usual shape: SO-101 "vla" kit
+station, SO-101 "vla" insert station, then a "scripted" ViperX pick_place station that moves the finished
+assembly into the crate (part = "any" there). Sorting lines keep assembly = false and task = "pick_place"."""
 
 PLAN_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["name", "stations", "parts", "note"],
+    "required": ["name", "stations", "parts", "note", "assembly"],
     "properties": {
         "name": {"type": "string"},
+        "assembly": {"type": "boolean"},
         "note": {"type": "string"},
         "parts": {
             "type": "array",
@@ -147,9 +178,25 @@ PLAN_SCHEMA = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["name", "part", "bin", "robot", "controller"],
+                "required": [
+                    "name",
+                    "part",
+                    "bin",
+                    "robot",
+                    "controller",
+                    "task",
+                    "slot",
+                ],
                 "properties": {
                     "name": {"type": "string"},
+                    "task": {
+                        "type": "string",
+                        "enum": ["pick_place", "kit", "insert"],
+                    },
+                    "slot": {
+                        "type": "string",
+                        "enum": ["", *KIT_SLOTS],
+                    },
                     "part": {"type": "string", "enum": [*PART_COLORS, ANY]},
                     "bin": {"type": "string", "enum": list(L.BIN_COLORS)},
                     "robot": {"type": "string", "enum": list(ROBOTS)},
@@ -166,6 +213,8 @@ def _rule_plan(text: str) -> dict:
     import re
 
     t = text.lower()
+    if re.search(r"\b(assembl\w*|housing|pallet|socket|insert\w*|crate)\b", t):
+        return {**assembly_plan(), "note": ""}
     stations, parts = [], []
     for m in re.finditer(
         r"\b("
@@ -207,6 +256,46 @@ def _rule_plan(text: str) -> dict:
     }
 
 
+def assembly_plan() -> dict:
+    """The default assembly line: a VLA station seats the housing in a pallet nest, a VLA station inserts it into
+    a socket, a scripted ViperX moves the finished assembly into the crate."""
+    return {
+        "name": "Housing assembly line",
+        "assembly": True,
+        "parts": ["red"],
+        "note": "",
+        "stations": [
+            {
+                "name": "Seat housing in pallet",
+                "part": "red",
+                "bin": "gray",
+                "robot": "so101",
+                "controller": "vla",
+                "task": "kit",
+                "slot": "front-left",
+            },
+            {
+                "name": "Insert into socket",
+                "part": "red",
+                "bin": "gray",
+                "robot": "so101",
+                "controller": "vla",
+                "task": "insert",
+                "slot": "",
+            },
+            {
+                "name": "Assembly to crate",
+                "part": ANY,
+                "bin": "gray",
+                "robot": "vx300s.native.native",
+                "controller": "scripted",
+                "task": "pick_place",
+                "slot": "",
+            },
+        ],
+    }
+
+
 def plan_line(text: str) -> Line:
     t0 = time.time()
     try:
@@ -215,29 +304,35 @@ def plan_line(text: str) -> Line:
         raw, model = _rule_plan(text), "keyword planner (offline)"
     stations = []
     seen = set()
+    assembly = bool(raw.get("assembly"))
     for i, s in enumerate(raw.get("stations", [])[:4]):
         part = s.get("part") if s.get("part") in (*PART_COLORS, ANY) else None
-        if (
-            part is None
-            or (part == ANY and i != len(raw["stations"][:4]) - 1)
-            or part in seen
-        ):
+        if part is None or (part == ANY and i != len(raw["stations"][:4]) - 1):
+            continue
+        if part in seen and not assembly:
             continue
         seen.add(part)
+        task = s.get("task") if s.get("task") in ("kit", "insert") else "pick_place"
         stations.append(
             Station(
                 index=len(stations),
                 name=str(s.get("name", ""))[:40] or f"Station {len(stations) + 1}",
-                part=part,
+                part="red" if assembly and part != ANY else part,
                 bin=s["bin"] if s.get("bin") in L.BIN_COLORS else "gray",
                 robot=s["robot"] if s.get("robot") in ROBOTS else "so101",
                 controller="scripted" if s.get("controller") == "scripted" else "vla",
+                task=task if assembly else "pick_place",
+                slot=(s.get("slot") if s.get("slot") in KIT_SLOTS else "front-left")
+                if task == "kit" and assembly
+                else "",
             )
         )
     parts = [c for c in raw.get("parts", []) if c in PART_COLORS][:4] or [
         s.part for s in stations if s.part != ANY
     ]
-    if stations and stations[-1].part == ANY and all(c in seen for c in parts):
+    if assembly:
+        parts = ["red"]
+    elif stations and stations[-1].part == ANY and all(c in seen for c in parts):
         parts.append(
             next(c for c in PART_COLORS if c not in seen)
         )  # something for the end of line to catch
@@ -257,6 +352,7 @@ def plan_line(text: str) -> Line:
             "seconds": round(time.time() - t0, 1),
             "note": raw.get("note", ""),
         },
+        assembly=assembly,
     )
 
 
@@ -269,7 +365,7 @@ def _reach_check(st: Station, n: int = 4) -> Check:
     from .sim.expert import HOVER_Z, IK, RELEASE_Z
 
     rng = np.random.default_rng(st.index)
-    lays = [L.station_layout(st.spec().obj, st.bin, rng) for _ in range(n)]
+    lays = [train_layout(st, rng) for _ in range(n)]
     sc = Scene(lays[0], st.robot)
     ik = IK(sc)
     q0 = sc.joint_pos()[: ik.n]
@@ -277,6 +373,8 @@ def _reach_check(st: Station, n: int = 4) -> Check:
     for lay in lays:
         pts = [(x, y, HOVER_Z) for _c, x, y, _yaw in lay.blocks.values()]
         pts += [(x, y, RELEASE_Z) for _c, x, y in lay.bins.values()]
+        if "goal" in lay.props:  # the pallet slot or the socket
+            pts.append((*lay.props["goal"][2:4], RELEASE_Z))
         for x, y, z in pts:
             _q, err = ik.solve(np.array([x, y, z]), q0, iters=150)
             worst, miss, tot = max(worst, err), miss + (err > REACH_TOL), tot + 1
@@ -299,7 +397,7 @@ def route_station(st: Station | dict, registry) -> Route:
     if isinstance(st, dict):
         st = Station(**{k: st[k] for k in Station.__dataclass_fields__ if k in st})
     checks = []
-    ok, why = robot_feasibility(st.robot, "pick_place")
+    ok, why = robot_feasibility(st.robot, st.task)
     checks.append(Check("robot", ok, f"{label(st.robot)}: {why}"))
     if not ok:
         return Route("not_feasible", why, checks)
@@ -324,7 +422,19 @@ def route_station(st: Station | dict, registry) -> Route:
             "a catch-all station has to be scripted (one VLA per part colour)",
             checks,
         )
-    sk = registry.exact(st.instruction, st.robot)
+    if st.task == "pick_place":
+        sk = registry.exact(st.instruction, st.robot)
+    else:  # only a skill trained in this kind of cell (belt, pallet or socket where the line puts it)
+        hits = [
+            k
+            for k in registry.skills.values()
+            if k.origin == "station"
+            and not k.composite
+            and k.instruction == st.instruction
+            and k.robot == st.robot
+            and f"cell {CELL_TAG}" in k.prompt
+        ]
+        sk = max(hits, key=lambda k: (k.success_rate, k.created)) if hits else None
     if sk is not None:
         checks.append(
             Check(
@@ -395,7 +505,12 @@ async def build_line(line: Line, agents, forge, on_event) -> None:
             "line_name": line.name,
             "line": line.id,
         }
-        run = await agents.submit(st.instruction, "train", "", station=sj)
+        prompt = (
+            st.instruction
+            if st.task == "pick_place"
+            else f"{st.instruction} (cell {CELL_TAG})"
+        )
+        run = await agents.submit(prompt, "train", "", station=sj)
         on_event("station_run", station=st.index, run=run.id)
         fut = agents.pending.get(run.id)
         t0 = time.time()
@@ -485,11 +600,47 @@ def _home_phase(sc: Scene, q_from: np.ndarray, frame: list[float]) -> list[list[
     return frames
 
 
-def _cell_layout(st: Station, color: str, x: float, y: float, yaw: float) -> Layout:
+def _cell_layout(
+    st: Station,
+    color: str,
+    x: float,
+    y: float,
+    yaw: float,
+    rng: np.random.Generator | None = None,
+) -> Layout:
+    """A station's cell with the part at (x, y). Sorting: a tote. Kit: a 2 x 2 pallet beside the belt with a goal
+    marker at the named slot. Insert: a socket beside the belt. rng jitters where the fixture stands."""
+    from .sim.props import slot_offset
+
     lay = Layout(belt=True)
     lay.blocks["target"] = (color, x, y, yaw)
-    lay.bins["goal"] = (st.bin, *L.TOTE_XY)
+    if st.task == "pick_place":
+        lay.bins["goal"] = (st.bin, *L.TOTE_XY)
+        return lay
+    j = (lambda a: float(rng.uniform(-a, a))) if rng is not None else (lambda a: 0.0)
+    if st.task == "kit":
+        fy = j(0.1)
+        cx, cy = TRAY_AT[0] + j(0.008), TRAY_AT[1] + j(0.008)
+        ox, oy = slot_offset(st.slot or "front-left")
+        gx = cx + ox * math.cos(fy) - oy * math.sin(fy)
+        gy = cy + ox * math.sin(fy) + oy * math.cos(fy)
+        lay.props["tray"] = ("tray", "gray", cx, cy, fy)
+        lay.props["goal"] = ("marker", "gray", gx, gy, fy)
+    else:
+        sx, sy = SOCKET_AT[0] + j(0.006), SOCKET_AT[1] + j(0.008)
+        lay.props["goal"] = ("socket", "gray", sx, sy, math.atan2(sy, sx))
     return lay
+
+
+def train_layout(st: Station | dict, rng: np.random.Generator) -> Layout:
+    """A training or held-out scene for a station: the part stopped at the photo-eye, the station's fixtures."""
+    if isinstance(st, dict):
+        st = Station(**{k: st[k] for k in Station.__dataclass_fields__ if k in st})
+    if st.task == "pick_place":
+        return L.station_layout(st.spec().obj, st.bin, rng)
+    lay = L.station_layout(st.spec().obj, "gray", rng)
+    _c, x, y, yaw = lay.blocks["target"]
+    return _cell_layout(st, st.spec().obj, x, y, yaw, rng)
 
 
 def _yaw_of(frame: list[float], body: int) -> float:
@@ -524,8 +675,11 @@ def run_line(
     }
     per_station = []
     for st in line.stations:
-        mine = [i for i in on_line if st.takes(parts[i])]
-        passing = [i for i in on_line if i not in mine]
+        if line.assembly:  # every part that is still good goes through every station
+            mine, passing = list(on_line), []
+        else:
+            mine = [i for i in on_line if st.takes(parts[i])]
+            passing = [i for i in on_line if i not in mine]
         stats = {"station": st.index, "parts": len(mine), "succeeded": 0, "work_s": []}
         # belt phases (scripted line control)
         arrivals = {}
@@ -562,7 +716,13 @@ def run_line(
             )
         if mine:
             lays = [
-                _cell_layout(st, parts[i], *arrivals[i][1:]).to_json() for i in mine
+                _cell_layout(
+                    st,
+                    parts[i],
+                    *arrivals[i][1:],
+                    rng=np.random.default_rng(seed * 7919 + st.index * 131 + i),
+                ).to_json()
+                for i in mine
             ]
             results = []
             if st.controller == "vla":
@@ -646,7 +806,7 @@ def run_line(
                     "ok": bool(ok),
                     "why": "" if ok else why,
                 }
-        on_line = passing
+        on_line = [i for i in mine if fate[i]["ok"]] if line.assembly else passing
         stats["mean_work_s"] = (
             round(float(np.mean(stats["work_s"])), 2) if stats["work_s"] else None
         )
@@ -704,7 +864,7 @@ def _schedule(line: Line, episodes: list[dict], n_parts: int) -> dict:
             free[k] = start + dur
             t = start + dur
             makespan = max(makespan, t)
-            if e["kind"] == "pick":
+            if e["kind"] == "pick" and not line.assembly:
                 break
     return {"times": times, "makespan": makespan}
 
@@ -736,6 +896,7 @@ def load_all() -> dict[str, Line]:
             d.get("status", "planned"),
             d.get("result", {}),
             d.get("training", []),
+            d.get("assembly", False),
         )
         out[ln.id] = ln
     return out
