@@ -21,6 +21,7 @@ from .sim.tasks import TaskSpec
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS_DIR = ROOT / "skills"
+HIDDEN = SKILLS_DIR / "hidden.json"
 BASE_PATH = ROOT / "models" / "base.pt"
 TILES_DIR = (
     SKILLS_DIR / "tiles"
@@ -116,7 +117,9 @@ class Registry:
             return sk
 
     def ordered(self) -> list[Skill]:
-        return sorted(self.skills.values(), key=lambda s: -s.created)
+        """Shown skills, newest first. skills/hidden.json lists older renders and repeats kept on disk but not shown."""
+        hide = HIDDEN.exists() and set(json.loads(HIDDEN.read_text())["hidden"]) or set()
+        return sorted((s for s in self.skills.values() if s.id not in hide), key=lambda s: -s.created)
 
     def exact(self, instruction: str, robot: str = "so101") -> Skill | None:
         """The best published single skill for exactly this instruction on this robot (what a composed task reuses)."""
