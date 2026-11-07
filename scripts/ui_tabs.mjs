@@ -13,7 +13,7 @@ const { chromium } = require("playwright");
 const [base = "http://127.0.0.1:8100", tag = "ui"] = process.argv.slice(2);
 const shots = process.env.SHOTS || `${homedir()}/Pictures/Screenshots`;
 const day = new Date().toISOString().slice(0, 10);
-const TABS = ["sim", "line", "robot", "skills", "ladder"];
+const TABS = ["sim", "line", "skills", "rsi"];
 const SIZES = { desktop: [1920, 934], phone: [400, 860] };
 
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
@@ -28,7 +28,7 @@ for (const [size, [width, height]] of Object.entries(SIZES)) {
     await btn.click();
     // software WebGL can hold the main thread for a while; wait until the view has actually switched
     await page.waitForFunction((t) => document.getElementById("app").dataset.view === t, tab, { timeout: 60000 });
-    await page.waitForTimeout(tab === "line" || tab === "robot" ? 3500 : 2500);
+    await page.waitForTimeout(tab === "line" ? 3500 : 2500);
     // let finite entrance animations finish and two frames paint, so the shot is the settled page
     await page.evaluate(async () => {
       const once = document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity);

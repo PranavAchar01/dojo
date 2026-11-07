@@ -37,18 +37,12 @@
       </div>
     </div>
     <div class="toolrow">
-      <div class="tg">
-        <button class="ib" id="toggle-left" title="Chat panel" aria-label="Toggle chat panel">
-          <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M8 4v12"/></svg>
-        </button>
-      </div>
+      <div class="tg tg-spacer" aria-hidden="true"></div>
       <div class="tg view">
         <div class="seg" role="tablist">
           <button class="on" data-view="skills">Library</button>
           <button data-view="sim">Sim</button>
-          <button data-view="robot">Robot</button>
-          <button data-view="ladder">Ladder</button>
-          <button data-view="plan">Build plan</button>
+          <button data-view="rsi">RSI</button>
           <button data-view="agents">How it works</button>
         </div>
       </div>
@@ -61,24 +55,6 @@
   </header>
 
   <div class="body">
-    <aside class="chat" id="chat-panel">
-      <div class="rp-head"><h2>Chat</h2><button class="ib sm" id="new-chat" title="New chat" aria-label="New chat"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></button></div>
-      <div class="thread" id="thread">
-        <div class="empty" id="empty">
-          <span class="mascot sm" data-follow></span>
-          <p class="empty-hint">Describe a task below, or press + to train a new model.</p>
-        </div>
-      </div>
-      <form class="composer" id="prompt-form" autocomplete="off">
-        <textarea id="prompt" rows="2" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
-        <div class="composer-row">
-          <button type="button" class="chip-mode" onclick="setView('robot')" title="Change the robot"><span class="sq"></span><span id="robot-chip">SO-101 &middot; sim</span></button>
-          <button class="send" id="go" type="submit" aria-label="Train" disabled>
-            <svg viewBox="0 0 20 20"><path d="M10 15V5M5.5 9.5 10 5l4.5 4.5"/></svg>
-          </button>
-        </div>
-      </form>
-    </aside>
 
     <section class="canvas">
       <div class="view blank" id="view-sim">
@@ -98,7 +74,7 @@
           </video>
           <p class="wl-now" id="welcome-now">touch the yellow block</p>
         </div>
-        <div class="sim-load" id="sim-load" hidden><span class="spin"></span><span id="sim-load-t">Loading the rollout</span></div>
+        <div class="sim-load" id="sim-load" hidden role="status"><span class="mascot sm" data-loading></span><span id="sim-load-t">Loading the rollout</span></div>
 
         <div class="navc" data-keepclear>
           <button data-cam="orbit" class="vc-btn on" title="Orbit" aria-label="Orbit camera"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M3.5 10h13"/></svg></button>
@@ -117,50 +93,17 @@
         </div>
       </div>
 
-            <div class="view hidden" id="view-robot">
-        <div class="doc build">
-          <div class="doc-h">
-            <h2>Build the <em>robot</em></h2>
-            <p>Pick an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. Dojo assembles them into one MuJoCo file, checks it, and trains the next skill on it.</p>
-          </div>
-          <div class="build-grid">
-            <div class="slots" id="slots"></div>
-            <aside class="assembly">
-              <div class="asm-view">
-                <canvas id="asm"></canvas>
-                <div class="asm-cap"><b id="asm-name"></b><span class="num dim" id="asm-id"></span></div>
-                <div class="asm-load hidden" id="asm-load"><span class="spin"></span>assembling</div>
-                <div class="asm-legend"><span><i class="k ok"></i>reached</span><span><i class="k bad"></i>missed</span><span><i class="k tcp"></i>tool point</span></div>
-              </div>
-              <div class="asm-body">
-                <div class="mono dim asm-facts" id="asm-facts"></div>
-                <div id="asm-fail" class="fail-card hidden"></div>
-                <div class="sec-h"><span class="lbl">Checks</span><span id="asm-sum" class="dim"></span></div>
-                <ul id="checks" class="checks"></ul>
-                <div class="sec-h"><span class="lbl">Models it can learn</span></div>
-                <ul id="feas" class="checks"></ul>
-                <button class="primary use" id="use-robot" disabled>Train a model on this robot</button>
-                <div class="use-note" id="use-note"></div>
-              </div>
-            </aside>
-          </div>
-          <details class="not-offered"><summary>Parts looked at and left out</summary><ul id="not-offered"></ul></details>
-        </div>
-      </div>
-
-      <div class="view hidden" id="view-ladder">
+      <div class="view hidden" id="view-rsi">
         <div class="doc">
           <div class="doc-h">
-            <h2>Scaling <em>ladder</em></h2>
-            <p>Every row is one prompt, timed from typing to a published skill agent, with success measured on 20 held-out scenes. Tier 1 is one motion, tier 2 carries a block somewhere, tier 3 chains published skill agents.</p>
+            <h2>Recursive <em>self-improvement</em></h2>
+            <p>Each finished prompt becomes a published model, and later prompts start from what earlier ones learned. Every row is one prompt, timed from typing to a published model, with success measured on 20 held-out scenes; "Started from" shows what it built on. Tier 1 is one motion, tier 2 carries a block somewhere, tier 3 chains published models.</p>
           </div>
           <div id="ladder"></div>
         </div>
       </div>
 
       <div class="view hidden" id="view-agents"></div>
-
-      <div class="view hidden" id="view-plan"></div>
 
       <div class="view hidden" id="view-skills">
         <div class="doc">
@@ -191,21 +134,94 @@
 
       <div class="nm" id="new-modal" hidden role="dialog" aria-modal="true" aria-labelledby="nm-title">
         <div class="nm-back" data-close></div>
-        <form class="nm-card" id="nm-form" autocomplete="off">
+        <div class="nm-card" id="nm-card" data-pane="main">
           <button type="button" class="ib sm nm-x" data-close aria-label="Close"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
-          <h2 id="nm-title">What should the arm <em>learn</em>?</h2>
-          <p class="nm-sub">Describe a task. Dojo turns it into a success check, collects demos, fine-tunes a vision-language-action policy and measures it on 20 scenes it never saw.</p>
-          <textarea id="nm-prompt" rows="3" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
-          <div class="nm-row">
-            <button type="button" class="chip-mode" id="nm-arm" title="Change the robot"><span class="sq"></span><span id="nm-robot">SO-101 &middot; sim</span></button>
-            <button class="btn primary nm-go" id="nm-go" type="submit" disabled>Train model</button>
+
+          <form class="nm-pane nm-main" id="nm-form" autocomplete="off">
+            <h2 id="nm-title">What should the arm <em>learn</em>?</h2>
+            <p class="nm-sub">Describe a task. Dojo turns it into a success check, collects demos, fine-tunes a vision-language-action policy and measures it on 20 scenes it never saw.</p>
+            <textarea id="nm-prompt" rows="3" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
+            <div class="nm-tools">
+              <button type="button" class="chip-mode" id="nm-arm" title="Change the robot"><span class="sq"></span><span id="nm-robot">SO-101 &middot; sim</span></button>
+              <span class="nm-attach-wrap">
+                <button type="button" class="chip-mode nm-attach" id="nm-attach" aria-haspopup="true" aria-expanded="false" title="Attach a reference"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>Attach</button>
+                <span class="nm-menu" id="nm-menu" hidden role="menu">
+                  <button type="button" role="menuitem" id="nm-pick-img">Reference image</button>
+                  <button type="button" role="menuitem" id="nm-pick-3d">3D model</button>
+                </span>
+              </span>
+              <span class="nm-ref" id="nm-ref" hidden><img id="nm-ref-img" alt=""><span id="nm-ref-name"></span><button type="button" id="nm-ref-x" aria-label="Remove the reference">&times;</button></span>
+              <input type="file" id="nm-file" accept="image/*" hidden>
+            </div>
+            <div class="nm-plan" id="nm-plan" hidden></div>
+            <div class="nm-foot"><button class="btn primary nm-go" id="nm-go" type="submit" disabled>Train model</button></div>
+            <div class="nm-chips">
+              <button type="button" class="mx" data-say="touch the red block"><span class="t">T1</span>touch the red block</button>
+              <button type="button" class="mx" data-say="put the blue block in the blue bowl"><span class="t">T2</span>put the blue block in the blue bowl</button>
+              <button type="button" class="mx" data-say="sort the blue and green blocks into the bowls of the same color"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
+              <button type="button" class="mx" data-say="add another SO-101"><span class="t">+1</span>add another SO-101</button>
+              <button type="button" class="mx" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket"><span class="t">2 arms</span>two arms: one seats the housing in the pallet, the other inserts it into the socket</button>
+              <button type="button" class="mx" data-say="build the brick bridge from the plan" data-ref="bridge"><span class="t">Build</span>build the brick bridge from the plan</button>
+            </div>
+          </form>
+
+          <div class="nm-pane nm-robot">
+            <button type="button" class="nm-back-btn" data-pane-go="main"><svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5"/></svg>Back to the prompt</button>
+            <div class="build" id="view-robot-pane">
+              <div class="nm-rh">
+                <h2>Pick the <em>robot</em></h2>
+                <p class="nm-sub">Choose an arm, a wrist and an end effector. Every part is a real open-source model with its licence and source. Dojo assembles them into one MuJoCo file, checks it, and trains the next model on it.</p>
+              </div>
+              <div class="build-grid">
+                <div class="slots" id="slots"></div>
+                <aside class="assembly">
+                  <div class="asm-view">
+                    <canvas id="asm"></canvas>
+                    <div class="asm-cap"><b id="asm-name"></b><span class="num dim" id="asm-id"></span></div>
+                    <div class="asm-load hidden" id="asm-load"></div>
+                    <div class="asm-legend"><span><i class="k ok"></i>reached</span><span><i class="k bad"></i>missed</span><span><i class="k tcp"></i>tool point</span></div>
+                  </div>
+                  <div class="asm-body">
+                    <div class="mono dim asm-facts" id="asm-facts"></div>
+                    <div id="asm-fail" class="fail-card hidden"></div>
+                    <div class="sec-h"><span class="lbl">Checks</span><span id="asm-sum" class="dim"></span></div>
+                    <ul id="checks" class="checks"></ul>
+                    <div class="sec-h"><span class="lbl">Models it can learn</span></div>
+                    <ul id="feas" class="checks"></ul>
+                    <button type="button" class="primary use" id="use-robot" disabled>Use this robot</button>
+                    <div class="use-note" id="use-note"></div>
+                  </div>
+                </aside>
+              </div>
+              <details class="not-offered"><summary>Parts looked at and left out</summary><ul id="not-offered"></ul></details>
+            </div>
           </div>
-          <div class="nm-chips">
-            <button type="button" class="mx" data-say="touch the red block"><span class="t">T1</span>touch the red block</button>
-            <button type="button" class="mx" data-say="put the blue block in the blue bowl"><span class="t">T2</span>put the blue block in the blue bowl</button>
-            <button type="button" class="mx" data-say="sort the blue and green blocks into the bowls of the same color"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
-            <button type="button" class="mx" data-say="add another SO-101"><span class="t">+1</span>add another SO-101</button>
-            <button type="button" class="mx" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket"><span class="t">2 arms</span>two arms: one seats the housing in the pallet, the other inserts it into the socket</button>
+
+          <div class="nm-pane nm-models">
+            <button type="button" class="nm-back-btn" data-pane-go="main"><svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5"/></svg>Back to the prompt</button>
+            <h2>Pick a <em>3D model</em></h2>
+            <p class="nm-sub">Choose one from the library, or import your own, to use as the reference for this task.</p>
+            <div id="nm-assets"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock" id="dock">
+        <section class="dock-thread" id="dock-thread" hidden aria-label="Conversation">
+          <div class="dock-th">
+            <button type="button" class="dock-toggle" id="dock-toggle" aria-expanded="true"><span class="mascot xs" data-follow></span><b>Dojo</b><span class="dim" id="dock-last"></span><svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg></button>
+            <button class="ib sm" id="new-chat" type="button" title="Clear the conversation" aria-label="Clear the conversation"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+          </div>
+          <div class="thread" id="thread"></div>
+        </section>
+        <form class="composer dock-bar" id="prompt-form" autocomplete="off">
+          <button type="button" class="dock-plus" id="dock-plus" title="Train a new model" aria-label="Open the new model window"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></button>
+          <textarea id="prompt" rows="1" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
+          <div class="composer-row">
+            <button type="button" class="chip-mode" id="robot-open" title="Change the robot"><span class="sq"></span><span id="robot-chip">SO-101 &middot; sim</span></button>
+            <button class="send" id="go" type="submit" aria-label="Train" disabled>
+              <svg viewBox="0 0 20 20"><path d="M10 15V5M5.5 9.5 10 5l4.5 4.5"/></svg>
+            </button>
           </div>
         </form>
       </div>
