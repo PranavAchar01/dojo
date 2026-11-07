@@ -105,7 +105,12 @@ class Stub:
         if kind == "plan":
             from .factory import _rule_plan
 
-            return _rule_plan(user)
+            plan = _rule_plan(user)
+            if plan.get("assembly") and "crate" not in user.lower():
+                plan["stations"] = plan["stations"][
+                    :2
+                ]  # no crating arm unless the request asks for one
+            return plan
         if kind == "critic":
             from .llm import _rule_critic
 
