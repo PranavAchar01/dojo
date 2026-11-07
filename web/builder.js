@@ -3,7 +3,6 @@
 // the embodiment the next skill trains on.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
 import { setupRenderer, makeEnvironment, addStudioLights, robotMaterial as studioMaterial } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -46,14 +45,62 @@ export function robotLabel(rid) {
 
 // ---------------------------------------------------------------- mesh buffers -> three.js
 const geoms = new Map();
+const bytes = (b64) => {
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(b64).buffer;
+  const bin = atob(b64);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < u.length; i++) u[i] = bin.charCodeAt(i);
+  return u.buffer;
+};
+// Creased normals on typed arrays: each face corner takes the area-weighted normals of the faces around its vertex
+// that lie within `angle` of its own face. three's toCreasedNormals does the same through string-keyed maps and
+// took seconds per mesh; this is a few milliseconds.
+function creased(pos, idx, angle) {
+  const nF = idx.length / 3;
+  const nV = pos.length / 3;
+  const fn = new Float32Array(nF * 3); // area-weighted face normals
+  const unit = new Float32Array(nF * 3);
+  for (let f = 0; f < nF; f++) {
+    const a = idx[3 * f] * 3, b = idx[3 * f + 1] * 3, c = idx[3 * f + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+    const l = Math.hypot(x, y, z) || 1;
+    fn[3 * f] = x; fn[3 * f + 1] = y; fn[3 * f + 2] = z;
+    unit[3 * f] = x / l; unit[3 * f + 1] = y / l; unit[3 * f + 2] = z / l;
+  }
+  const start = new Uint32Array(nV + 1); // faces around each vertex, packed
+  for (let i = 0; i < idx.length; i++) start[idx[i] + 1]++;
+  for (let v = 0; v < nV; v++) start[v + 1] += start[v];
+  const fill = start.slice(0, nV);
+  const around = new Uint32Array(idx.length);
+  for (let f = 0; f < nF; f++) for (let k = 0; k < 3; k++) around[fill[idx[3 * f + k]]++] = f;
+  const cos = Math.cos(angle);
+  const P = new Float32Array(nF * 9), N = new Float32Array(nF * 9);
+  for (let f = 0; f < nF; f++) {
+    for (let k = 0; k < 3; k++) {
+      const v = idx[3 * f + k];
+      let x = 0, y = 0, z = 0;
+      for (let j = start[v]; j < start[v + 1]; j++) {
+        const g = around[j];
+        if (unit[3 * g] * unit[3 * f] + unit[3 * g + 1] * unit[3 * f + 1] + unit[3 * g + 2] * unit[3 * f + 2] >= cos) {
+          x += fn[3 * g]; y += fn[3 * g + 1]; z += fn[3 * g + 2];
+        }
+      }
+      const l = Math.hypot(x, y, z) || 1;
+      const o = 9 * f + 3 * k;
+      P[o] = pos[3 * v]; P[o + 1] = pos[3 * v + 1]; P[o + 2] = pos[3 * v + 2];
+      N[o] = x / l; N[o + 1] = y / l; N[o + 2] = z / l;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(P, 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(N, 3));
+  return g;
+}
 function geometry(key, data) {
   if (geoms.has(key)) return geoms.get(key);
-  const v = new Float32Array(Uint8Array.from(atob(data.v), (c) => c.charCodeAt(0)).buffer);
-  const f = new Uint32Array(Uint8Array.from(atob(data.f), (c) => c.charCodeAt(0)).buffer);
-  let g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(v, 3));
-  g.setIndex(new THREE.BufferAttribute(f, 1));
-  g = toCreasedNormals(g, Math.PI / 7);
+  const g = creased(new Float32Array(bytes(data.v)), new Uint32Array(bytes(data.f)), Math.PI / 7);
   geoms.set(key, g);
   return g;
 }
@@ -84,20 +131,7 @@ const fetchJSON = (url) => {
 // the wrist options and the native jaw are not parts of their own: they are shown on the selected arm,
 // framed close on the wrist and jaw (the stock SO-101 if that arm cannot be built with them)
 const onArm = (slot, id) => slot === "wrist" || (slot === "effector" && id === "native");
-function partURL(slot, id, arm = sel.arm) {
-  if (slot === "arm") return `/api/parts/arm/${id}/view`;
-  if (!onArm(slot, id)) return `/api/parts/effector/${id}/view`;
-  const rid = robotId({ arm, wrist: slot === "wrist" ? id : "native", effector: "native" });
-  return `/api/robots/${rid}/view`;
-}
-function closeUp(v) { // a box around the tool point big enough for the wrist and the jaw
-  const lo = new THREE.Vector3().fromArray(v.bbox[0]);
-  const hi = new THREE.Vector3().fromArray(v.bbox[1]);
-  const h = 0.19 * hi.distanceTo(lo);
-  const c = new THREE.Vector3().fromArray(v.tcp);
-  c.z += 0.5 * h;
-  return [[c.x - h, c.y - h, c.z - h], [c.x + h, c.y + h, c.z + h]];
-}
+const prefetch = (rid) => { fetchJSON(`/api/robots/${rid}/view`).catch(() => {}); fetchJSON(`/api/robots/${rid}/report`).catch(() => {}); };
 
 function stage(canvas) {
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: true });
@@ -123,49 +157,17 @@ function frame(cam, bbox, dir = [1.1, -0.9, 0.7], pad = 1.0) {
   return c;
 }
 
-// one shared offscreen renderer draws every part tile to an image
-let thumb = null;
-const thumbQueue = [];
-let thumbBusy = false;
-function queueThumb(img, slot, id) {
-  thumbQueue.push([img, slot, id]);
-  if (!thumbBusy) drainThumbs();
-}
-async function drainThumbs() {
-  thumbBusy = true;
-  if (!thumb) {
-    const c = document.createElement("canvas");
-    c.width = 360; c.height = 240;
-    thumb = stage(c);
-    thumb.r.setPixelRatio(1);
-    thumb.r.setSize(360, 240, false);
-    thumb.cam.aspect = 1.5;
-    thumb.cam.updateProjectionMatrix();
-  }
-  while (thumbQueue.length) {
-    const [img, slot, id] = thumbQueue.shift();
-    try {
-      let v;
-      try {
-        v = await fetchJSON(partURL(slot, id));
-      } catch (err) {
-        if (!onArm(slot, id) || sel.arm === "so101") throw err;
-        v = await fetchJSON(partURL(slot, id, "so101"));
-      }
-      const g = partGroup(v);
-      thumb.s.add(g);
-      if (onArm(slot, id) && v.tcp) frame(thumb.cam, closeUp(v), [0.7, -1, 0.5], 1.1);
-      else frame(thumb.cam, v.bbox);
-      thumb.r.render(thumb.s, thumb.cam);
-      img.src = thumb.r.domElement.toDataURL("image/png");
-      img.classList.add("in");
-      thumb.s.remove(g);
-    } catch {
-      img.alt = "preview failed";
-      img.classList.add("in", "bad");
-    }
-  }
-  thumbBusy = false;
+// card images are rendered once on the server (assets/thumbs, long-cached): a card is an <img>, nothing assembles
+// in the browser until an arm is picked
+const thumbURL = (slot, id) => (onArm(slot, id) ? `/api/thumbs/${slot}/${id}?arm=${sel.arm}` : `/api/thumbs/${slot}/${id}`);
+function loadThumb(fig, img, slot, id, tries = 0) {
+  fig.classList.add("sk");
+  img.onload = () => { fig.classList.remove("sk"); img.classList.add("in"); };
+  img.onerror = () => { // not drawn yet (first start renders them in the background): ask again shortly
+    if (tries < 40) setTimeout(() => loadThumb(fig, img, slot, id, tries + 1), 3000);
+    else { fig.classList.remove("sk"); img.alt = "preview unavailable"; }
+  };
+  img.src = thumbURL(slot, id);
 }
 
 // ---------------------------------------------------------------- the assembled robot, live
@@ -248,7 +250,7 @@ function card(slot, p) {
   const fig = el("div", "part-fig");
   const img = el("img");
   img.alt = p.name;
-  fig.append(img, el("span", "spin"));
+  fig.append(img);
   const name = el("div", "part-name", p.name);
   const by = el("div", "part-by", onArm(slot, p.id) ? `on the ${armName()}` : p.maker);
   const meta = el("div", "part-meta mono");
@@ -271,7 +273,8 @@ function card(slot, p) {
   if (slot !== "arm" && p.notes) b.append(el("div", "part-note", p.notes));
   b.append(prov);
   b.onclick = () => pick(slot, p.id);
-  queueThumb(img, slot, p.id);
+  loadThumb(fig, img, slot, p.id);
+  b.addEventListener("pointerenter", () => { if (slot === "arm") prefetch(robotId({ ...sel, arm: p.id, wrist: "native", effector: "native" })); }, { once: true });
   return b;
 }
 
@@ -284,8 +287,8 @@ function redrawOnArm() { // wrist and native-jaw tiles follow the selected arm
     if (!onArm(c.dataset.slot, c.dataset.id)) return;
     c.querySelector(".part-by").textContent = `on the ${armName()}`;
     const img = c.querySelector(".part-fig img");
-    img.classList.remove("in", "bad");
-    queueThumb(img, c.dataset.slot, c.dataset.id);
+    img.classList.remove("in");
+    loadThumb(c.querySelector(".part-fig"), img, c.dataset.slot, c.dataset.id);
   });
 }
 function pick(slot, id) {
@@ -302,16 +305,20 @@ async function assemble() {
   const n = ++assembling;
   $("#asm-id").textContent = rid;
   $("#asm-name").textContent = robotLabel(rid);
-  $("#asm-load").classList.remove("hidden");
+  const slow = setTimeout(() => { if (n === assembling) $("#asm-load").classList.remove("hidden"); }, 150);
   $("#use-robot").disabled = true;
   $("#checks").innerHTML = "";
   $("#feas").innerHTML = "";
   $("#asm-fail").classList.add("hidden");
   $("#asm-sum").textContent = "assembling and checking...";
+  performance.mark(`rv-start-${rid}`);
   const [rep, view] = await Promise.allSettled([fetchJSON(`/api/robots/${rid}/report`), fetchJSON(`/api/robots/${rid}/view`)]);
+  clearTimeout(slow);
   if (n !== assembling) return;
+  performance.mark(`rv-fetched-${rid}`);
   $("#asm-load").classList.add("hidden");
   if (view.status === "fulfilled") showAssembly(rid, view.value);
+  performance.mark(`rv-shown-${rid}`);
   if (rep.status !== "fulfilled") {
     failCard("The server could not assemble these parts.", String(rep.reason));
     $("#asm-sum").textContent = "";
@@ -389,19 +396,27 @@ function setActive(rid) {
 }
 
 let built = false;
+const catReady = fetch("/api/robots").then((r) => r.json());
 export async function initBuilder(activeId) {
   active = activeId || "so101";
   Object.assign(sel, parse(active));
-  CAT = await (await fetch("/api/robots")).json();
+  CAT = await catReady;
   setActive(active);
 }
 
-export function showBuilder(on) {
+export async function showBuilder(on) {
   visible = on;
   if (!on || built) return;
   built = true;
-  initAssembly();
+  performance.mark("rv-tab");
+  prefetch(robotId()); // the selected robot's preview and checks download while the cards draw
   const box = $("#slots");
+  // never a blank left side: grey placeholder cards hold the grid until the catalog (a few ms) is in
+  const sk = el("div", "parts");
+  sk.append(...Array.from({ length: 8 }, () => { const c = el("div", "part part-sk"); c.append(el("div", "part-fig sk")); return c; }));
+  box.replaceChildren(sk);
+  CAT ||= await catReady;
+  box.replaceChildren();
   for (const [slot, title, sub, key] of SLOTS) {
     const s = el("section", "slot");
     const h = el("div", "slot-h");
@@ -419,5 +434,7 @@ export function showBuilder(on) {
     no.append(li);
   }
   $("#use-robot").onclick = useRobot;
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r)));
+  initAssembly(); // the WebGL setup is the slow part on a weak GPU: after the cards are on screen
   assemble();
 }
