@@ -1174,11 +1174,17 @@ def report(robot_id: str) -> dict:
     reach = reachability(robot_id)
     out["reach"] = reach
     f = reach["fraction"]
+    short = [k for k in ("grasp", "hover") if f[k] < 0.9]
     check(
         "Reaches the table workspace",
-        f["grasp"] >= 0.9 and f["hover"] >= 0.9,
-        f"top-down: {f['grasp']:.0%} of grasp points, {f['push']:.0%} push, {f['hover']:.0%} hover "
-        f"(r {WS_R[0]:.3f}-{WS_R[1]:.3f} m, +/-{math.degrees(WS_ANG):.0f} deg)",
+        not short,
+        (
+            f"reaches {f['grasp']:.0%} of grasp points and {f['hover']:.0%} of hover points"
+            if not short
+            else " and ".join(f"reaches only {f[k]:.0%} of {k} points" for k in short)
+            + " (needs 90%; red dots on the preview are the misses)"
+        )
+        + f" in a {WS_R[0] * 100:.0f}-{WS_R[1] * 100:.0f} cm, +/-{math.degrees(WS_ANG):.0f} deg arc in front of the base",
     )
     tq = holding_torque(robot_id)
     out["torque"] = tq
