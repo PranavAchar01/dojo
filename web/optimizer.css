@@ -126,3 +126,9 @@
 
 .opt-test { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #F1F4F7; font-size: 13px; line-height: 1.45; }
 .opt-test b { display: block; margin-bottom: 4px; }
+
+.opt-held { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--o-line); font-size: 13px; line-height: 1.45; }
+.opt-held:empty { display: none; }
+.opt-held-h { font-weight: 600; }
+.opt-held-sub, .opt-held-row { color: var(--o-mute); font-size: 12px; }
+.opt-held-line { margin-top: 4px; font-weight: 600; color: var(--o-text); }
