@@ -252,7 +252,12 @@ def _compact(r, nbody_frames: int = KEEP_FRAMES) -> dict:
 
 
 def score(
-    model: VLA, spec, layouts: list[dict], robot: str, progress: Callable[[int], None]
+    model: VLA,
+    spec,
+    layouts: list[dict],
+    robot: str,
+    progress: Callable[[int], None],
+    first: int = 0,
 ) -> list[dict]:
     """The same scenes every time: scene i always has seed SEED0 + i (so the same lighting and the same layout)."""
     out: list[dict] = []
@@ -262,7 +267,7 @@ def score(
             model,
             spec,
             len(part),
-            seed0=SEED0 + c,
+            seed0=SEED0 + first + c,
             layouts=part,
             record=True,
             robot=robot,
@@ -592,3 +597,33 @@ def asset(oid: str, rel: str) -> Path | None:
         and p.suffix == ".jpg"
     )
     return p if ok else None
+
+
+def rerender_hero(oid: str) -> dict:
+    """Replay the saved run's hero scene again (the first-try skill and final.pt) and rewrite the two filmstrips."""
+    out = RUNS / f"opt-{oid}"
+    d = json.loads((out / "run.json").read_text())
+    from .registry import Registry
+
+    sk = Registry().skills[d["skill"]["id"]]
+    spec, dev = sk.task(), device()
+    i = d["hero"]["scene"]
+    lay = sample_layout(spec, np.random.default_rng(SEED0 + i)).to_json()
+    stage = montage.Stage(sk.robot)
+    res = {}
+    for tag, path in (("a", ROOT / sk.model), ("b", out / "final.pt")):
+        m, _ = VLA.load(path, dev)
+        r = score(m, spec, [lay], sk.robot, lambda n: None, first=i)[0]
+        res[tag] = r
+        montage.write_hero(
+            stage, r, out / ("hero_r0.jpg" if tag == "a" else "hero_final.jpg")
+        )
+    stage.close()
+    d["hero"].update(
+        a_success=res["a"]["success"],
+        b_success=res["b"]["success"],
+        a_failure=res["a"]["failure"],
+        b_failure=res["b"]["failure"],
+    )
+    (out / "run.json").write_text(json.dumps(d, indent=1))
+    return d["hero"]

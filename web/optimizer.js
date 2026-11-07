@@ -1,12 +1,12 @@
 /* Optimizer step: a language model improves a trained skill, one change per round, scored on the same scenes.
-   Mounts into <div id="optimizer-root"></div>. Self-contained: needs only web/optimizer.css (injected if missing)
+   ES module: export mount(root, ctx) puts a compact panel in #optimizer-root and opens the montage as an overlay.
+   ctx.stage(name, state, metric) (optional) drives the rail step. Self-contained: needs only web/optimizer.css (injected if missing)
    and these endpoints: GET /api/optimizer/skills, POST /api/optimizer/start, GET /api/optimizer/runs,
    GET /api/optimizer/runs/{id}, GET /api/optimizer/runs/{id}/img/{path}.
    Everything shown comes from the run record; nothing here is simulated by the page. */
-(() => {
-  "use strict";
-  const root = document.getElementById("optimizer-root");
-  if (!root) return;
+export function mount(root, ctx = {}) {
+  if (!root || root.dataset.optMounted) return;
+  root.dataset.optMounted = "1";
   if (!document.querySelector('link[href*="optimizer.css"]')) {
     const l = document.createElement("link");
     l.rel = "stylesheet";
@@ -45,6 +45,7 @@
   head.append(title, controls);
 
   const badge = el("div", "opt-badge");
+  const badge2 = el("div", "opt-badge");
   const main = el("div", "opt-main");
   const gridCard = el("div", "opt-grid-card");
   const gridTop = el("div", "opt-grid-top");
@@ -74,21 +75,55 @@
 
   const replay = el("div", "opt-replay");
   const table = el("div", "opt-table");
-  root.append(head, badge, main, replay, table);
+  const summary = el("div", "opt-summary");
+  const openBtn = el("button", "opt-btn opt-ghost", "Open the montage");
+  const panel = el("div", "opt-panel");
+  panel.append(head, badge, summary, openBtn);
+  const overlay = el("div", "opt-overlay");
+  overlay.hidden = true;
+  const ovHead = el("div", "opt-ov-head");
+  const closeBtn = el("button", "opt-btn opt-ghost", "Close");
+  ovHead.append(el("h3", "", "Optimizer montage"), closeBtn);
+  overlay.append(ovHead, badge2, main, replay, table);
+  root.append(panel, overlay);
+  const setOpen = (v) => { overlay.hidden = !v; root.dataset.optOpen = v ? "1" : ""; };
+  openBtn.onclick = () => setOpen(true);
+  closeBtn.onclick = () => setOpen(false);
+  document.addEventListener("keydown", (e) => e.key === "Escape" && setOpen(false));
+  window.addEventListener("forge:newchat", () => setOpen(false));
+  window.addEventListener("forge:optimizer", (e) => e.detail && e.detail.open && loadLists());
+
+  function setBadge(cls, text) {
+    for (const b of [badge, badge2]) { b.className = "opt-badge " + cls; b.textContent = text; }
+  }
+  function report(r) {
+    const done = r.rounds.filter((x) => x.success != null);
+    const first = done[0], best = r.rounds[r.best_round];
+    if (first && best) {
+      summary.textContent = `R0 ${first.success}/${first.n}, best R${r.best_round} ${best.success}/${best.n}, in simulation. ` +
+        (r.status === "running" ? `Now: ${phaseText(r)}.` : r.status === "error" ? `Stopped: ${r.error}` : "Finished.");
+    } else summary.textContent = r.status === "running" ? `Now: ${phaseText(r)}.` : "";
+    if (ctx.stage) {
+      const m = first && best ? `${first.success} to ${best.success}/${first.n}` : "";
+      ctx.stage("optimizer", r.status === "running" ? "live" : r.status === "done" ? "done" : "fail", m);
+    }
+  }
 
   /* ---------- run list and start ---------- */
   async function loadLists() {
     try {
       S.skills = await get(`${API}/skills`);
+      const keep = skillSel.value;
       skillSel.textContent = "";
       for (const s of S.skills) skillSel.add(new Option(`${s.name} (${s.success_rate * s.n_eval}/${s.n_eval} on its check)`, s.id));
       if (!S.skills.length) skillSel.add(new Option("no skill with headroom", ""));
+      if (keep) skillSel.value = keep;
       S.runs = await get(`${API}/runs`);
       pastSel.textContent = "";
       pastSel.add(new Option(S.runs.length ? "Earlier runs" : "No earlier runs", ""));
       for (const r of S.runs) pastSel.add(new Option(`${r.skill.instruction}, ${r.rounds_done} rounds, ${r.status}`, r.id));
     } catch (e) {
-      badge.textContent = "The optimizer endpoints are not available on this server.";
+      setBadge("", "The optimizer endpoints are not available on this server.");
     }
   }
   go.onclick = async () => {
@@ -103,8 +138,9 @@
       if (!r.ok) throw new Error(j.detail || r.status);
       S.follow = true;
       open(j.id);
+      setOpen(true);
     } catch (e) {
-      badge.textContent = `Could not start: ${e.message}`;
+      setBadge("", `Could not start: ${e.message}`);
     }
     go.disabled = false;
   };
@@ -123,9 +159,11 @@
     try { r = await get(`${API}/runs/${id}`); } catch { return; }
     const first = !S.run;
     S.run = r;
+    if (first && [...skillSel.options].some((o) => o.value === r.skill.id)) skillSel.value = r.skill.id;
     const done = r.rounds.filter((x) => x.success !== undefined && x.success !== null);
     if (S.follow || first) S.sel = Math.max(0, done.length - 1);
     if (r.status === "done" || r.status === "error") { clearInterval(S.poll); S.poll = null; loadLists(); }
+    report(r);
     render();
   }
 
@@ -184,12 +222,11 @@
     const r = S.run;
     if (!r) return;
     const answered = r.llm && r.llm.answered;
-    badge.className = "opt-badge " + (answered ? (r.llm.real_llama ? "llama" : "fallback") : "");
-    badge.textContent = !answered
+    setBadge(answered ? (r.llm.real_llama ? "llama" : "fallback") : "", !answered
       ? "Llama proposes the change when the Meta Llama API key works; otherwise the model that answers is named here."
       : r.llm.real_llama
         ? `Llama proposes the change (${answered}).`
-        : `Llama (planned), running on fallback: ${answered} proposed these changes.`;
+        : `Llama (planned), running on fallback: ${answered} proposed these changes.`);
     gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} held-out scenes`;
 
     ticker.textContent = "";
@@ -335,4 +372,4 @@
     const live = S.runs.find((r) => r.status === "running") || S.runs[0];
     if (live) open(live.id);
   });
-})();
+}
