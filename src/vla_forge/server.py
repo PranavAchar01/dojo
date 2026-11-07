@@ -21,7 +21,15 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agents_api, factory, optimizer_api, robotcache, thumbs, tiles
+from . import (
+    agents_api,
+    assets_api,
+    factory,
+    optimizer_api,
+    robotcache,
+    thumbs,
+    tiles,
+)
 from .agents import Forge as Agents
 from .agents import describe_run_reply, run_once
 from .pipeline import FORGE
@@ -55,6 +63,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(agents_api.router)
 app.include_router(optimizer_api.router)
+app.include_router(assets_api.router)
 
 
 class Prompt(BaseModel):

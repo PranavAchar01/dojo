@@ -1,0 +1,10 @@
+{
+  "name": "Factory cell",
+  "floor": {"repeat": 1.0},
+  "lights": [{"pos": [0.2, 0.0, 2.4], "intensity": 0.55, "shadow": true, "cutoff": 80}],
+  "scenery": [
+    {"id": "euro_pallet", "pos": [1.3, -0.7, -0.75], "yaw": 10},
+    {"id": "grey_tote", "pos": [1.3, -0.7, -0.61], "yaw": 80}
+  ],
+  "product": {"scale": 0.25, "yaw": 0, "cassette_lift": [0, 0, 0.12], "lid_lift": [0, -0.06, 0]}
+}
