@@ -94,7 +94,7 @@ function closeOpen(status = "done") {
 }
 function onThought(e) {
   if (e.run !== st.run) { st.run = e.run; }
-  const t = { agent: e.agent || "forge", text: String(e.text || ""), llm: !!e.llm, t: Date.now() };
+  const t = { agent: e.agent || "forge", text: String(e.text || ""), llm: !!e.llm && !/^chat message from/i.test(String(e.text || "")), t: Date.now() };
   if (!t.text) return;
   pushThought(t);
   closeOpen();

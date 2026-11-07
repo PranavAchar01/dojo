@@ -36,14 +36,14 @@ if (video && video.play) {
 if (!reduced && innerWidth >= 760) {
   import("/static/mascot.js").then(({ roamer, goTo, goHomeSoon, say }) => {
     const LINES = {
-      how: "One sentence goes in. Eight steps hand it down the pipe.",
-      agents: "These are the Fetch.ai agents. Llama thinks behind three of them.",
-      arms: "Ask for another SO-101 and each arm gets its own sub-task.",
-      skills: "Every finished skill is saved and becomes an agent too.",
-      robots: "Every part here comes from a real source, with its licence.",
-      models: "This is what runs today. Llama plans and critiques.",
+      how: "One sentence, eight steps.",
+      agents: "Fetch.ai agents, Llama behind three.",
+      arms: "Another arm gets its own sub-task.",
+      skills: "Each saved skill is an agent too.",
+      robots: "Every part has a real source.",
+      models: "What runs today. Llama plans.",
     };
-    setTimeout(() => { say("Hi, I am the forge bot. I will point things out as you scroll.", 3600); }, 1400);
+    setTimeout(() => { say("Hi, I will point things out.", 3600); }, 1400);
     let last = "", t = 0;
     const seen = new IntersectionObserver((es) => {
       for (const e of es) {
@@ -51,12 +51,14 @@ if (!reduced && innerWidth >= 760) {
         last = e.target.id;
         clearTimeout(t);
         t = setTimeout(() => {
-          const h = e.target.querySelector("h2");
+          const w = e.target.querySelector(".wrap") || e.target;
+          let h = w.querySelector(".tour-pin");
+          if (!h) { h = document.createElement("span"); h.className = "tour-pin"; h.style.cssText = "position:absolute;right:8%;top:130px;width:24px;height:24px;pointer-events:none"; w.style.position = "relative"; w.append(h); }
           if (h && goTo(h, { dwell: 5200, force: true })) { say(LINES[last], 4200); goHomeSoon(5600); }
         }, 700);
       }
     }, { threshold: 0.45 });
     document.querySelectorAll("section.band").forEach((s) => seen.observe(s));
-    roamer.host.addEventListener("click", () => say("Open the app and give the arm a task. Ask me what I am doing there.", 4200));
+    roamer.host.addEventListener("click", () => say("Open the app and give it a task.", 4200));
   });
 }
