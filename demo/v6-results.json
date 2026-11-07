@@ -1,11 +1,11 @@
 {
- "recorded": "2026-11-07T06:19:35.589Z",
+ "recorded": "2026-11-07T07:09:39.190Z",
  "sim_skill": {
-  "instruction": "put the green block in the front-right slot of the tray",
-  "skill_id": "put-the-green-block-in-the-front-right-slot-of-the-tray-510c",
-  "parent": "put-the-red-block-in-the-front-left-slot-of-the-tray-f8b0",
-  "train_seconds": 161.5,
-  "held_out_success": 0.85,
+  "instruction": "put the green block in the back-right slot of the tray",
+  "skill_id": "put-the-green-block-in-the-back-right-slot-of-the-tray-0b1e",
+  "parent": "put-the-green-block-in-the-back-left-slot-of-the-tray-1693",
+  "train_seconds": 178.6,
+  "held_out_success": 0.75,
   "n_eval": 20,
   "rounds": [
    {
@@ -13,7 +13,7 @@
     "n": 20
    },
    {
-    "succeeded": 17,
+    "succeeded": 15,
     "n": 20
    }
   ],

@@ -230,9 +230,9 @@ await sleep(900);
 await page.waitForFunction(() => /passed$/.test(document.querySelector("#asm-sum")?.textContent || ""), { timeout: 120000 }).catch(() => {});
 await sleep(6000);
 
-// 7. back to the line
-await view("line");
-await page.evaluate(() => document.querySelector("#view-line").scrollTo({ top: 0, behavior: "smooth" }));
+// 7. close on the library, where the skills forged in this tour sit as tiles
+await view("skills");
+await page.evaluate(() => document.querySelector("#view-skills").scrollTo({ top: 0, behavior: "smooth" }));
 await mark("close");
 await sleep(5000);
 marks.end = await now();
