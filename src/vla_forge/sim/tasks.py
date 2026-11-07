@@ -70,6 +70,7 @@ class TaskSpec:
     distractors: int = 2
     instruction: str = ""
     success: list[dict] = field(default_factory=list)
+    feasibility: dict = field(default_factory=dict)  # sim/feasibility.py: included / excluded objects and the numbers
 
     def __post_init__(self):
         assert self.skill in SKILLS, self.skill
@@ -94,6 +95,7 @@ class TaskSpec:
                     "distractors",
                     "instruction",
                     "success",
+                    "feasibility",
                 )
                 if k in d
             }
