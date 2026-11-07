@@ -944,6 +944,18 @@ async function renderRsi() {
   const skills = Object.fromEntries(st.skills.map((s) => [s.id, s]));
   box.innerHTML = "";
   const done = st.runs.filter((r) => r.status === "published");
+  // runs live only as long as the server process; published models are on disk, so they fill in the rows a restart forgot
+  const seen = new Set(done.map((r) => r.skill_id || r.skill));
+  for (const s of st.skills) {
+    if (seen.has(s.id)) continue;
+    const n = s.n_eval || 20;
+    done.push({
+      tier: s.tier, prompt: s.instruction, elapsed: s.seconds || s.train_seconds || 0,
+      rounds: [{ eval: { succeeded: Math.round((s.success_rate || 0) * n), n } }], best_round: 0,
+      init_from: s.parent ? { skill: s.parent } : null,
+      plan: (s.steps || []).map((p) => ({ source: p.source || "reuse", seconds: p.seconds || 0 })),
+    });
+  }
   if (!done.length) { box.append(el("div", "empty-note", "No prompts finished yet.")); return; }
   const tmax = Math.max(180, ...done.map((r) => r.elapsed));
   for (const tier of [1, 2, 3]) {
@@ -965,10 +977,10 @@ async function renderRsi() {
         const trained = r.plan.filter((p) => p.source === "train");
         from = `calls ${r.plan.length} models; reused ${reuse}` + (trained.length ? `, trained ${trained.length} (${trained.map((p) => Math.round(p.seconds) + "s").join(", ")})` : "");
       } else if (r.parent) {
-        const src = r.init_from && r.init_from.skill ? `, fine-tuned from "${skills[r.init_from.skill]?.instruction || r.init_from.skill}"` : ", from the base policy";
+        const src = r.init_from && r.init_from.skill ? `, fine-tuned from "${skills[r.init_from.skill]?.instruction || r.init_from.skill.replace(/-[0-9a-f]{4}$/, "").replace(/-/g, " ")}"` : ", from the base policy";
         from = `step ${r.step_index + 1} of a tier 3 task${src}`;
       } else if (r.init_from && r.init_from.skill) {
-        from = `fine-tuned from "${skills[r.init_from.skill]?.instruction || r.init_from.skill}"`;
+        from = `fine-tuned from "${skills[r.init_from.skill]?.instruction || r.init_from.skill.replace(/-[0-9a-f]{4}$/, "").replace(/-/g, " ")}"`;
       } else {
         from = "the multi-task base policy";
       }
