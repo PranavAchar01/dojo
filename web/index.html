@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/static/dock.css">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/library.css">
+<link rel="stylesheet" href="/static/assets.css">
 <link rel="stylesheet" href="/static/arms.css">
 <link rel="stylesheet" href="/static/roam.css">
 <link rel="stylesheet" href="/static/agents.css">
@@ -167,6 +168,11 @@
             <h2>Model <em>library</em></h2>
             <p>Every model here is a custom-trained vision-language-action policy: a frame from its own rollout, its success on held-out scenes, and how long it took to train. Click one to watch it run, test it on new scenes, remix it with a new prompt, or train a new one.</p>
           </div>
+          <div class="lib-mode" id="lib-mode" role="group" aria-label="Library">
+            <button data-m="models" class="on" type="button">Trained models</button><button data-m="3d" type="button">3D models</button>
+          </div>
+          <div id="lib-3d" hidden></div>
+          <div id="lib-trained">
           <div class="lib-bar">
             <input id="lib-q" type="search" placeholder="Search models" aria-label="Search models">
             <div class="lib-filter" id="lib-filter" role="group" aria-label="Filter">
@@ -179,6 +185,7 @@
           </div>
           <div id="lib-count" class="lib-count"></div>
           <div id="skills" class="tiles"></div>
+          </div>
         </div>
       </div>
 

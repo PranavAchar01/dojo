@@ -16,7 +16,7 @@ const MAX_MB = 50;
 const ACCEPT = ".glb,.gltf,.obj,.stl,.zip";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const cm = (m) => (m >= 1 ? `${m.toFixed(2)} m` : `${(m * 100).toFixed(m < 0.1 ? 1 : 0)} cm`);
-const NICE = { conveyor: "Conveyors", pallet: "Pallets", container: "Totes and bins", shelving: "Shelving", workbench: "Benches and carts", handling: "Handling", machine: "Machines", part: "Parts", tool: "Tools", lighting: "Lighting", safety: "Safety", utility: "Utility", structure: "Structure", mine: "Imported" };
+const NICE = { conveyor: "Conveyors", pallet: "Pallets", container: "Totes and bins", shelving: "Shelving", workbench: "Benches and carts", handling: "Handling", machine: "Machines", part: "Parts", tool: "Tools", lighting: "Lighting", safety: "Safety", utility: "Utility", structure: "Structure", mine: "Imported", product: "Products" };
 const SOURCE_SHORT = { "Poly Haven": "Poly Haven", "Gazebo Fuel": "Gazebo Fuel", user: "Your file" };
 
 function licenceChip(m) {
@@ -34,7 +34,7 @@ export function mountAssets(root, opts = {}) {
       <div class="as-origin" role="group" aria-label="Origin">
         <button data-o="" class="on">All</button><button data-o="library">Library</button><button data-o="user">My models</button>
       </div>
-      <button class="as-import" type="button"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Import model</button>
+      <button class="as-import" type="button"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Import a 3D model</button>
     </div>
     <div class="as-cats" role="group" aria-label="Category"></div>
     <div class="as-count"></div>
@@ -127,6 +127,26 @@ export function mountAssets(root, opts = {}) {
   }
 
   // ---------------------------------------------------------------- import
+  function chooseSource() {
+    const modal = $(".as-modal");
+    modal.hidden = false;
+    modal.innerHTML = `<div class="as-sheet as-imp" role="dialog" aria-label="Import a 3D model">
+      <button class="as-x" aria-label="Close">&times;</button>
+      <h3>Import a 3D model</h3>
+      <p class="as-desc">Bring in a GLB, glTF, OBJ, STL or a zip (up to ${MAX_MB} MB). It is scaled to metres, split into convex pieces and given physics defaults, then it joins the grid.</p>
+      <div class="as-actions"><button class="as-pick" type="button">Choose a file</button></div>
+      <label>Or paste a link<input class="as-url" type="url" placeholder="https://example.com/model.glb" maxlength="500"></label>
+      <div class="as-status" aria-live="polite"></div>
+      <div class="as-actions"><button class="as-fetch" type="button">Use this link</button></div></div>`;
+    modal.querySelector(".as-x").onclick = closeModal;
+    modal.querySelector(".as-pick").onclick = () => $(".as-file").click();
+    modal.querySelector(".as-fetch").onclick = () => {
+      const u = modal.querySelector(".as-url").value.trim();
+      if (!/^https?:\/\/\S+$/i.test(u)) { const st = modal.querySelector(".as-status"); st.className = "as-status bad"; st.textContent = "Paste a web link that starts with http or https."; return; }
+      importFile({ url: u, name: decodeURIComponent(u.split("?")[0].split("/").pop() || "model"), size: 0 });
+    };
+  }
+
   async function importFile(file) {
     const modal = $(".as-modal");
     modal.hidden = false;
@@ -134,7 +154,7 @@ export function mountAssets(root, opts = {}) {
     modal.innerHTML = `<div class="as-sheet as-imp" role="dialog" aria-label="Import">
       <button class="as-x" aria-label="Close">&times;</button>
       <h3>Import ${esc(file.name)}</h3>
-      <p class="as-desc">${(file.size / 1048576).toFixed(1)} MB. The file is checked, scaled to metres, split into convex pieces and given physics defaults.</p>
+      <p class="as-desc">${file.url ? "From a link." : `${(file.size / 1048576).toFixed(1)} MB.`} The file is checked, scaled to metres, split into convex pieces and given physics defaults.</p>
       <label>Name<input class="as-name" value="${esc(file.name.replace(/\.[^.]+$/, ""))}" maxlength="60"></label>
       <label>Units<select class="as-units"><option value="auto">Detect</option><option value="m">Metres</option><option value="cm">Centimetres</option><option value="mm">Millimetres</option><option value="in">Inches</option></select></label>
       <label>Physics<select class="as-kindsel"><option value="dynamic">Dynamic (can be picked up)</option><option value="static">Static (fixed in place)</option></select></label>
@@ -147,9 +167,11 @@ export function mountAssets(root, opts = {}) {
     modal.querySelector(".as-go").onclick = async () => {
       const go = modal.querySelector(".as-go"); go.disabled = true;
       const q = new URLSearchParams({ name: modal.querySelector(".as-name").value, units: modal.querySelector(".as-units").value, kind: modal.querySelector(".as-kindsel").value });
-      status.className = "as-status"; status.textContent = "Uploading...";
+      status.className = "as-status"; status.textContent = file.url ? "Downloading..." : "Uploading...";
       try {
-        const r = await fetch(`${API}/import?${q}`, { method: "POST", headers: { "X-Filename": encodeURIComponent(file.name) }, body: file });
+        const r = file.url
+          ? await fetch(`${API}/import-url`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: file.url, name: modal.querySelector(".as-name").value, units: modal.querySelector(".as-units").value, kind: modal.querySelector(".as-kindsel").value }) })
+          : await fetch(`${API}/import?${q}`, { method: "POST", headers: { "X-Filename": encodeURIComponent(file.name) }, body: file });
         const j = await r.json();
         if (!r.ok) throw new Error(j.detail || r.statusText);
         status.textContent = "Converting: scaling, convex decomposition, physics...";
@@ -172,7 +194,7 @@ export function mountAssets(root, opts = {}) {
   $(".as-cats").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { state.cat = b.dataset.c; load(); } });
   $(".as-origin").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { state.origin = b.dataset.o; syncOrigin(); load(); } });
   $(".as-grid").addEventListener("click", (e) => { const c = e.target.closest(".as-card"); if (c) openModel(c.dataset.id); });
-  $(".as-import").onclick = () => $(".as-file").click();
+  $(".as-import").onclick = chooseSource;
   $(".as-file").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); };
   const onKey = (e) => { if (e.key === "Escape") closeModal(); };
   document.addEventListener("keydown", onKey);
@@ -227,5 +249,5 @@ function makePreview(canvas, url) {
 }
 
 // Standalone page (web/assets.html) mounts itself.
-const auto = document.getElementById("assets-root");
+const auto = document.getElementById("assets-root");  // standalone page only
 if (auto) mountAssets(auto);

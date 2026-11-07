@@ -590,3 +590,25 @@ $("#lib-new").addEventListener("click", () => { setMode("scratch", "", ""); wind
 window.forgeLib = { onEvent, refresh, render: () => draw(), takeMode, startTest, replay, openTile };
 draw();
 refresh();
+
+// Trained models | 3D models: the second face is the real-model library (web/assets.js), mounted on first use.
+{
+  let panel = null;
+  document.getElementById("lib-mode")?.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const three = b.dataset.m === "3d";
+    document.querySelectorAll("#lib-mode button").forEach((x) => x.classList.toggle("on", x === b));
+    document.getElementById("lib-trained").hidden = three;
+    document.getElementById("lib-3d").hidden = !three;
+    const lede = document.querySelector("#view-skills .doc-h p");
+    if (lede) {
+      lede.dataset.trained ??= lede.textContent;
+      lede.textContent = three ? "Real open-source 3D models, each with its source and licence, already converted for MuJoCo. Click one to look at it, or import your own from a file or a link." : lede.dataset.trained;
+    }
+    if (three && !panel) {
+      const { mountAssets } = await import("/static/assets.js");
+      panel = mountAssets(document.getElementById("lib-3d"));
+    }
+  });
+}
