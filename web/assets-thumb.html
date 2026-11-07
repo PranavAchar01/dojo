@@ -1,52 +1,25 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>thumb</title>
-<style>html,body{margin:0;background:#f1f4f7}canvas{display:block}</style>
+<style>html,body{margin:0;background:#e7e8ea}canvas{display:block}</style>
 <script type="importmap">
 { "imports": { "three": "/web/vendor/three/three.module.js", "three/addons/": "/web/vendor/three/addons/" } }
 </script>
 <body>
+<canvas id="c"></canvas>
 <script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-
+// Library thumbnails come out of the same stage as the Sim tab and the factory view (web/stage.js).
+import { createStage, loadModel, standOnFloor, frameBox } from "/web/stage.js";
 const W = 480, H = 360;
-const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-r.setSize(W, H); r.setPixelRatio(1);
-r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
-r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
-document.body.append(r.domElement);
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf1f4f7);
-const pm = new THREE.PMREMGenerator(r);
-scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
-scene.add(sun);
-const ground = new THREE.Mesh(new THREE.CircleGeometry(20, 48), new THREE.ShadowMaterial({ opacity: 0.18 }));
-ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-const cam = new THREE.PerspectiveCamera(32, W / H, 0.01, 100);
+const st = createStage(document.getElementById("c"), { width: W, height: H, preserve: true, fog: null, target: [0.2, 0, 0] });
 let current = null;
-
 window.shoot = async (url) => {
-  if (current) scene.remove(current);
-  const gltf = await new GLTFLoader().loadAsync(url);
-  current = gltf.scene; scene.add(current);
-  current.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  const box = new THREE.Box3().setFromObject(current);
-  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
-  const rad = Math.max(0.05, s.length() / 2);
-  const d = rad / Math.sin((cam.fov * Math.PI) / 360) * 1.02;
-  cam.position.set(c.x + d * 0.62, c.y + d * 0.5, c.z + d * 0.62);
-  cam.lookAt(c); cam.near = d / 100; cam.far = d * 10; cam.updateProjectionMatrix();
-  sun.position.set(c.x + rad * 2, c.y + rad * 3, c.z + rad * 1.5);
-  sun.target.position.copy(c); sun.target.updateMatrixWorld();
-  const sh = rad * 1.6; Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, near: 0.01, far: rad * 8 });
-  sun.shadow.camera.updateProjectionMatrix();
-  ground.position.y = box.min.y;
-  r.render(scene, cam);
-  return { size: [s.x, s.y, s.z] };
+  if (current) st.scene.remove(current);
+  const { holder, size } = standOnFloor(await loadModel(url));
+  current = holder; st.scene.add(holder);
+  frameBox(st, new st.THREE.Box3().setFromObject(holder), [0.62, -0.62, 0.5], 1.05);
+  st.render();
+  return { size: [size[0], size[2], size[1]] }; // y up in the file, as the card shows it
 };
 window.ready = true;
 </script>
