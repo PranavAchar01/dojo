@@ -1,12 +1,12 @@
 hook	hook	This is VLA Forge. A company describes its line in plain words, and gets a trained robot policy for each station in minutes. All of this runs in simulation.
-describe	explain	Here's a new kitting line. Red parts go to the blue tote, yellow parts to the green one, and a ViperX at the end catches the rest.
-cards	explain	The planner turns that into a chain of three stations: a VLA, then a VLA, then a scripted cell. Each VLA is fine-tuned from the closest skill in the library.
-train	explain	Now both stations train for real. The forge collects demos, fine-tunes, then tests each policy on scenes it never saw. The waiting is sped up four times, and the badge shows it.
-round2	honest	The {rname} station got {r1} of {rn} on its first round, under the bar, so the critic sent it back for another.
-trained	proud	The {a} station trained in {t0} seconds and the {b} one in {t1}. On {n} held-out scenes, they got {s0} and {s1}.
-replay	explain	Then {parts} parts go down the belt, in simulation.
-results	proud	{done} of {parts} ended up in the right tote, at about {tpm} parts a minute in simulated time.
-library	explain	Each station's skill is saved in the library as a tile with its measured success.
+describe	explain	In the editor you type a task. Here, an SO-101 puts a green block in a slot of the pallet tray, a harder kitting skill.
+train	explain	The agents write the success check, collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
+round2	honest	The first round got {r1} of {rn}, under the bar, so the critic sent it back for another.
+trained	proud	The new skill trained in {t} seconds and got {s} of {n} held-out scenes, in simulation.
+line	explain	Now the factory line. In Housing Assembly, one SO-101 seats each housing in a pallet slot, a second one inserts it into a socket, and a scripted ViperX crates the result.
+cards	proud	Pallet seating got {a0} of {n0} held-out scenes, and {a1} of {a2} on the line. Socket insertion got {b0} of {n1}, and {b1} of {b2}. The scripted crate step got {c1} of {c2}. All in simulation.
+results	proud	End to end, {done} of {parts} parts made it into the crate, at about {tpm} parts a minute of simulated time.
+library	explain	Every skill is saved in the library as a tile with its measured success, including the harder ones: kitting, insertion, and rotate and place.
 far	honest	Ask for something the arm can't reach, like lifting a block sixty centimeters, and the router says not feasible. The jaws top out at fifty-three.
 robot	explain	In the Robot tab you build the arm itself. Every part has a preview, and each one is a real open-source model.
-close	close	From typing that line to a finished run took under {mins} minutes.
+close	close	That is VLA Forge: describe the line, and get a measured policy for every station, in simulation.

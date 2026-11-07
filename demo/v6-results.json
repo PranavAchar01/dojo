@@ -1,0 +1,74 @@
+{
+ "recorded": "2026-11-07T06:19:35.589Z",
+ "sim_skill": {
+  "instruction": "put the green block in the front-right slot of the tray",
+  "skill_id": "put-the-green-block-in-the-front-right-slot-of-the-tray-510c",
+  "parent": "put-the-red-block-in-the-front-left-slot-of-the-tray-f8b0",
+  "train_seconds": 161.5,
+  "held_out_success": 0.85,
+  "n_eval": 20,
+  "rounds": [
+   {
+    "succeeded": 10,
+    "n": 20
+   },
+   {
+    "succeeded": 17,
+    "n": 20
+   }
+  ],
+  "new_runs": 1
+ },
+ "line_id": "194528-ab1b",
+ "line_name": "Housing Assembly",
+ "prompt": "Assemble housings: an SO-101 seats each housing in a pallet slot, a second SO-101 inserts it into a socket, then a scripted ViperX moves the finished assembly into the crate.",
+ "stations": [
+  {
+   "name": "Pallet Seating",
+   "controller": "vla",
+   "robot": "so101",
+   "held_out_success": 0.8,
+   "n_eval": 20,
+   "train_seconds": 94.5,
+   "on_line": {
+    "succeeded": 26,
+    "parts_in": 30,
+    "mean_work_s": 9.75
+   }
+  },
+  {
+   "name": "Socket Insertion",
+   "controller": "vla",
+   "robot": "so101",
+   "held_out_success": 0.8,
+   "n_eval": 20,
+   "train_seconds": 107.5,
+   "on_line": {
+    "succeeded": 22,
+    "parts_in": 26,
+    "mean_work_s": 11.54
+   }
+  },
+  {
+   "name": "Finished Assembly Crating",
+   "controller": "scripted",
+   "robot": "vx300s.native.native",
+   "held_out_success": null,
+   "n_eval": null,
+   "train_seconds": null,
+   "on_line": {
+    "succeeded": 22,
+    "parts_in": 22,
+    "mean_work_s": 10.26
+   }
+  }
+ ],
+ "line": {
+  "parts": 30,
+  "completed": 22,
+  "success_rate": 0.733,
+  "parts_per_min": 2.97,
+  "makespan_s": 444.6
+ },
+ "retry": true
+}
