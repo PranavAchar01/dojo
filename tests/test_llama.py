@@ -83,7 +83,7 @@ def test_stub_plan_and_critic_are_schema_shaped():
         "two arms: seat the housing in the pallet then insert it into the socket",
         {},
     )
-    assert plan["stations"]
+    assert len(plan["stations"]) == 2
     crit = llama.Stub().chat_json(
         "critic",
         "s",
