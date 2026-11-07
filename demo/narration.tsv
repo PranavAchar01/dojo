@@ -1,4 +1,4 @@
-hook	hook	This is VLA Forge. You describe a task in plain words, and it trains a robot policy for it. All of this runs in simulation.
+hook	hook	This is VLA Forge. You describe a task in plain words, and it trains a robot policy for it. Building a skill from one sentence needs a frontier model, and here that model is Llama. All of this runs in simulation.
 describe	explain	The canvas starts blank. I type one task for an SO-101: put the blue block in the front-left slot of the tray.
 train	explain	The agents write the success check, collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
 round2	honest	The first round got {r1} of {rn}, under the bar, so the critic sent it back for another.
@@ -6,8 +6,8 @@ trained	proud	The new skill trained in {t} seconds and got {s} of {n} held-out s
 addarm	explain	Now I type add another SO-101, and a second arm appears in place.
 twoarm	explain	Then I describe a task for two arms: one seats the housing in the pallet, and the other inserts it into the socket.
 armsresult	proud	The Arms list gives plain results: {ac} of {an} tries finished by both arms, in simulation.
-optimize	explain	Next, the Optimize step. This is a saved run on socket insertion, scored on the same one hundred scenes every round.
-montage	explain	Each tile is one scene, blue for a success and red for a failure. Llama 4 Maverick reads where the skill fails and proposes one change per round. A change is kept only if success rises on the same scenes.
-ticker	proud	Round zero got {o0} of one hundred. The best round, round three, got {ob}. Rounds four and five were reverted.
-replay	honest	Here is one scene before and after. The intervals overlap, so call this an improvement in this run, not proof. All of it in simulation.
-close	close	That is VLA Forge: describe a task, add arms, and measure the result, in simulation.
+optimize	explain	Next, the Optimize step. Llama plans the task, critiques the failures, and now optimizes. This is a saved run on socket insertion, and each round it reads where the skill fails and proposes one change.
+montage	explain	Each tile is one selection scene, blue for a success and red for a failure. A change is kept only if success rises on these same one hundred scenes.
+ticker	proud	Round zero got {o0} of one hundred. Rounds one, three and five were kept, and rounds two and four were reverted. The last kept round, round five, got {ob}.
+held	honest	Selection scores can flatter a policy, so here are one hundred test scenes the optimizer never saw. Round zero got {h0} of one hundred, and the final policy got {hf}. Random changes over the same rounds went from {c0} to {cf}. That is plus seven, not yet significant, with p of point three four. All of it in simulation.
+close	close	That is VLA Forge: describe a task, add arms, and let Llama optimize the skill, measured in simulation.

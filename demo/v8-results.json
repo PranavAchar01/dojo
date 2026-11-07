@@ -1,0 +1,185 @@
+{
+ "recorded": "2026-11-07T15:31:13.660Z",
+ "sim_skill": {
+  "instruction": "put the blue block in the front-left slot of the tray",
+  "skill_id": "put-the-blue-block-in-the-front-left-slot-of-the-tray-6807",
+  "parent": "put-the-blue-block-in-the-front-left-slot-of-the-tray-99a5",
+  "train_seconds": 184,
+  "held_out_success": 0.65,
+  "n_eval": 20,
+  "rounds": [
+   {
+    "succeeded": 10,
+    "n": 20
+   },
+   {
+    "succeeded": 13,
+    "n": 20
+   }
+  ],
+  "new_runs": 1
+ },
+ "arms": {
+  "line_id": "072957-ac2a",
+  "prompt": "two arms: one seats the housing in the pallet, the other inserts it into the socket",
+  "arms": [
+   {
+    "name": "seat housing in pallet",
+    "controller": "vla",
+    "task": "kit",
+    "instruction": null,
+    "held_out_success": null,
+    "n_eval": null
+   },
+   {
+    "name": "insert into socket",
+    "controller": "vla",
+    "task": "insert",
+    "instruction": null,
+    "held_out_success": null,
+    "n_eval": null
+   }
+  ],
+  "text": "8 of 12 tries finished by both arms, in simulation. 12 tries (12 red), seed 7. Not finished: try 3 (red) at arm 1, landed on a divider; try 4 (red) at arm 1, dropped it on the way; try 11 (red) at arm 2, jammed on the socket rim; try 12 (red) at arm 1, landed on a divider.",
+  "tries": 12,
+  "completed": 8,
+  "seed": 7
+ },
+ "optimizer": {
+  "run": "064106-9ad6",
+  "skill": "insert the green block into the socket",
+  "n_scenes": 100,
+  "best_round": 5,
+  "test": {
+   "n": 100,
+   "r0": {
+    "k": 67,
+    "rate": 0.67,
+    "ci": [
+     0.573,
+     0.754
+    ]
+   },
+   "final": {
+    "k": 74,
+    "rate": 0.74,
+    "ci": [
+     0.646,
+     0.816
+    ]
+   },
+   "delta": 0.07,
+   "mcnemar": {
+    "fixed": 23,
+    "broken": 16,
+    "p": 0.3368
+   },
+   "random_control": {
+    "n": 100,
+    "before": {
+     "k": 67,
+     "rate": 0.67,
+     "ci": [
+      0.573,
+      0.754
+     ]
+    },
+    "after": {
+     "k": 65,
+     "rate": 0.65,
+     "ci": [
+      0.553,
+      0.736
+     ]
+    },
+    "delta": -0.02,
+    "delta_ci": [
+     -0.14,
+     0.1
+    ],
+    "mcnemar": {
+     "fixed": 19,
+     "broken": 21,
+     "p": 0.8746
+    }
+   },
+   "llm": {
+    "asked": "Llama 4 Maverick",
+    "backend": "openai:gpt-5.5",
+    "backends_used": [
+     "openai:gpt-5.5"
+    ],
+    "real_llama": false
+   }
+  },
+  "rounds": [
+   {
+    "round": 0,
+    "success": 60,
+    "n": 100,
+    "status": "start",
+    "ci": [
+     0.502,
+     0.691
+    ],
+    "change": null
+   },
+   {
+    "round": 1,
+    "success": 66,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.563,
+     0.745
+    ],
+    "change": "add 40 demonstrations at the failed starts"
+   },
+   {
+    "round": 2,
+    "success": 56,
+    "n": 100,
+    "status": "reverted",
+    "ci": [
+     0.462,
+     0.653
+    ],
+    "change": "train only the action layers"
+   },
+   {
+    "round": 3,
+    "success": 70,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.604,
+     0.781
+    ],
+    "change": "add 60 demonstrations at the failed starts"
+   },
+   {
+    "round": 4,
+    "success": 66,
+    "n": 100,
+    "status": "reverted",
+    "ci": [
+     0.563,
+     0.745
+    ],
+    "change": "train 60 s per round"
+   },
+   {
+    "round": 5,
+    "success": 74,
+    "n": 100,
+    "status": "kept",
+    "ci": [
+     0.646,
+     0.816
+    ],
+    "change": "learning rate 5e-05"
+   }
+  ]
+ },
+ "retry": true
+}
