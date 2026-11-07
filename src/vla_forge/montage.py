@@ -59,7 +59,13 @@ class Stage:
         return self.models[key]
 
     def render(
-        self, layout_json: dict, frames: np.ndarray, idx: list[int], w: int, h: int
+        self,
+        layout_json: dict,
+        frames: np.ndarray,
+        idx: list[int],
+        w: int,
+        h: int,
+        distance: float = 0.46,
     ) -> list[np.ndarray]:
         lay = Layout.from_json(layout_json)
         m, d, rs = self._model(lay)
@@ -73,7 +79,7 @@ class Stage:
         cam = mujoco.MjvCamera()
         cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         cam.lookat[:] = [0.15, 0.0, 0.07]
-        cam.distance = 0.46
+        cam.distance = distance
         cam.azimuth = 148.0
         cam.elevation = -34.0
         out = []
@@ -148,6 +154,7 @@ def write_hero(stage: Stage, scene: dict, out: Path) -> None:
         moment_index(len(scene["frames"]), HERO_FRAMES),
         HERO_W,
         HERO_H,
+        distance=0.62,
     )
     strip = Image.new("RGB", (HERO_W * len(imgs), HERO_H))
     for i, im in enumerate(imgs):
