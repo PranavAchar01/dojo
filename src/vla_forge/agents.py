@@ -94,7 +94,7 @@ def library_state(run: Run) -> tuple[dict, dict]:
                 "id": s.id,
                 "instruction": s.instruction,
                 "name": s.name,
-                "task": s.task().to_json(),
+                "task": s.spec,  # raw: a composite skill has steps, not one task
                 "robot": s.robot,
                 "success_rate": s.success_rate,
                 "n_eval": s.n_eval,
