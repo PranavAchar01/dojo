@@ -343,7 +343,7 @@ export function createDock(hostEl, opts = {}) {
     if (s && ms) overlayT = setTimeout(() => { overlay = null; paintState(); }, ms);
   }
   function paintStatus() {
-    const t = statusTemp || actWords || statusBase || DEFAULT_STATUS;
+    const t = statusTemp || statusBase || DEFAULT_STATUS; // the header owns the run state (Thinking, Working); the pill only speaks while listening
     if (statusText.textContent === t) return;
     statusText.textContent = t;
     statusText.title = t;

@@ -126,7 +126,7 @@
 .lib-mode button:hover { background: var(--bg-hover); color: var(--text); }
 
 /* ---------------------------------------------------------------- toast */
-.lib-toast { position: absolute; left: 50%; bottom: 104px; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--ink); color: #fff; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .25s, transform .3s var(--bounce); max-width: calc(100% - 32px); }
+.lib-toast { position: absolute; left: 50%; bottom: 24px; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--ink); color: #fff; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .25s, transform .3s var(--bounce); max-width: calc(100% - 32px); }
 .lib-toast.is-saved { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 .lib-toast .tk { width: 22px; height: 22px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; flex: none; }
 .lib-toast .tk svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 2.2; }

@@ -52,7 +52,7 @@ function stage(key, state, metric) {
   const s = rail[key];
   if (!s) return;
   if (state) {
-    s.classList.remove("live", "done", "fail");
+    s.classList.remove("live", "done", "fail", "unrec");
     if (state !== "idle") s.classList.add(state);
   }
   if (metric !== undefined) s.querySelector(".m").textContent = metric;
@@ -483,7 +483,7 @@ function setRef(r) {
   if (r && r.kind === "model") $("#nm-ref-name").textContent = `${r.name} (shown in the scene)`;
   if (!plan) return window.forgePlan?.close();
   const note = r.kind === "image" ? `Reference: your image "${r.name}". Read it into steps below.` : "";
-  window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note });
+  setTimeout(() => window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note }), 0); // let the click return before the plan loads its meshes
 }
 $("#nm-attach").addEventListener("click", () => {
   const m = $("#nm-menu");
@@ -710,10 +710,10 @@ function tool(run, agent, text, state) {
     tx.append(el("b", "", `${NAMES[agent] || agent}: `), document.createTextNode(text));
   }
   if (state) {
-    t.classList.remove("live", "done", "fail");
+    t.classList.remove("live", "done", "fail", "unrec");
     t.classList.add(state);
     const st = t.querySelector(".st");
-    st.innerHTML = state === "live" ? '<span class="spin"></span>working' : state === "done" ? "✓ done" : "failed";
+    st.innerHTML = state === "live" ? '<span class="spin"></span>working' : state === "done" ? "✓ done" : state === "unrec" ? "not recorded" : "failed";
   }
   scrollThread();
 }
@@ -726,11 +726,12 @@ function settle(run, agent, state = "done") {
 // the conversation panel only exists while there is a conversation; its header folds it down to one line
 function syncDock() {
   const has = thread.children.length > 0;
-  dockThread.hidden = !has;
+  dockThread.hidden = !has && !dockThread.querySelector(".wf:not([hidden])");
   const last = [...thread.querySelectorAll(".msg.you .txt")].pop();
   $("#dock-last").textContent = last ? last.textContent : "";
 }
 new MutationObserver(syncDock).observe(thread, { childList: true });
+addEventListener("dock:sync", syncDock);
 $("#dock-toggle").addEventListener("click", () => {
   const on = dockThread.classList.toggle("collapsed");
   $("#dock-toggle").setAttribute("aria-expanded", String(!on));
@@ -869,7 +870,7 @@ async function loadRollout(run, ri, i) {
   shown = { run, round: ri, index: i };
   document.querySelectorAll(".rtab").forEach((c, k) => c.classList.toggle("sel", k === i));
   $("#chips").children[i]?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  const res = await fetch(`/api/runs/${run}/rollout/${ri}/${i}`);
+  const res = await fetch(`${runApi(run)}/rollout/${ri}/${i}`);
   if (!res.ok) return;
   const p = await res.json();
   if (shown.index !== i || shown.run !== run) return;
@@ -911,7 +912,7 @@ $("#round-pick").onclick = () => {
 // the arm and cell appear once a task has parsed: the run's own scene when it exists, else the default one
 async function ensureScene(rid) {
   if (world || window.forgeArms?.active()) return;
-  let res = await fetch(`/api/runs/${rid}/scene`);
+  let res = await fetch(`${runApi(rid)}/scene`);
   let sc = res.ok ? await res.json() : { pending: true };
   if (sc.pending) sc = await (await fetch("/api/preview")).json();
   play = null;
@@ -919,7 +920,7 @@ async function ensureScene(rid) {
   applyFrame(sc.frame);
 }
 async function showPreview(rid) {
-  const res = await fetch(`/api/runs/${rid}/scene`);
+  const res = await fetch(`${runApi(rid)}/scene`);
   if (!res.ok) return;
   const sc = await res.json();
   if (sc.pending) return;
@@ -1084,8 +1085,14 @@ function setTier(t) {
 
 // ---------------------------------------------------------------- events
 const es = new EventSource("/api/events");
+let replaying = false; // a recorded run is playing: only its events (run ids start with "rp:") reach the page
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
+  if (replaying && e.kind !== "ready" && e.kind !== "agents") return;
+  dispatch(e);
+};
+// the one path every event takes, live from the stream or fed by a recorded run (replay.js)
+function dispatch(e) {
   window.forgeLib?.onEvent(e, e.run === current || family.has(e.run));
   window.dispatchEvent(new CustomEvent("forge:event", { detail: e })); // the multi-arm cell (arms.js) and the optimizer listen here (one stream per page)
   if (e.kind === "ready") { setReady(true); return; }
@@ -1095,7 +1102,12 @@ es.onmessage = (m) => {
     beginRun(e.run);
   }
   handle(e);
-};
+}
+// where a run's scene and rollouts are fetched from: the live run, or a recorded one ("rp:<skill>@<n>:<run>")
+function runApi(rid) {
+  const m = /^rp:([^@]+)@/.exec(String(rid));
+  return m ? `/api/replays/${m[1]}` : `/api/runs/${rid}`;
+}
 function beginRun(rid) {
   stopWelcome();
   current = rid;
@@ -1261,6 +1273,14 @@ function handle(e) {
       if (e.plan.action === "retrain") for (const k of ["data", "trainer", "eval"]) stage(k, "idle");
       break;
     }
+    case "stage_mark": // a recorded run only: a stage whose result was kept as a number, not as a stream
+      settle(e.run, e.stage, e.state === "fail" ? "fail" : "done");
+      stage(e.stage, e.state, e.metric);
+      break;
+    case "not_recorded": // a recorded run only: nothing of this stage was kept, so none is shown
+      tool(e.run, e.stage, e.note, "unrec");
+      stage(e.stage, "unrec", "no record");
+      break;
     case "published":
       settle(e.run, "registry");
       const held = heldOut(e.run, e.best_round, e.success_rate);
@@ -1307,7 +1327,14 @@ $("#prompt").addEventListener("keydown", (ev) => {
 window.submitPrompt = submit;
 // what the library (library.js) needs from the sim view and the chat thread
 window.forge = {
-  el, fmt, stage, setView, submit, openNew, startPlayback, scrollThread,
+  el, fmt, stage,
+  // recorded runs (replay.js): the same handlers a live run uses, with live events held back meanwhile
+  replay: {
+    begin(prompt) { replaying = true; lastPrompt = prompt; },
+    feed: dispatch,
+    busy: () => !!(current && !runDone),
+    end() { replaying = false; $("#go").disabled = !$("#ready-dot").classList.contains("on"); runDone ||= Date.now() / 1000; },
+  }, setView, submit, openNew, startPlayback, scrollThread,
   toolList: (run) => toolLists[run],
   current: () => current,
   setBadge(text, ok) {
@@ -1493,6 +1520,9 @@ async function openRailCard(k) {
   railCard = c;
 }
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && railCard) closeRailCard(); });
+$("#replay-open").addEventListener("click", () => savedModel && window.forgeReplay?.open(savedModel.sk));
+// the Replay button shows only while a saved Library model is open in Sim
+setInterval(() => { $("#replay-open").hidden = !savedModel || !!window.forgeReplay?.active(); }, 500);
 async function showSavedModel(sk) {
   savedModel = { sk };
   let run = null;
@@ -1611,6 +1641,11 @@ function reserveBottom() {
   const pr = document.querySelector(".ag-pill")?.getBoundingClientRect();
   // the prompt bar owns a strip under the views; it only steps up when the voice pill would sit under it
   const lift = dock && pr && pr.width && Math.min(pr.right, dock.right) - Math.max(pr.left, dock.left) > 12 ? pill + 8 : 0;
+  // with the inspector folded away the rounds strip runs under the voice pill: it ends where the pill begins
+  const tabs = document.querySelector(".tabs"), cv = document.querySelector(".canvas");
+  const tr = tabs?.getBoundingClientRect(), cr = cv?.getBoundingClientRect();
+  const tabsClear = tr && cr && pr && pr.width && pr.top < tr.bottom && pr.bottom > tr.top && pr.left < cr.right ? Math.max(0, cr.right - pr.left + 10) : 0;
+  root.style.setProperty("--tabs-clear", `${Math.round(tabsClear)}px`);
   root.style.setProperty("--dock-lift", `${Math.max(0, lift)}px`);
   root.style.setProperty("--pill-pad", `${Math.max(0, pill) + 16}px`);
   root.style.setProperty("--clear", `${(dock ? 0 : Math.max(pill, 0)) + 16}px`);

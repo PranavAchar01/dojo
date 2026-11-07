@@ -20,16 +20,21 @@ def _font(size: int):
     return ImageFont.load_default()
 
 
-def add_brick_visual(spec, body, brick: db.Brick, tag: str, rgba=None) -> None:
-    """The real mesh (studs and underside tubes included) as a non-colliding visual geom on `body`."""
-    v, f = db.part_mesh_cached(brick.part)
-    mname = f"{brick.part}_m"
+def ensure_mesh(spec, part: str) -> str:
+    mname = f"{part}_m"
     if not any(m.name == mname for m in spec.meshes):
+        v, f = db.part_mesh_cached(part)
         spec.add_mesh(
             name=mname,
             uservert=v.astype(np.float32).ravel(),
             userface=f.astype(np.int32).ravel(),
         )
+    return mname
+
+
+def add_brick_visual(spec, body, brick: db.Brick, tag: str, rgba=None) -> None:
+    """The real mesh (studs and underside tubes included) as a non-colliding visual geom on `body`."""
+    mname = ensure_mesh(spec, brick.part)
     body.add_geom(
         name=f"{tag}_vis",
         type=mujoco.mjtGeom.mjGEOM_MESH,

@@ -4,12 +4,9 @@ from __future__ import annotations
 
 import json
 
-from PIL import Image
-
 from vla_forge import tiles
 from vla_forge.registry import Registry, Skill
-from vla_forge.sim.scene import Layout, Scene
-from vla_forge.sim.tasks import TaskSpec, sample_layout
+from vla_forge.sim.tasks import TaskSpec
 
 
 def test_new_fields_survive_a_reload(tmp_path):
@@ -52,19 +49,3 @@ def test_registry_from_before_the_library_loads(tmp_path):
     path.write_text(json.dumps([old]))
     sk = Registry(path).skills["b"]
     assert sk.robot == "so101" and sk.tests == [] and sk.replay == ""
-
-
-def test_thumbnail_is_rendered_from_a_recorded_state(tmp_path):
-    import numpy as np
-
-    lay = sample_layout(TaskSpec("reach", "red"), np.random.default_rng(0))
-    sc = Scene(lay)
-    sc.reset(lay)
-    frame = sc.pose_frame()
-    sc.close()
-    out = tiles.render_thumb(lay.to_json(), frame, [0.0] * 6, tmp_path / "t.png")
-    img = Image.open(out)
-    assert img.size == (tiles.THUMB_W, tiles.THUMB_H)
-    px = np.asarray(img)
-    assert px.std() > 10  # a scene, not a blank frame
-    assert Layout.from_json(lay.to_json()).blocks

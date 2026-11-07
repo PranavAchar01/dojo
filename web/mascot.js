@@ -90,7 +90,7 @@ function workspaceFor() {
   const phone = innerWidth < 760, r = sim.getBoundingClientRect();
   if (sim.classList.contains("blank")) return { el: sim, compact: false, inset: phone ? { l: 10, r: 10, t: 40, b: 272 } : { l: 64, r: 104, t: 56, b: 16 } };
   const w = Math.round(Math.min(phone ? 220 : 300, r.width - 70)), h = Math.round(w * 0.66);
-  const l = phone ? r.width - w - 10 : 64, t = phone ? 50 : r.height - 160 - h;
+  const l = phone ? r.width - w - 10 : 64, t = phone ? 50 : r.height - 56 - h;
   return { el: sim, compact: true, inset: { l, t, r: r.width - l - w, b: r.height - t - h } };
 }
 function captionFor(k) {

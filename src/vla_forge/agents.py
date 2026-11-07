@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
-from . import lanes, llama, subq, tiles
+from . import hero_flow, hero_replay, lanes, llama, subq, tiles
 from .pipeline import EVAL_N, FIRST_DEMOS, FIRST_TRAIN, FORGE, Round, Run
 from .registry import ROOT, Skill
+from .rollout import Rollout
 
 DECISION_WORDS = {
     "reuse": "reuse a tile",
@@ -201,8 +203,11 @@ class Forge:
         from_skill: str = "",
         station: dict | None = None,
         scenery: str = "",
+        bridge: bool = False,
     ) -> Run:
         run = FORGE.new_run(prompt, mode, from_skill, station, scenery)
+        if bridge:
+            run.bridge = {"pending": True}  # the brick bridge: hero_flow runs it instead of a trained skill
         self.pending[run.id] = self.loop.create_future()
         self.loop.create_task(self._go(run))
         return run
@@ -231,6 +236,8 @@ class Forge:
 
     # ------------------------------------------------------------------ task + router
     async def _task(self, run: Run) -> None:
+        if run.bridge:
+            return await self._bridge(run)
         with lanes.about(run.id, "parse the task"):
             if run.station:  # the line planner already wrote the task; no model call
                 spec, match = FORGE.parse(run), None
@@ -343,6 +350,120 @@ class Forge:
             await self._compose(run)
             return
         await self._train(run)
+
+    # ------------------------------------------------------------------ the scripted brick bridge
+    async def _bridge(self, run: Run) -> None:
+        """task -> router -> scene -> data -> eval -> registry, with no trainer or critic: the expert is scripted."""
+        t0 = time.time()
+        rules, bricks = hero_flow.plan()
+        checked = await self._stage("task", hero_flow.check_plan, bricks, rules)
+        spec = hero_flow.spec_json(rules, bricks, checked)
+        run.bridge = {"spec": spec}
+        run.parse_info = {}
+        run.status = "running"
+        FORGE.emit(run.id, "task", "task", spec=spec, parse={}, tier=3)
+        self.log(
+            run.id,
+            "task",
+            f"{len(bricks)} bricks from the plan; the plan itself passes "
+            f"{sum(r.ok for r in checked)}/{len(checked)} rules",
+        )
+        run.route = hero_flow.route_json(len(checked))
+        FORGE.emit(run.id, "route", "router", **run.route)
+        self.log(run.id, "router", f"scripted build: {run.route['reason']}")
+        scene, frame0 = await self._stage("scene", hero_flow.scene_and_start, bricks)
+        run.bridge.update(scene=scene, frame0=frame0, rolls=[])
+        FORGE.emit(run.id, "scene", "scene", blocks=len(bricks))
+        self.log(run.id, "scene", f"two SO-101s and {len(bricks)} loose bricks; {len(hero_flow.SEEDS)} placements sampled")
+        n = len(hero_flow.SEEDS)
+        self.log(run.id, "data", f"recording {n} scripted builds, {hero_flow.WORKERS} at a time")
+
+        good = [0]
+
+        def done(k: int, b: dict) -> None:
+            good[0] += hero_flow.success(b)
+            FORGE.emit(run.id, "demos", "data", ok=good[0], n=n, done=k)
+
+        builds = await self._stage("data", self._bridge_builds, run, bricks, rules, done)
+        self.log(run.id, "data", f"{n} builds recorded, {sum(b['seated'] for b in builds)}/{sum(b['total'] for b in builds)} bricks seated in all")
+        rep = {
+            "n": n,
+            "succeeded": sum(hero_flow.success(b) for b in builds),
+            "failures": hero_flow.failures(builds),
+            "seconds": round(time.time() - t0, 1),
+        }
+        rep["success_rate"] = rep["succeeded"] / n
+        successes = [hero_flow.success(b) for b in builds]
+        FORGE.emit(run.id, "eval", "eval", round=0, **rep, successes=successes)
+        self.log(
+            run.id,
+            "eval",
+            f"{rep['succeeded']}/{n} builds pass every rule; "
+            + (", ".join(f"{k} failed in {v}" for k, v in rep["failures"].items()) or "no rule failed"),
+        )
+        skill = await self._stage("registry", self._bridge_publish, run, builds, rep, successes)
+        FORGE.emit(
+            run.id,
+            "published",
+            "registry",
+            skill=skill.id,
+            address="",
+            success_rate=skill.success_rate,
+            seconds=run.seconds,
+            best_round=0,
+        )
+        self.log(run.id, "registry", f"saved skill-{skill.id} (scripted; {rep['succeeded']}/{n} builds pass every rule)")
+        self._done(run, f"published|{skill.id}")
+
+    def _bridge_builds(self, run: Run, bricks, rules, done) -> list[dict]:
+        with FORGE.compute:
+            builds = hero_flow.build_all(bricks, rules, done)
+        run.bridge["rolls"] = [hero_replay.payload(i, b, run.bridge["scene"]) for i, b in enumerate(builds)]
+        run.rounds.append(Round(index=0, demos=len(builds)))
+        run.rollouts[0] = [
+            Rollout(i, hero_flow.SEEDS[i], {}, success=hero_flow.success(b), failure=hero_replay.failure_text(b))
+            for i, b in enumerate(builds)
+        ]
+        return builds
+
+    def _bridge_publish(self, run: Run, builds: list[dict], rep: dict, successes: list[bool]) -> Skill:
+        rnd = run.rounds[0]
+        rnd.eval = {k: rep[k] for k in ("n", "succeeded", "success_rate", "failures", "seconds")}
+        rnd.successes = successes
+        run.best_round = 0
+        sid = f"build-the-brick-bridge-{run.id[-4:]}"
+        best = max(builds, key=lambda b: (b["thumb"] is not None, b["seated"]))
+        FORGE.emit(run.id, "saving", "registry", skill=sid)
+        skill = Skill(
+            id=sid,
+            instruction=hero_flow.INSTRUCTION,
+            spec="",
+            model="",
+            parent=None,
+            success_rate=rep["success_rate"],
+            n_eval=rep["n"],
+            seconds=round(run.elapsed(), 1),
+            tier=3,
+            prompt=run.prompt,
+            robot=run.robot,
+            origin="scripted",
+            name=hero_flow.NAME,
+        )
+        files = hero_replay.save(sid, ROOT, best["thumb"], run.bridge["rolls"])
+        for k, v in files.items():
+            setattr(skill, k, v)
+        run.skill_id, run.seconds, run.status = sid, round(run.elapsed(), 1), "published"
+        skill.record = {
+            **run.summary(),
+            "detail": hero_flow.detail(builds, run.seconds),
+            "builds": [
+                {k: b[k] for k in ("seed", "bricks", "seated", "total", "rules", "rules_passed", "rules_total", "sim_seconds", "wall_seconds")}
+                for b in builds
+            ],
+        }
+        FORGE.registry.add(skill)
+        FORGE.emit(run.id, "saved", "registry", tile=tiles.tile(skill))
+        return skill
 
     # ------------------------------------------------------------------ one skill
     async def _train(self, run: Run) -> Skill | None:

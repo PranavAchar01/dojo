@@ -1,0 +1,23 @@
+/* Replay: a recorded development played back through the live handlers. Always labelled, never mistaken for a live run. */
+.rail li.unrec { color: var(--ink3); opacity: .72; }
+.rail li.unrec svg { stroke-dasharray: 2 2; }
+.tool.unrec { background: transparent; box-shadow: inset 0 0 0 1px var(--line2); border-style: dashed; color: var(--ink3); }
+.tool.unrec .st { color: var(--ink3); font-style: italic; }
+.tile-acts button.replay-btn { background: var(--accent-bg); color: var(--accent-700); }
+.tile-acts button.replay-btn:hover:not(:disabled) { background: var(--accent-600); color: #fff; }
+
+.replay-bar { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 13; display: grid; grid-template-columns: auto auto auto 1fr auto auto; align-items: center; gap: 8px 10px; width: min(640px, calc(100% - 200px)); padding: 8px 12px; background: rgba(255, 255, 255, .95); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); font-size: 12px; color: var(--ink2); }
+.replay-bar[hidden] { display: none; }
+.replay-bar .rp-tag { font: 700 11px/1 var(--ui); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 6px; background: var(--amber); color: #3b2a00; }
+.replay-bar .rp-play { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--accent-600); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; }
+.replay-bar .rp-speed { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: #f1f4f7; }
+.replay-bar .rp-speed button { height: 22px; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--ink2); font: 600 11.5px var(--ui); cursor: pointer; }
+.replay-bar .rp-speed button.on { background: #fff; color: var(--accent-700); box-shadow: 0 1px 2px rgba(16, 24, 32, .12); }
+.replay-bar input[type=range] { width: 100%; min-width: 80px; accent-color: var(--accent-600); }
+.replay-bar .rp-time { font: 500 11.5px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink3); white-space: nowrap; }
+.replay-bar .rp-x { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--ink3); font-size: 16px; line-height: 1; cursor: pointer; }
+.replay-bar .rp-x:hover { background: #f1f4f7; color: var(--ink); }
+.replay-bar .rp-note { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink3); line-height: 1.35; }
+.replay-bar .rp-note b { color: var(--ink2); font-weight: 600; }
+.tabs .replay-open { margin-left: auto; flex: none; background: var(--accent-bg); color: var(--accent-700); font-weight: 650; }
+.tabs .replay-open:hover { background: var(--accent-600); color: #fff; }

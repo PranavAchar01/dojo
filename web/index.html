@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/static/roam.css">
 <link rel="stylesheet" href="/static/agents.css">
 <link rel="stylesheet" href="/static/plan.css">
+<link rel="stylesheet" href="/static/replay.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
@@ -78,13 +79,6 @@
 
         <ol class="rail" id="rail" data-keepclear></ol>
 
-        <div class="pill" id="playbar" data-keepclear>
-          <button id="pb-prev" aria-label="Previous rollout">&minus;</button>
-          <span class="num" id="pb-label">rollout &middot;</span>
-          <button id="pb-next" aria-label="Next rollout">+</button>
-          <button id="pb-replay" class="txt">Replay</button>
-          <div class="pb-progress"><div id="pb-fill"></div></div>
-        </div>
       </div>
 
       <div class="view hidden" id="view-rsi">
@@ -209,6 +203,13 @@
           </div>
           <div class="thread" id="thread"></div>
         </section>
+          <div class="pill" id="playbar" data-keepclear>
+            <button id="pb-prev" aria-label="Previous rollout">&minus;</button>
+            <span class="num" id="pb-label">rollout &middot;</span>
+            <button id="pb-next" aria-label="Next rollout">+</button>
+            <button id="pb-replay" class="txt">Replay</button>
+            <div class="pb-progress"><div id="pb-fill"></div></div>
+          </div>
         <form class="composer dock-bar" id="prompt-form" autocomplete="off">
           <button type="button" class="dock-plus" id="dock-plus" title="Train a new model" aria-label="Open the new model window"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></button>
           <textarea id="prompt" rows="1" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
@@ -224,6 +225,7 @@
       <footer class="tabs">
         <button class="page" id="round-pick"><span id="round-label">Round &middot;</span><svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg></button>
         <div class="tabs-scroll" id="chips"></div>
+        <button class="page replay-open" id="replay-open" hidden>Replay the build</button>
       </footer>
     </section>
 
@@ -264,6 +266,7 @@
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/mascot.js"></script>
 <script type="module" src="/static/library.js"></script>
+<script type="module" src="/static/replay.js"></script>
 <script type="module" src="/static/arms.js"></script>
 <script type="module" src="/static/agents.js"></script>
 <script type="module" src="/static/plan.js"></script>
