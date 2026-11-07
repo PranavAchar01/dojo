@@ -726,11 +726,12 @@ function settle(run, agent, state = "done") {
 // the conversation panel only exists while there is a conversation; its header folds it down to one line
 function syncDock() {
   const has = thread.children.length > 0;
-  dockThread.hidden = !has;
+  dockThread.hidden = !has && !dockThread.querySelector(".wf:not([hidden])");
   const last = [...thread.querySelectorAll(".msg.you .txt")].pop();
   $("#dock-last").textContent = last ? last.textContent : "";
 }
 new MutationObserver(syncDock).observe(thread, { childList: true });
+addEventListener("dock:sync", syncDock);
 $("#dock-toggle").addEventListener("click", () => {
   const on = dockThread.classList.toggle("collapsed");
   $("#dock-toggle").setAttribute("aria-expanded", String(!on));
@@ -1637,6 +1638,11 @@ function reserveBottom() {
   const pr = document.querySelector(".ag-pill")?.getBoundingClientRect();
   // the prompt bar owns a strip under the views; it only steps up when the voice pill would sit under it
   const lift = dock && pr && pr.width && Math.min(pr.right, dock.right) - Math.max(pr.left, dock.left) > 12 ? pill + 8 : 0;
+  // with the inspector folded away the rounds strip runs under the voice pill: it ends where the pill begins
+  const tabs = document.querySelector(".tabs"), cv = document.querySelector(".canvas");
+  const tr = tabs?.getBoundingClientRect(), cr = cv?.getBoundingClientRect();
+  const tabsClear = tr && cr && pr && pr.width && pr.top < tr.bottom && pr.bottom > tr.top && pr.left < cr.right ? Math.max(0, cr.right - pr.left + 10) : 0;
+  root.style.setProperty("--tabs-clear", `${Math.round(tabsClear)}px`);
   root.style.setProperty("--dock-lift", `${Math.max(0, lift)}px`);
   root.style.setProperty("--pill-pad", `${Math.max(0, pill) + 16}px`);
   root.style.setProperty("--clear", `${(dock ? 0 : Math.max(pill, 0)) + 16}px`);
