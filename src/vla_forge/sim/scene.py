@@ -212,6 +212,9 @@ def _arm_spec() -> mujoco.MjSpec:
     spec = mujoco.MjSpec.from_file(str(MJCF))
     spec.option.timestep = TIMESTEP
     spec.option.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
+    # elliptic friction cones: pyramidal cones let a heavier or rounded object wedge out of parallel jaws
+    spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
+    spec.option.impratio = 10.0
     for body in spec.bodies:
         if body.name != "world":
             body.gravcomp = 1.0

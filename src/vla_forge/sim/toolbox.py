@@ -29,10 +29,19 @@ REPO = Path(__file__).resolve().parents[3]
 LIB = REPO / "assets" / "library"
 
 TOOLBOX = "metal_toolbox"
-TOOLS = ("ratchet_wrench", "pliers", "screwdriver")
-ALL_TOOLS = TOOLS
+ALL_TOOLS = (
+    "pipe_wrench",
+    "ratchet_wrench",
+    "pliers",
+    "screwdriver",
+)  # the library's candidates
 VOXEL = 0.005
-TOOL_RGBA = {  # plain Dojo-light colours (the policy cameras and the browser draw the same flat materials)
+TOOL_RGBA = {
+    "pipe_wrench": (
+        0.80,
+        0.30,
+        0.22,
+    ),  # plain Dojo-light colours (the policy cameras and the browser draw the same flat materials)
     "ratchet_wrench": (0.18, 0.40, 0.78),
     "pliers": (0.92, 0.66, 0.16),
     "screwdriver": (0.20, 0.62, 0.40),
@@ -343,14 +352,26 @@ def placement() -> dict:
     z0 = FRONT_TOP + CLEAR + FINGER_BELOW
     best = None
     for ox in np.arange(0.18, 0.321, 0.02):
-        for oy in (-0.2, -0.23, -0.26):  # keeps the box's open side clear of the arm's home pose (y ~ 0)
+        for oy in (
+            -0.2,
+            -0.23,
+            -0.26,
+        ):  # keeps the box's open side clear of the arm's home pose (y ~ 0)
             worst = 0.0
             for lx in (-0.045, 0.0, 0.045):
                 xy = np.array([ox - lx, oy - SLOT_LY])
                 for z in (z0, z0 + 0.02):
                     ep = R.solve_topdown(
-                        m, d, site, r.arm_joints, r.home, np.array([*xy, z]),
-                        np.array([0.0, 1.0, 0.0]), seeds, w_ori=0.1 * CARRY_TILT, iters=200,
+                        m,
+                        d,
+                        site,
+                        r.arm_joints,
+                        r.home,
+                        np.array([*xy, z]),
+                        np.array([0.0, 1.0, 0.0]),
+                        seeds,
+                        w_ori=0.1 * CARRY_TILT,
+                        iters=200,
                     )[1]
                     worst = max(worst, float(ep))
             cand = {"x": float(ox), "y": float(oy), "ik_err": worst}
@@ -367,15 +388,34 @@ def placement() -> dict:
 # ------------------------------------------------------------------ held-out sampling
 
 
-def sample(rng: np.random.Generator, tools=TOOLS) -> tuple[dict, dict]:
+def box_centre() -> tuple[float, float]:
+    """World xy of the cavity centre at the derived placement."""
+    pl = placement()
+    cx, cy = cavity()["centre"]
+    return (pl["x"] - cx, pl["y"] - cy)  # BOX_YAW = pi
+
+
+def packable() -> list[str]:
+    """The candidate tools the feasibility engine (sim/feasibility.py) says the SO-101 can pack into the toolbox."""
+    from .feasibility import feasibility
+
+    return feasibility("so101", list(ALL_TOOLS), TOOLBOX, container_xy=box_centre())[
+        "included"
+    ]
+
+
+def sample(rng: np.random.Generator, tools=None) -> tuple[dict, dict]:
     """(toolbox prop, tools) for one scene: the box origin jittered a little; the tools lie on the table on the
     cavity's open side, along the radial direction (the jaws close across the width), apart from each other."""
+    tools = tuple(tools or packable())
     pl = placement()
     ox, oy = pl["x"] + rng.uniform(-0.01, 0.01), pl["y"] + rng.uniform(-0.01, 0.01)
     box = {"goal": ("toolbox", "gray", float(ox), float(oy), BOX_YAW)}
-    front = max(oy + 0.137 + 0.015, 0.065) # the open side's wall, plus a hand's width
+    front = max(oy + 0.137 + 0.015, 0.065)  # the open side's wall, plus a hand's width
     out = {}
-    rows = [int(i) for i in rng.permutation(len(tools))]  # which table row (nearest the box first) each tool takes
+    rows = [
+        int(i) for i in rng.permutation(len(tools))
+    ]  # which table row (nearest the box first) each tool takes
     y = front
     ys = {}
     for i in rows:
@@ -384,7 +424,9 @@ def sample(rng: np.random.Generator, tools=TOOLS) -> tuple[dict, dict]:
         ys[i] = y + w / 2
         y += w + gap
     for i, t in enumerate(tools):
-        a = rng.uniform(-0.1, 0.1) + math.pi * rng.integers(0, 2)  # along x, head either way
+        a = rng.uniform(-0.1, 0.1) + math.pi * rng.integers(
+            0, 2
+        )  # along x, head either way
         x = rng.uniform(0.10, 0.18)
         out["target" if i == 0 else f"tool{i}"] = (t, float(x), float(ys[i]), float(a))
     return box, out
@@ -393,9 +435,17 @@ def sample(rng: np.random.Generator, tools=TOOLS) -> tuple[dict, dict]:
 # ------------------------------------------------------------------ the scripted expert
 
 
+DROP_GAP = 0.008  # the engine's feasibility carry-height check
 GRASP_SITE_Z = 0.005  # jaw tips just off the table, as for the 3 cm blocks
 CARRY_UP = 0.03
-SLOT = ((0.0, -0.08), (0.0, -0.05), (0.0, -0.065))  # box-frame (x, y) each tool is released over
+OUT_DIST = 0.10  # the tool swings to this far out from the slot, on the box's open side, before pushing in
+GRASP_FRAC: float | None = None
+SQUEEZE: float | None = None  # jaw command while carrying; None = the stock squeeze
+SLOT = (
+    (0.0, -0.08),
+    (0.0, -0.05),
+    (0.0, -0.065),
+)  # box-frame (x, y) each tool is released over
 
 
 def _tool_state(sc, name: str, tool: str):
@@ -424,44 +474,80 @@ def run_pack(ex) -> None:
     for k, name in enumerate(order):
         tool = tools[name][0]
         com, centre, yaw, pts = _tool_state(sc, name, tool)
-        hw = float(np.ptp(pts @ np.array([-math.sin(yaw), math.cos(yaw), 0.0]))) / 2
+        # half-width of the tool where the jaws close: the hull points within 2.5 cm of the grasp point along the length
+        along = (pts[:, :2] - com[:2]) @ np.array([math.cos(yaw), math.sin(yaw)])
+        near = pts[np.abs(along) < 0.025]
+        near = near if len(near) > 2 else pts
+        hw = float(np.ptp(near @ np.array([-math.sin(yaw), math.cos(yaw), 0.0]))) / 2
         radial = com[:2] / max(np.linalg.norm(com[:2]), 1e-9)
-        cands = [np.array([-math.sin(yaw), math.cos(yaw), 0.0]), np.array([math.sin(yaw), -math.cos(yaw), 0.0])]
+        cands = [
+            np.array([-math.sin(yaw), math.cos(yaw), 0.0]),
+            np.array([math.sin(yaw), -math.cos(yaw), 0.0]),
+        ]
         heading = max(cands, key=lambda n: float(n[:2] @ radial))
         ex.ik.heading = heading
         ex.ik.tilt = 1.0
         c_open = r.centre_open - 0.015 + hw
         c_grasp = r.centre_grasp - 0.015 + hw
         bottom = pts[:, 2].min()
+        gz = (
+            GRASP_SITE_Z
+            if GRASP_FRAC is None
+            else GRASP_FRAC * tool_info(tool)["height"]
+        )
 
-        def site(xy, z, c):
+        def site(xy, z, c, heading=heading):
             return np.array([*xy, z]) - c * heading
 
         ex.g_goal = r.g_open
         ex.goto([*site(com[:2], HOVER_Z, c_open)[:2], HOVER_Z], TRANSIT_SPEED)
-        ex.goto(site(com[:2], bottom + GRASP_SITE_Z, c_open), APPROACH_SPEED)
+        ex.goto(site(com[:2], bottom + gz, c_open), APPROACH_SPEED)
         ex.calm = True
-        ex.goto(site(com[:2], bottom + GRASP_SITE_Z, c_grasp), APPROACH_SPEED * 0.5, settle=0.05)
-        ex.grip(r.g_squeeze, settle=0.5)
+        ex.goto(site(com[:2], bottom + gz, c_grasp), APPROACH_SPEED * 0.5, settle=0.05)
+        ex.grip(SQUEEZE if SQUEEZE is not None else r.g_squeeze, settle=0.5)
         ex.calm = False
-        ex.goto(site(com[:2], bottom + GRASP_SITE_Z + CARRY_UP, c_grasp), LIFT_SPEED, settle=0.1)
-        # carry: the wrist may tilt, the tool is raised until its bottom clears the front wall
+        lift_goal = site(com[:2], bottom + gz + CARRY_UP, c_grasp)
+        ex.goto(lift_goal, LIFT_SPEED, settle=0.1)
+        # carry: the wrist may tilt. Rise and swing toward the open side of the box in one sweep, until the tool's
+        # bottom clears the front wall, then push in over the wall to the slot
         ex.ik.tilt = CARRY_TILT
         clear_z = FRONT_TOP + CLEAR
-        for _ in range(2):
-            _c, _ce, _y, p = _tool_state(sc, name, tool)
-            z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
-            ex.goto([*sc.ee_pos()[:2], z], LIFT_SPEED, settle=0.1)
-        com, centre, _y, p = _tool_state(sc, name, tool)
-        grip_off = com[:2] - centre[:2]
         bx, by = SLOT[k % len(SLOT)]
         goal_xy = bp[:2] + Rb[:2, :2] @ np.array([bx, by])
-        z = sc.ee_pos()[2]
+        out_dir = Rb[:2, :2] @ np.array(
+            [0.0, -1.0]
+        )  # the box's open side, in the world
+
+        def to_slot(extra=0.0, name=name, tool=tool, goal_xy=goal_xy, out_dir=out_dir):
+            _c, _ce, _y, p = _tool_state(sc, name, tool)
+            return sc.ee_pos()[:2] + (
+                goal_xy + extra * out_dir + (_c[:2] - _ce[:2]) - _c[:2]
+            )
+
+        _c, _ce, _y, p = _tool_state(sc, name, tool)
+        z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
         ex.calm = True
-        ex.goto([*(ex.ee_cmd[:2] + (goal_xy + grip_off - com[:2])), z], TRANSIT_SPEED, settle=0.3)
-        # re-centre on the slot from the measured tool position
-        com, centre, _y, p = _tool_state(sc, name, tool)
-        ex.goto([*(sc.ee_pos()[:2] + (goal_xy + grip_off - com[:2])), z], LIFT_SPEED, settle=0.2)
+        sag = [np.zeros(3)]
+
+        def go(goal, speed, settle, sag=sag):
+            """goto, then correct for the arm's sag under the tool's weight (a P-controlled joint hangs low):
+            the commanded point is shifted by what the measured tool-centre point fell short."""
+            goal = np.asarray(goal, float)
+            ex.goto(goal + sag[0], speed, settle)
+            sag[0] = np.clip(sag[0] + (goal - sc.ee_pos()), -0.05, 0.05)
+            ex.goto(goal + sag[0], speed, 0.1)
+
+        go(lift_goal, LIFT_SPEED, 0.3)
+        go(lift_goal, LIFT_SPEED, 0.3)
+        _c, _ce, _y, p = _tool_state(sc, name, tool)
+        z = sc.ee_pos()[2] + clear_z - p[:, 2].min()
+        go([*to_slot(OUT_DIST), z], LIFT_SPEED, 0.3)
+        _c, _ce, _y, p = _tool_state(sc, name, tool)
+        z += clear_z - p[:, 2].min()
+        go([*to_slot(OUT_DIST), z], LIFT_SPEED, 0.2)
+        go([*to_slot(0.0), z], LIFT_SPEED, 0.2)
+        go([*to_slot(0.0), z], LIFT_SPEED, 0.2)
+        z = sc.ee_pos()[2]
         ex.grip(r.g_open, settle=0.5)
         ex.goto([*sc.ee_pos()[:2], z + 0.03], LIFT_SPEED, settle=0.0)
         ex.calm = False
