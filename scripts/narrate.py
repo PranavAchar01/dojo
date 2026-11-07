@@ -24,7 +24,9 @@ from pathlib import Path
 import websockets
 
 ROOT = Path(__file__).resolve().parents[1]
-LINES = ROOT / os.environ.get("NARRATION", "demo/narration.tsv")  # NARRATION=demo/narration-ui.tsv for the UI cut
+LINES = ROOT / os.environ.get(
+    "NARRATION", "demo/narration.tsv"
+)  # NARRATION=demo/narration-ui.tsv for the UI cut
 NARR = ROOT / "demo/narration"
 OUT_1X, OUT = NARR / "1x", NARR
 CACHE = NARR / "cache"
