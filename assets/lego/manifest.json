@@ -1,122 +1,11 @@
 {
-  "duck_source": {
-    "what": "LEGO Serious Play 'Duck' kit, set 2000416 (6 parts). The kit has no instructions; the exercise is freeform. The assembly copies one duck from a published photo of builds made from the kit.",
-    "kit_parts": "Brickset inventory https://brickset.com/inventories/2000416-1 : Plate 2x3 bright red x2, Brick 2x4 yellow, Brick 2x2 yellow, Brick 1x2 yellow, Brick 2x2 yellow with printed eye",
-    "photo": "https://brickresales.com.au/blogs/blog/lego-serious-play-what-is-the-duck-challenge (feature image; duck at lower middle; used only for a local side-by-side, not redistributed)",
-    "not_visible_in_photo": "the yellow 1x2 (placed as a low tail, our choice); the printed eye is drawn as a decal",
-    "parts": [
-      {
-        "name": "foot",
-        "part": "3021",
-        "colour": "red",
-        "stud_col": 1,
-        "stud_row": 0,
-        "plate_level": 0,
-        "yaw_deg": 0,
-        "role": "red plate, the duck's foot",
-        "pos_m": [
-          0.02,
-          0.008,
-          0.0
-        ]
-      },
-      {
-        "name": "leg",
-        "part": "3003",
-        "colour": "yellow",
-        "stud_col": 2,
-        "stud_row": 0,
-        "plate_level": 1,
-        "yaw_deg": 0,
-        "role": "2x2 leg on the foot",
-        "pos_m": [
-          0.024,
-          0.008,
-          0.0032
-        ]
-      },
-      {
-        "name": "body",
-        "part": "3001",
-        "colour": "yellow",
-        "stud_col": 0,
-        "stud_row": 0,
-        "plate_level": 4,
-        "yaw_deg": 0,
-        "role": "2x4 body across the leg, rear overhangs",
-        "pos_m": [
-          0.016,
-          0.008,
-          0.0128
-        ]
-      },
-      {
-        "name": "beak",
-        "part": "3021",
-        "colour": "red",
-        "stud_col": 2,
-        "stud_row": 0,
-        "plate_level": 7,
-        "yaw_deg": 0,
-        "role": "red plate on the front studs, one stud past the body",
-        "pos_m": [
-          0.028,
-          0.008,
-          0.0224
-        ]
-      },
-      {
-        "name": "head",
-        "part": "3003",
-        "colour": "yellow",
-        "stud_col": 2,
-        "stud_row": 0,
-        "plate_level": 8,
-        "yaw_deg": 0,
-        "role": "2x2 head (printed eye) on the plate",
-        "pos_m": [
-          0.024,
-          0.008,
-          0.0256
-        ]
-      },
-      {
-        "name": "tail",
-        "part": "3004",
-        "colour": "yellow",
-        "stud_col": 0,
-        "stud_row": 0,
-        "plate_level": 7,
-        "yaw_deg": 0,
-        "role": "1x2 tail, lying on the rear studs (not visible in the source photo)",
-        "pos_m": [
-          0.008,
-          0.004,
-          0.0224
-        ]
-      }
-    ]
-  },
+  "build": "Rule-generated brick bridge (src/vla_forge/hero_bricks.py). Every placement follows from the three rules (gap, pillar height, deck length); nothing is placed by eye. Parts are plain LDraw bricks.",
   "library": "LDraw Parts Library, official complete.zip",
   "library_url": "https://library.ldraw.org/library/updates/complete.zip",
   "library_licence": "CC BY 4.0 (parts); the zip's CAlicense.txt text is Creative Commons Attribution 2.0",
   "attribution": "LDraw is a trademark of the Estate of James Jessiman. Parts are from the LDraw Parts Library.",
-  "conversion": "src/vla_forge/duck_ldraw.py: sub-file recursion with BFC winding, LDU 0.4 mm, Y-down to Z-up, origin at the footprint bottom centre. Studs and underside tubes are kept in the visual mesh; physics uses boxes.",
+  "conversion": "src/vla_forge/hero_ldraw.py: sub-file recursion with BFC winding, LDU 0.4 mm, Y-down to Z-up, origin at the footprint bottom centre. Studs and underside tubes are kept in the visual mesh; physics uses boxes.",
   "parts": {
-    "3001": {
-      "title": "Brick 2 x 4",
-      "source_url": "https://library.ldraw.org/library/official/parts/3001.dat",
-      "author": "James Jessiman",
-      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "footprint_studs": [
-        4,
-        2
-      ],
-      "mesh": "meshes/3001.npz",
-      "vertices": 472,
-      "triangles": 700
-    },
     "3003": {
       "title": "Brick 2 x 2",
       "source_url": "https://library.ldraw.org/library/official/parts/3003.dat",
@@ -131,33 +20,47 @@
       "vertices": 212,
       "triangles": 316
     },
-    "3004": {
-      "title": "Brick 1 x 2",
-      "source_url": "https://library.ldraw.org/library/official/parts/3004.dat",
+    "3001": {
+      "title": "Brick 2 x 4",
+      "source_url": "https://library.ldraw.org/library/official/parts/3001.dat",
       "author": "James Jessiman",
       "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
       "licence_url": "https://creativecommons.org/licenses/by/4.0/",
       "footprint_studs": [
-        2,
-        1
-      ],
-      "mesh": "meshes/3004.npz",
-      "vertices": 115,
-      "triangles": 172
-    },
-    "3021": {
-      "title": "Plate 2 x 3",
-      "source_url": "https://library.ldraw.org/library/official/parts/3021.dat",
-      "author": "James Jessiman",
-      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "footprint_studs": [
-        3,
+        4,
         2
       ],
-      "mesh": "meshes/3021.npz",
-      "vertices": 342,
-      "triangles": 508
+      "mesh": "meshes/3001.npz",
+      "vertices": 472,
+      "triangles": 700
+    },
+    "2456": {
+      "title": "Brick 2 x 6",
+      "source_url": "https://library.ldraw.org/library/official/parts/2456.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        6,
+        2
+      ],
+      "mesh": "meshes/2456.npz",
+      "vertices": 732,
+      "triangles": 1084
+    },
+    "3007": {
+      "title": "Brick 2 x 8",
+      "source_url": "https://library.ldraw.org/library/official/parts/3007.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        8,
+        2
+      ],
+      "mesh": "meshes/3007.npz",
+      "vertices": 1070,
+      "triangles": 1540
     }
   }
 }
