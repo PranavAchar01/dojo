@@ -4,6 +4,7 @@ One JSON sidecar per skill under skills/runs/<id>.json. Fields that were never c
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -57,6 +58,52 @@ def from_run(run) -> dict:
         if r.plan
     ]
     return {k: v for k, v in rec.items() if v not in (None, [], {})}
+
+
+# What the page received during the run, kept so a Library card can play the whole development again.
+SKIP_KINDS = {"saving", "saved", "ready", "agents"}
+STAGE_OF_KIND = {
+    "task": "task",
+    "route": "router",
+    "scene": "scene",
+    "demos": "data",
+    "loss": "trainer",
+    "eval": "eval",
+    "critic": "critic",
+}
+
+
+def capture_stages(events: list[dict]) -> dict:
+    """Which rail stages the live stream actually carried; the others are 'not_recorded', never guessed."""
+    seen = {STAGE_OF_KIND[e["kind"]] for e in events if e.get("kind") in STAGE_OF_KIND}
+    seen.add("registry")  # the publish event is added when the record is played
+    keys = ("task", "router", "scene", "data", "trainer", "eval", "critic", "optimizer", "registry")
+    return {k: ("captured" if k in seen else "not_recorded") for k in keys}
+
+
+def save_capture(sid: str, run, forge) -> None:
+    """The event stream plus the scene and rollout frames the page fetched for this run, next to its record."""
+    from .viz import preview
+
+    events = [e for e in run.events if e.get("kind") not in SKIP_KINDS]
+    RECORDS.mkdir(parents=True, exist_ok=True)
+    (RECORDS / f"{sid}.events.json").write_text(
+        json.dumps({"run": run.id, "prompt": run.prompt, "t0": run.t0, "events": events})
+    )
+    media: dict = {"scene": None, "rollouts": {}}
+    if run.layouts:
+        from .sim.scene import Layout
+
+        media["scene"] = preview(Layout.from_json(run.layouts[0]), run.robot)
+    for rnd, rolls in run.rollouts.items():
+        media["rollouts"][str(rnd)] = [forge.rollout_payload(run, rnd, i) for i in range(len(rolls))]
+    tmp = RECORDS / f"{sid}.media.json.gz.tmp"
+    with gzip.open(tmp, "wt") as fh:
+        json.dump(media, fh)
+    tmp.replace(RECORDS / f"{sid}.media.json.gz")
+    rec = json.loads((RECORDS / f"{sid}.json").read_text())
+    rec["replay"] = {"source": "live", "stages": capture_stages(events), "events": len(events)}
+    save(sid, rec)
 
 
 def save(sid: str, rec: dict) -> None:
