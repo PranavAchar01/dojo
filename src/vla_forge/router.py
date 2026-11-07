@@ -50,6 +50,8 @@ PALETTE = {
     "tray": PROP_COLORS,
     "socket": PROP_COLORS,
     "slot": {},
+    "tool": {},
+    "toolbox": {},
 }
 # words the offline parser recognises as colours or as the scene's objects (the LLM path reports them itself)
 COLOR_WORDS = set(BLOCK_COLORS) | set(BOWL_COLORS) | set(PAD_COLORS) | {
@@ -61,6 +63,8 @@ NOUNS = {
     "bowl": "bowl", "bowls": "bowl", "square": "square", "squares": "square", "pad": "square",
     "pads": "square", "tape": "square", "tray": "tray", "trays": "tray", "socket": "socket",
     "sockets": "socket", "slot": "slot", "slots": "slot",
+    "toolbox": "toolbox", "tool": "tool", "tools": "tool", "ratchet": "tool", "wrench": "tool", "pliers": "tool",
+    "screwdriver": "tool",
 }  # fmt: skip
 FILLER = {
     "and",
@@ -360,6 +364,7 @@ SKILL_VERB = {
     "kit": "put a block in a tray slot",
     "insert": "insert a block into a socket",
     "rotate": "rotate a block into a diamond socket",
+    "pack": "pack tools into a toolbox",
 }
 
 

@@ -213,6 +213,7 @@ def parse_task(prompt: str) -> tuple[TaskSpec | list[Step] | None, dict]:
 
 
 MOTION_WORDS = (
+    ("pack", ("pack", "toolbox", "tool box", "ratchet", "pliers", "screwdriver")),
     ("stack", ("stack", " on top")),
     ("rotate", ("rotate", "diamond", "twist", "turn it")),
     ("insert", ("insert", "socket", "peg", "plug in")),

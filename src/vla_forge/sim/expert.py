@@ -81,6 +81,7 @@ class IK:
         self.use_heading = self.n >= 5
         self.w_ori, self.w_post, self.damping = w_ori, w_post, damping
         self.heading: np.ndarray | None = None
+        self.tilt = 1.0  # weight of the top-down term against the heading term (the toolbox carry lowers it)
 
     def fk(self, q):
         self.d.qpos[self.qadr] = q
@@ -97,7 +98,7 @@ class IK:
         for _ in range(iters):
             pos, mat = self.fk(q)
             ep = target - pos
-            eo = np.cross(mat[:, 0], DOWN)
+            eo = self.tilt * np.cross(mat[:, 0], DOWN)
             if self.heading is not None and self.use_heading:
                 eo = eo + np.cross(mat[:, 2], self.heading)
             if np.linalg.norm(ep) < tol and np.linalg.norm(eo) < 0.02:
@@ -387,6 +388,10 @@ class Expert:
             )
             self.seat()
             self.home()
+        elif sk == "pack":
+            from .toolbox import run_pack
+
+            run_pack(self)
         elif sk == "lift":
             self.grasp()
             c = self.sc.body_pos("target")

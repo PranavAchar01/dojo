@@ -52,8 +52,15 @@ def render_thumb(
         adr = m.joint(f"{name}_free").qposadr[0]
         d.qpos[adr : adr + 3] = f[bid - 1, :3]
         d.qpos[adr + 3 : adr + 7] = f[bid - 1, 3:]
+    for name in lay.tools:  # library tools lying in the toolbox (or on the table): the recorded poses
+        bid = m.body(name).id
+        adr = m.joint(f"{name}_free").qposadr[0]
+        d.qpos[adr : adr + 3] = f[bid - 1, :3]
+        d.qpos[adr + 3 : adr + 7] = f[bid - 1, 3:]
     for name, (_c, x, y) in lay.fixtures().items():
         d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
+    for name, (*_k, yaw) in lay.props.items():
+        d.mocap_quat[m.body(name).mocapid[0]] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
     mujoco.mj_forward(m, d)
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
