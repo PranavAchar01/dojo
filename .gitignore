@@ -16,3 +16,4 @@ skills/tiles/
 .cache/
 MUJOCO_LOG.TXT
 skills/registry.json.*
+assets/lego/_dl/
