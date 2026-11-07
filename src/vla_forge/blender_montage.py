@@ -37,7 +37,9 @@ GB_PER_WORKER = 1.5
 
 
 def blender_bin() -> str | None:
-    if os.environ.get("VLA_FORGE_NO_BLENDER") == "1":  # the GPU is busy or absent: draw the grid with MuJoCo
+    if (
+        os.environ.get("VLA_FORGE_NO_BLENDER") == "1"
+    ):  # the GPU is busy or absent: draw the grid with MuJoCo
         return None
     return shutil.which("blender") or (str(APP) if APP.exists() else None)
 
@@ -73,6 +75,8 @@ def worker_count(jobs: int, cap: int | None = None) -> int:
     n = int(min(cores - 1, (free_gb - 0.1 * total_gb) // GB_PER_WORKER, jobs))
     if cap:
         n = min(n, cap)
+    if os.environ.get("VLA_FORGE_BLENDER_WORKERS"):
+        n = min(n, int(os.environ["VLA_FORGE_BLENDER_WORKERS"]))
     return max(1, n)
 
 
@@ -128,6 +132,9 @@ def export_geometry(stage: montage.Stage, layout_json: dict, path: Path) -> None
     )
 
 
+WORKER_TIMEOUT_S = int(os.environ.get("VLA_FORGE_BLENDER_TIMEOUT", "600"))
+
+
 def _run_workers(specs: list[Path], log_dir: Path) -> list[float]:
     """Launch one Blender per spec, wait for all, return each one's wall time. Only these PIDs are ever signalled."""
     binary = blender_bin()
@@ -156,8 +163,18 @@ def _run_workers(specs: list[Path], log_dir: Path) -> list[float]:
         )
         procs.append((p, log, time.time()))
     times = []
+    deadline = time.time() + WORKER_TIMEOUT_S
     for p, log, t0 in procs:
-        rc = p.wait()
+        try:
+            rc = p.wait(timeout=max(1.0, deadline - time.time()))
+        except subprocess.TimeoutExpired:
+            for q, _, _ in procs:
+                if q.poll() is None:
+                    q.kill()
+            log.close()
+            raise RuntimeError(
+                f"Blender workers timed out after {WORKER_TIMEOUT_S}s; see {log_dir}"
+            ) from None
         times.append(round(time.time() - t0, 1))
         log.close()
         if rc != 0:

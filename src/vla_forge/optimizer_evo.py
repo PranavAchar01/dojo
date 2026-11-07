@@ -51,7 +51,7 @@ ROUND_BUDGET_S = 480.0
 MAX_ROUNDS_SEEDS = (
     400  # round numbers whose demonstration seeds are checked against SELECT and TEST
 )
-CACHE = 3  # trained policies kept in memory besides the control arm's
+CACHE = 1  # trained policies kept in memory besides the control arm's
 LIGHT = ("index", "success", "failure", "steps", "stats", "target_xy", "goal_xy")
 PEEK_NOTE = (
     "TEST is the held-out set. Which policy counts as best is decided on SELECT only. TEST is looked at on the current "
@@ -301,8 +301,13 @@ def run(
         if sheets:
             save_traj(rnd, traj, sc)
             phase("rendering", round=rnd)
+            st = None
             if use_blender:
-                st = blender_montage.render_sheets(stage, sc, out / f"r{rnd}")
+                try:
+                    st = blender_montage.render_sheets(stage, sc, out / f"r{rnd}")
+                except RuntimeError:
+                    st = None
+            if st is not None:
                 bl["engine"] = st["engine"]
                 bl["renders"] += st["renders"]
                 bl["rounds"] += 1
@@ -644,8 +649,13 @@ def run(
             pick = next((i for i in range(N) if not sa[i]["success"]), 0)
         for z, ss, name in ((a, sa, "hero_r0.jpg"), (b, sb, "hero_final.jpg")):
             scene = {"layout": layouts[pick], "frames": z[f"s{pick}"]}
+            r = None
             if use_blender:
-                r = blender_montage.render_hero(stage, scene, out / name)
+                try:
+                    r = blender_montage.render_hero(stage, scene, out / name)
+                except RuntimeError:
+                    r = None
+            if r is not None:
                 bl["renders"] += r["renders"]
                 bl["seconds"] = round(bl["seconds"] + r["seconds"], 1)
                 bl["hero_renders"] = bl.get("hero_renders", 0) + r["renders"]
