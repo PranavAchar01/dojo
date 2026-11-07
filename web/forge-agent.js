@@ -1,7 +1,7 @@
 // Glue: the Etch dock (dock.js) and the Thinking panel on top of the forge's own event stream, with the roaming robot.
 // Everything shown comes from the real run: "thought" events are the agents' own log lines (critic rationale, parse
-// notes, the plan, optimizer rounds), "agent_msg" events are the uAgents messages, and the answer to "What are you
-// doing?" is built from the current stage and the last thoughts. No text is invented.
+// notes, the plan, optimizer rounds), and the answer to "What are you doing?" is built from the current stage and the
+// last thoughts. No text is invented.
 import { createDock } from "./dock.js";
 import { roamer, goTo, goHomeSoon, TARGET } from "./mascot.js";
 
@@ -21,7 +21,7 @@ dock.setStatus("");
 const st = { run: "", thoughts: [], n: 0, open: null, graph: null, last: 0 };
 let loading = false, t0 = 0, loadIv = 0;
 
-function agentLabel(agent, llm) { return llm ? `${agent} · uAgent · Llama 4 Maverick` : `${agent} · uAgent`; }
+function agentLabel(agent, llm) { return llm ? `${agent} · Llama 4 Maverick` : `${agent} · code`; }
 
 function railNow() {
   const live = $("#rail li.live"), done = [...document.querySelectorAll("#rail li.done")];
@@ -69,11 +69,15 @@ function renderAll() {
   body.scrollTop = body.scrollHeight;
   paintFoot();
 }
+// which backend really answers each lane ("meta:...", "openai:...", "subq:...", "stub"), from /api/agents "models"
+function modelLine(g) {
+  const m = g && g.models;
+  if (!m) return "";
+  return [["Llama", m.llama], ["SubQ", m.subq]].filter(([, v]) => v).map(([k, v]) => `${k} ${v.backend || "stub"}`).join(", ");
+}
 function paintFoot() {
   const b = st.graph ? (st.graph.backends || []).join(", ") || "stub" : "";
-  const av = st.graph && st.graph.agentverse;
-  const where = av && av.registered.length ? "Reps and its optimizer are registered on Agentverse" : "not registered on Agentverse";
-  foot.textContent = st.graph ? `Agents run as uAgents in one local Bureau, ${where}. Model backend answering here: ${b}.` : "";
+  foot.textContent = st.graph ? `Model backends answering here: ${modelLine(st.graph) || b}.` : "";
 }
 function pushThought(t) {
   st.thoughts.push(t);
@@ -135,13 +139,13 @@ async function compose(q) {
     const n = g.nodes.find((x) => x.id === named);
     fly(named);
     const said = [...st.thoughts].reverse().find((t) => t.agent === named);
-    return `**${named}** is a uAgent in the Fetch.ai Bureau. ${n.description}${n.llm ? " It asks Llama 4 Maverick." : " It runs plain code, no model call."}${said ? ` Last thing it said: "${said.text}"` : " It has not said anything in this session yet."}`;
+    return `**${named}** is a stage of the pipeline. ${n.description}${n.llm ? " It asks Llama 4 Maverick." : " It runs plain code, no model call."}${said ? ` Last thing it said: "${said.text}"` : " It has not said anything in this session yet."}`;
   }
   if (/model|llama|backend|who.*(answer|power)/.test(s) && g) {
-    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Llama 4 Maverick**. The backend that actually answered in this process is **${(g.backends || []).join(", ") || "a stub"}**. The Fetch.ai agents run in a local Bureau${g.agentverse && g.agentverse.registered.length ? "; the task agent and the optimizer are registered on Agentverse" : " and are not registered on Agentverse"}.`;
+    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Llama 4 Maverick**. SubQ reads the whole run history, every past round and the skill library. In each optimizer round both propose a change at the same time and both are scored in simulation. Backends answering in this process: **${modelLine(g) || (g.backends || []).join(", ") || "a stub"}**.`;
   }
-  if (/agent|fetch|uagent|who/.test(s) && g) {
-    return `${g.nodes.filter((n) => !n.skill).length} uAgents pass typed messages: ${g.nodes.filter((n) => !n.skill).map((n) => n.id).join(", ")}. Open the **Agents** tab to watch the messages move.`;
+  if (/agent|stage|who/.test(s) && g) {
+    return `${g.nodes.filter((n) => !n.skill).length} stages run in one pipeline: ${g.nodes.filter((n) => !n.skill).map((n) => n.id).join(", ")}. Open the **Llama + SubQ** tab to watch the model calls.`;
   }
   if (/think|why|reason/.test(s)) {
     setThinking(true);

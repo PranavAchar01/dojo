@@ -291,6 +291,8 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--ink3); }
 .foot span:last-child { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rounds { display: flex; flex-direction: column; gap: 8px; }
+.rounds .ph { font-size: 12.5px; line-height: 1.45; color: var(--ink3); padding: 10px 12px; border-radius: 10px; background: #fafbfc; border: 1px dashed var(--line); }
+.loss text.ph { fill: var(--ink3); opacity: .8; font: 500 12px var(--ui); }
 .round { display: grid; grid-template-columns: 62px 1fr 42px; gap: 8px; align-items: center; font-size: 12.5px; color: var(--ink2); animation: tt-in .3s var(--soft) both; }
 .round .bar { height: 6px; border-radius: 3px; background: #eef1f4; overflow: hidden; }
 .round .bar div { height: 100%; background: var(--accent); border-radius: 3px; transform-origin: left; animation: grow-x .7s var(--soft) both; }
