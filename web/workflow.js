@@ -18,14 +18,16 @@ const ROWS = [
 ];
 
 const rail = document.querySelector("#rail");
-const canvas = document.querySelector(".canvas");
+const canvas = document.querySelector("#view-sim"); // the card lives in the Sim view, so it always sits above the prompt bar under it
 if (rail && canvas) {
   const card = el("div", "wf");
   card.dataset.keepclear = "";
   card.setAttribute("aria-label", "What the run is doing");
   card.hidden = true;
   canvas.append(card);
-  let tl = null, last = "", hideT = 0, t0 = 0;
+  let tl = null, last = "", hideT = 0, t0 = 0, savedSecs = null;
+  // a saved model's rail fills in an instant, so its time is the train time kept on the skill record
+  addEventListener("dojo:skill", (e) => { savedSecs = +e.detail.seconds > 0 ? +e.detail.seconds : null; });
   const li = (k) => rail.querySelector(`li[data-stage="${k}"]`);
   const st = (k) => { const n = li(k); return !n || n.classList.contains("off") ? "" : n.classList.contains("live") ? "live" : n.classList.contains("fail") ? "fail" : n.classList.contains("done") ? "done" : ""; };
   const metric = (k) => (li(k)?.querySelector(".m")?.textContent || "").trim();
@@ -61,7 +63,7 @@ if (rail && canvas) {
     // a row that dropped back to idle is no longer part of this run's story; leave it folded
     const published = rows.find((r) => r.id === "publish")?.status === "done";
     const failedEnd = rows.some((r) => r.status === "failed") && !anyLive;
-    if ((published || failedEnd) && !anyLive && !tl.finished) { tl.done((performance.now() - t0) / 1000); scheduleHide(12000); }
+    if ((published || failedEnd) && !anyLive && !tl.finished) { { const m = (performance.now() - t0) / 1000; tl.done(m < 2 ? savedSecs ?? 0 : m); savedSecs = null; } scheduleHide(12000); }
   }
   function scheduleHide(ms) {
     clearTimeout(hideT);

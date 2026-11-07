@@ -218,6 +218,7 @@ a.brand:hover { color: var(--accent); }
 
 /* agent rail: a floating card on the right (Etch's inspector card) */
 .rail { max-height: calc(100% - 120px); overflow-y: auto; scrollbar-width: none; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 10; margin: 0; padding: 6px; list-style: none; display: flex; flex-direction: column; gap: 2px; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); animation: mk-in-r .5s var(--soft) .16s both; }
+@media (min-width: 761px) and (max-height: 900px) { .rail { gap: 0; } .rail li { padding: 2px 0 2px; gap: 1px; } .rail li .m { min-height: 0; } }
 .rail li { width: 62px; padding: 7px 0 6px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--ink3); position: relative; transition: background .26s, color .26s; }
 .rail li svg { width: 17px; height: 17px; }
 .rail li.live { background: var(--accent-bg); color: var(--accent-700); }
@@ -478,7 +479,8 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .wf { position: absolute; left: 50%; bottom: 14px; z-index: 13; width: min(440px, calc(100% - 32px)); transform: translateX(-50%); padding: 8px 12px; background: var(--card, #fff);
   border-radius: 16px; box-shadow: 0 8px 28px rgba(22, 28, 45, .12), 0 1px 2px rgba(22, 28, 45, .1); font-family: var(--ag-sans); color: var(--ag-ink);
   transition: bottom .42s var(--bounce), opacity .25s, transform .25s; animation: pill-rise .45s var(--soft) both; }
-.wf.lift { bottom: 70px; }
+.wf { max-height: calc(100% - 28px); overflow-y: auto; overscroll-behavior: contain; }
+.wf.lift { bottom: 70px; max-height: calc(100% - 84px); }
 .wf.gone { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
 .wf[hidden] { display: none; }
 .wf .ag-tl-live:empty { display: none; }
@@ -486,11 +488,9 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 @media (max-width: 760px) { .wf, .wf.lift { bottom: 176px; } }
 @media (prefers-color-scheme: dark) { .ag-eyes .ag-face { stroke: rgba(255, 255, 255, .85); stroke-width: 1px; } .ag-eyes .ag-eyes-dots circle { fill: #fff; } }
 
-/* welcome: with nothing picked, the floor loops real recorded rollouts, no card and no controls */
-.welcome { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 4; width: min(640px, 88%); pointer-events: none; animation: wl-in .5s var(--soft) both; }
+/* welcome: with nothing picked, the regular loading mascot sits centred in the free space above the prompt bar */
+.welcome { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; animation: wl-in .5s var(--soft) both; }
 .welcome[hidden] { display: none; }
-.welcome img { display: block; width: 100%; height: auto; max-height: calc(100% - 20px); aspect-ratio: 880 / 690; object-fit: cover; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); }
-.wl-now { margin: -6px 0 0; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink3); }
 @keyframes wl-in { from { opacity: 0; } }
 /* the moment a tile is picked: a quiet card until its first frame is on the floor */
 .sim-load { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 13; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; background: rgba(255, 255, 255, .94); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink2); box-shadow: var(--shadow); }
@@ -529,11 +529,9 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .sim-load .mascot { margin: -6px 0; }
 
 /* ---------- the docked prompt: one bar at the bottom of the stage, the conversation above it ---------- */
-.dock { position: absolute; left: 50%; bottom: 96px; z-index: 30; width: min(700px, calc(100% - 32px)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; pointer-events: none; transition: bottom .25s var(--soft); }
-.dock > * { pointer-events: auto; }
-.app[data-view="sim"] .dock { bottom: 112px; }
+.dock { position: relative; flex: none; z-index: 30; align-self: center; width: min(700px, calc(100% - 32px)); padding: 10px 0 calc(14px + var(--dock-lift, 0px)); display: flex; flex-direction: column; gap: 8px; transition: padding .25s var(--soft); }
 .app.immersive .dock { display: none; }
-.dock-thread { display: flex; flex-direction: column; min-height: 0; border-radius: 18px; background: #fff; box-shadow: var(--ring-up), 0 12px 32px rgba(28, 43, 51, .08); overflow: hidden; animation: rise .3s var(--soft) both; }
+.dock-thread { position: absolute; left: 0; right: 0; bottom: calc(100% - 4px); display: flex; flex-direction: column; min-height: 0; border-radius: 18px; background: #fff; box-shadow: var(--ring-up), 0 12px 32px rgba(28, 43, 51, .08); overflow: hidden; animation: rise .3s var(--soft) both; }
 .dock-thread[hidden] { display: none; }
 .dock-th { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-bottom: 1px solid var(--line); }
 .dock-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: 600 13px var(--ui); color: var(--ink); text-align: left; }

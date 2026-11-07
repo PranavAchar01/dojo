@@ -377,7 +377,7 @@ async function startPlayback(payload, auto = false) {
 }
 let playTok = 0;
 
-// ---------------------------------------------------------------- welcome: with nothing picked, the floor is never blank; it loops real recorded rollouts
+// ---------------------------------------------------------------- welcome: with nothing picked, the floor shows the regular loading mascot while the rail follows the published models
 let welcomeOn = false, welcomeTimer = 0, welcomeTiles = null, welcomeShown = null;
 // a frame from each published model's own rollout, with its measured score, one after another
 async function welcomeStep(k) {
@@ -386,10 +386,6 @@ async function welcomeStep(k) {
   }
   if (!welcomeOn || !welcomeTiles.length) return;
   const t = welcomeTiles[k % welcomeTiles.length];
-  const img = $("#welcome-img");
-  img.src = `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent(t.replay_source || "")}`;
-  img.hidden = false;
-  $("#welcome-now").textContent = `${t.instruction}: ${Math.round(t.success_rate * t.n_eval)} / ${t.n_eval} on held-out scenes`;
   // the rail, the inspector and any open step card follow the model the loop is showing
   welcomeShown = t;
   const held = `${Math.round(t.success_rate * t.n_eval)}/${t.n_eval}`;
@@ -405,12 +401,10 @@ function startWelcome() {
   welcomeOn = true;
   $("#welcome").hidden = false;
   $("#view-sim").classList.add("welcoming");
-  welcomeStep(0);
 }
 function stopWelcome() {
   if (!welcomeOn) return;
   welcomeOn = false;
-  clearTimeout(welcomeTimer);
   $("#welcome").hidden = true;
   $("#view-sim").classList.remove("welcoming");
 }
@@ -631,7 +625,7 @@ let losses = []; // per round arrays of [t, loss] of the run being trained
 let planRows = [];
 let lastSkill = null;
 let selSkill = null;
-// recorded rollouts, fetched once per tile recording and kept: a second look, a hover prefetch, the welcome loop
+// recorded rollouts, fetched once per tile recording and kept: a second look, a hover prefetch
 const replays = new Map();
 function replayData(id, i = 0, src = "") {
   const k = `${id}:${i}:${src}`;
@@ -1338,7 +1332,7 @@ window.forge = {
     stage("registry", "done", held);
     showSavedModel(t);
     $("#crumb-run").textContent = t.name;
-    window.dispatchEvent(new CustomEvent("dojo:skill", { detail: { id: t.id, name: t.name, held } }));
+    window.dispatchEvent(new CustomEvent("dojo:skill", { detail: { id: t.id, name: t.name, held, seconds: t.train_seconds ?? t.seconds } }));
   },
   note: forgeNote, modelTag, lights, cellMarks, plate: () => plate, grid, gridMid,
   setCamShift(y, scale) { camShift = y; camScale = scale; setCam(camName); },
@@ -1613,9 +1607,13 @@ function reserveBottom() {
   const root = document.documentElement, vh = window.innerHeight;
   const top = (sel) => { const n = document.querySelector(sel); if (!n || !n.offsetParent && getComputedStyle(n).position !== "fixed") return vh; return n.getBoundingClientRect().top; };
   const pill = vh - top(".ag-pill");
-  const bar = $("#app").classList.contains("immersive") ? 0 : vh - top("#prompt-form");
+  const dock = $("#app").classList.contains("immersive") ? null : $("#dock").getBoundingClientRect();
+  const pr = document.querySelector(".ag-pill")?.getBoundingClientRect();
+  // the prompt bar owns a strip under the views; it only steps up when the voice pill would sit under it
+  const lift = dock && pr && pr.width && Math.min(pr.right, dock.right) - Math.max(pr.left, dock.left) > 12 ? pill + 8 : 0;
+  root.style.setProperty("--dock-lift", `${Math.max(0, lift)}px`);
   root.style.setProperty("--pill-pad", `${Math.max(0, pill) + 16}px`);
-  root.style.setProperty("--clear", `${Math.max(pill, bar, 0) + 16}px`);
+  root.style.setProperty("--clear", `${(dock ? 0 : Math.max(pill, 0)) + 16}px`);
 }
 addEventListener("resize", reserveBottom);
 new MutationObserver(reserveBottom).observe($("#app"), { attributes: true, attributeFilter: ["data-view", "class"] });

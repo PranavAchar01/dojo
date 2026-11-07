@@ -281,7 +281,9 @@ export function timeline({ verb = "Thought for" } = {}) {
     const scr = real.map((r) => /screen\w*\s+(\d[\d,]*)\s+(.*?parts)/i.exec(r.data.title || "")).find(Boolean);
     if (final) {
       const build = real.some((r) => r.data.kind === "task" || r.data.kind === "tool");
-      bits.push(tries ? `Built in ${tries} tr${tries === 1 ? "y" : "ies"} · ${fmtSecs(final.s)}` : `${build && verb === "Thought for" ? "Done in" : verb} ${fmtSecs(final.s)}`);
+      // a saved model replays its rail in an instant: no measured time is shown rather than 0.0s
+      const dur = final.s >= 0.05 ? fmtSecs(final.s) : "";
+      bits.push(tries ? `Built in ${tries} tr${tries === 1 ? "y" : "ies"}${dur ? " · " + dur : ""}` : dur ? `${build && verb === "Thought for" ? "Done in" : verb} ${dur}` : verb === "Ran for" ? "Ran" : "Done");
       bits.push(`${real.length} step${real.length === 1 ? "" : "s"}`);
       if (scr) bits.push(`screened ${scr[1]} parts`);
       const last = all[all.length - 1];
