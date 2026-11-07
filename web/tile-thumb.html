@@ -1,0 +1,106 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tile thumb</title>
+<style>html,body{margin:0;background:#e7e8ea}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": { "three": "/web/vendor/three/three.module.js", "three/addons/": "/web/vendor/three/addons/" } }
+</script>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+// A trained-model tile's thumbnail: the engine's own recorded rollout (scene export + one frame of body poses) drawn
+// on the shared stage (web/stage.js), the Sim tab's light look. The arm and every object it works with fill the frame.
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+import { createStage, loadModel, frameBox } from "/web/stage.js";
+import { robotMaterial, partsMesh, basePlate } from "/web/studio.js";
+
+const W = 480, H = 360;
+const st = createStage(document.getElementById("c"), { width: W, height: H, preserve: true, fog: null, target: [0.2, 0, 0.05] });
+const srgb = (c) => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+const shade = (m) => { m.castShadow = m.receiveShadow = true; return m; };
+const geoms = new Map();
+function meshGeometry(key, d) {
+  if (geoms.has(key)) return geoms.get(key);
+  const v = new Float32Array(Uint8Array.from(atob(d.v), (c) => c.charCodeAt(0)).buffer);
+  const f = new Uint32Array(Uint8Array.from(atob(d.f), (c) => c.charCodeAt(0)).buffer);
+  let g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(v, 3));
+  g.setIndex(new THREE.BufferAttribute(f, 1));
+  g = toCreasedNormals(g, Math.PI / 7);
+  geoms.set(key, g);
+  return g;
+}
+function bowlGeometry(r, h) {
+  const t = 0.006, pts = [new THREE.Vector2(0, 0)];
+  for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI / 2; pts.push(new THREE.Vector2((r + t) * Math.sin(a) * 0.96 + 0.004, (1 - Math.cos(a)) * h * 1.15)); }
+  pts.push(new THREE.Vector2(r + t * 0.5, h * 1.18 + 0.002));
+  for (let i = 16; i >= 0; i--) { const a = (i / 16) * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(r * Math.sin(a) * 0.96, 0.001), (1 - Math.cos(a)) * h * 1.1 + 0.004)); }
+  const g = new THREE.LatheGeometry(pts, 64);
+  g.rotateX(Math.PI / 2);
+  return g;
+}
+let current = null;
+window.shoot = async ({ scene: sc, frame, meshes, robot }) => {
+  if (current) st.scene.remove(current);
+  const root = new THREE.Group();
+  const bodies = sc.bodies.map(() => { const o = new THREE.Group(); root.add(o); return o; });
+  for (const g of sc.robot) {
+    const m = shade(new THREE.Mesh(meshGeometry(`${robot}|${g.mesh}`, meshes[String(g.mesh)]), robotMaterial(g.rgba, g.name)));
+    m.position.fromArray(g.pos);
+    m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
+    bodies[g.body].add(m);
+  }
+  const tracked = []; // the objects the task is about: the arm plus these fill the frame
+  for (const b of sc.blocks) {
+    let o;
+    if (b.parts) o = partsMesh(b.parts, b.rgb, b.kind || "part");
+    else {
+      const s = b.half * 2;
+      o = new THREE.Mesh(new RoundedBoxGeometry(s, s, s, 4, 0.0025), new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.5, clearcoat: 0.22, clearcoatRoughness: 0.45, envMapIntensity: 0.7 }));
+    }
+    o.traverse((x) => { if (x.isMesh) x.castShadow = x.receiveShadow = true; });
+    bodies[b.body].add(o); tracked.push(bodies[b.body]);
+  }
+  for (const b of sc.bowls) {
+    bodies[b.body].add(shade(new THREE.Mesh(bowlGeometry(b.r, b.h), new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.9, side: THREE.DoubleSide }))));
+    tracked.push(bodies[b.body]);
+  }
+  for (const p of sc.pads) {
+    const mat = new THREE.MeshStandardMaterial({ color: srgb(p.rgb), roughness: 0.85, envMapIntensity: 0.4 });
+    const t = p.half, w = 0.006;
+    for (const [x, y, sx, sy] of [[t, 0, w, t + w], [-t, 0, w, t + w], [0, t, t + w, w], [0, -t, t + w, w]]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx * 2, sy * 2, 0.0012), mat);
+      m.position.set(x, y, 0.0009); bodies[p.body].add(m);
+    }
+    tracked.push(bodies[p.body]);
+  }
+  for (const p of sc.props || []) {
+    const g = partsMesh(p.parts, p.rgb, p.kind);
+    g.traverse((x) => { if (x.isMesh) x.castShadow = x.receiveShadow = true; });
+    bodies[p.body].add(g); tracked.push(bodies[p.body]);
+  }
+  for (const m of sc.models || []) {
+    bodies[m.body].add(await loadModel(`/assets/library/${encodeURIComponent(m.model)}/model.glb`)); tracked.push(bodies[m.body]);
+  }
+  bodies.forEach((o, i) => {
+    const k = i * 7;
+    o.position.set(frame[k], frame[k + 1], frame[k + 2]);
+    o.quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
+  });
+  const plate = basePlate(0.17);
+  root.add(plate);
+  st.scene.add(root);
+  current = root;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  for (const o of bodies) box.expandByObject(o);
+  box.expandByPoint(new THREE.Vector3(0, 0, 0));
+  frameBox(st, box, [0.55, -0.75, 0.6], 0.92);
+  st.render();
+  return { size: box.getSize(new THREE.Vector3()).toArray() };
+};
+window.draw = () => { st.render(); st.render(); }; // the canvas keeps its buffer: the PNG is read from it, not screenshotted
+window.ready = true;
+</script>

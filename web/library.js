@@ -443,7 +443,7 @@ function tileEl(t, byId) {
     const img = el("img");
     img.alt = t.name;
     img.loading = "lazy";
-    img.src = `/api/skills/${t.id}/thumb.png?v=${encodeURIComponent(String(t.tests.length) + t.replay_source)}`;
+    img.src = `/api/skills/${t.id}/thumb.png?v=${encodeURIComponent(String(t.tests.length) + t.replay_source + "." + t.thumb_v)}`;
     th.append(img);
   } else {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));

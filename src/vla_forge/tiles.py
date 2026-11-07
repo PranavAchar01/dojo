@@ -1,6 +1,6 @@
 """Library tiles: what a finished skill leaves on disk besides its checkpoint.
 
-skills/tiles/<skill id>/thumb.png        one real frame of one of its own rollouts, rendered by MuJoCo
+skills/tiles/<skill id>/thumb.png        one real frame of one of its own rollouts, drawn on the shared stage (tile_stage.py)
 skills/tiles/<skill id>/replay.json.gz   recorded rollouts (scene + body poses at 30 Hz) for the tile's player
 
 The thumbnail is the final state of a recorded rollout: the blocks' recorded poses plus the arm's recorded joint
@@ -13,14 +13,8 @@ import gzip
 import json
 from pathlib import Path
 
-import mujoco
-import numpy as np
-from PIL import Image
-
 from .registry import ROOT, TILES_DIR, Skill
-from .sim.display import restyle
-from .sim.robots import calibrate, fix_qpos0
-from .sim.scene import JOINTS, Layout, build_spec
+from .sim.scene import Layout
 from .viz import export_scene
 
 THUMB_W, THUMB_H = 480, 360
@@ -29,51 +23,6 @@ REPLAY_KEEP = 3  # rollouts kept per tile: successes first, then one failure if 
 
 def tile_dir(skill_id: str) -> Path:
     return TILES_DIR / skill_id
-
-
-def render_thumb(
-    layout_json: dict, frame: list, q: list, out: Path, robot: str = "so101"
-) -> Path:
-    """Render one recorded state of a rollout to a PNG, on the robot that ran it."""
-    lay = Layout.from_json(layout_json)
-    m = build_spec(lay, robot=robot).compile()
-    fix_qpos0(m)
-    restyle(m)
-    d = mujoco.MjData(m)
-    rb = calibrate(robot)
-    joints = (
-        JOINTS if rb.default else rb.arm_joints
-    )  # a custom robot's q ends with its grip length
-    for j, v in zip(joints, q, strict=False):
-        d.qpos[m.joint(j).qposadr[0]] = v
-    f = np.asarray(frame, float).reshape(-1, 7)
-    for name in lay.blocks:
-        bid = m.body(name).id
-        adr = m.joint(f"{name}_free").qposadr[0]
-        d.qpos[adr : adr + 3] = f[bid - 1, :3]
-        d.qpos[adr + 3 : adr + 7] = f[bid - 1, 3:]
-    for name in lay.tools:  # library tools lying in the toolbox (or on the table): the recorded poses
-        bid = m.body(name).id
-        adr = m.joint(f"{name}_free").qposadr[0]
-        d.qpos[adr : adr + 3] = f[bid - 1, :3]
-        d.qpos[adr + 3 : adr + 7] = f[bid - 1, 3:]
-    for name, (_c, x, y) in lay.fixtures().items():
-        d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
-    for name, (*_k, yaw) in lay.props.items():
-        d.mocap_quat[m.body(name).mocapid[0]] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
-    mujoco.mj_forward(m, d)
-    cam = mujoco.MjvCamera()
-    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    cam.lookat[:] = [0.17, 0.0, 0.05]
-    cam.distance = 0.68
-    cam.azimuth = 148.0
-    cam.elevation = -34.0
-    with mujoco.Renderer(m, THUMB_H, THUMB_W) as r:
-        r.update_scene(d, camera=cam)
-        img = r.render()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(img).save(out, optimize=True)
-    return out
 
 
 def pick(rolls: list) -> list:
@@ -106,10 +55,6 @@ def save_assets(
     keep = pick(rolls)
     d = tile_dir(skill.id)
     d.mkdir(parents=True, exist_ok=True)
-    shot = keep[0]
-    thumb = render_thumb(
-        shot.layout, shot.frames[-1], shot.final_q, d / "thumb.png", skill.robot
-    )
     replay = d / "replay.json.gz"
     with gzip.open(replay, "wt") as fh:
         json.dump(
@@ -117,8 +62,11 @@ def save_assets(
             fh,
             separators=(",", ":"),
         )
+    from . import tile_stage
+
+    tile_stage.shoot([skill.id])  # the thumbnail is a frame of that replay, drawn on the shared stage
     return {
-        "thumb_png": str(thumb.relative_to(ROOT)),
+        "thumb_png": str(d.relative_to(ROOT) / "thumb.png"),
         "replay": str(replay.relative_to(ROOT)),
         "replay_source": source,
     }
@@ -148,6 +96,7 @@ def tile(skill: Skill) -> dict:
         "created": skill.created,
         "steps": skill.steps,
         "thumb": bool(skill.thumb_png),
+        "thumb_v": int((ROOT / skill.thumb_png).stat().st_mtime) if skill.thumb_png and (ROOT / skill.thumb_png).exists() else 0,
         "replay": bool(skill.replay),
         "replay_source": skill.replay_source,
         "detail": skill.record.get("detail", ""),
