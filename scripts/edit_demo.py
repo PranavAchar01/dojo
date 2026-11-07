@@ -25,12 +25,13 @@ CUES = [
     ("train", "speed0", 0.4),
     ("round2", "mid", 0.0),
     ("trained", "trained", 0.3),
-    ("line", "line", 0.3),
-    ("cards", "cards", 0.3),
-    ("results", "results", 0.3),
-    ("library", "library", 0.3),
-    ("far", "far", 1.5),
-    ("robot", "robot", 0.5),
+    ("addarm", "addarm", 0.3),
+    ("twoarm", "twoarm", 0.3),
+    ("armsresult", "armsresult", 0.3),
+    ("optimize", "optimize", 0.3),
+    ("montage", "montage", 2.3),
+    ("ticker", "ticker", 5.0),
+    ("replay", "replay", 0.3),
     ("close", "close", 0.5),
 ]
 
@@ -39,16 +40,12 @@ CUES = [
 # "speed_last_end" is where the last logged wait ends. Narration cues all sit before these.
 DROPS = [
     ("trained", 5.5, 1.5),
-    ("cards", 12.5, 2.5),
-    ("results", 5.0, 1.5),
-    ("far", 10.0, 2.5),
-    ("speed_last_end", 4.0, 3.0),
-    ("close", 3.5, 1.5),
+    ("close", 3.0, 1.0),
 ]
 
 
 def has_retry() -> bool:
-    return json.loads((ROOT / "demo/v6-results.json").read_text())["retry"]
+    return json.loads((ROOT / "demo/v7-results.json").read_text())["retry"]
 
 
 def main() -> None:

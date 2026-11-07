@@ -1,7 +1,7 @@
 """Demo narration: one gpt-realtime-2.1 take per script line (voice cedar), acted, checked, trimmed, sped up.
 
 Reads demo/narration.tsv (name<TAB>mood<TAB>line). Numbers in a line are {placeholders} filled from the run
-measured for this cut (demo/v6-results.json), spelled out as words; the
+measured for this cut (demo/v7-results.json), spelled out as words; the
 "round2" line is only voiced when a station really needed a second round. Each take's own transcript must match the line word for
 word (case and punctuation aside) or it is voiced again. Writes demo/narration/1x/<name>.wav (as spoken) and
 demo/narration/<name>.wav (sped to SPEED), 48 kHz mono. Adapted from meta-sight's narration script.
@@ -101,29 +101,20 @@ def decimal(x: float) -> str:  # 7.2 -> "seven point two"
 
 
 def fills() -> dict[str, str] | None:
-    f = ROOT / "demo/v6-results.json"
+    f = ROOT / "demo/v7-results.json"
     if not f.exists():
         return None
     r = json.loads(f.read_text())
-    sim, st, ln = r["sim_skill"], r["stations"], r["line"]
-    held = [round(x["held_out_success"] * x["n_eval"]) for x in st[:2]]
+    sim, arms, opt = r["sim_skill"], r["arms"], r["optimizer"]
+    best = opt["rounds"][opt["best_round"]]
     out = {
         "t": words(round(sim["train_seconds"])),
         "s": words(sim["rounds"][-1]["succeeded"]),
         "n": words(sim["n_eval"]),
-        "a0": words(held[0]),
-        "n0": words(st[0]["n_eval"]),
-        "a1": words(st[0]["on_line"]["succeeded"]),
-        "a2": words(st[0]["on_line"]["parts_in"]),
-        "b0": words(held[1]),
-        "n1": words(st[1]["n_eval"]),
-        "b1": words(st[1]["on_line"]["succeeded"]),
-        "b2": words(st[1]["on_line"]["parts_in"]),
-        "c1": words(st[2]["on_line"]["succeeded"]),
-        "c2": words(st[2]["on_line"]["parts_in"]),
-        "parts": words(ln["parts"]),
-        "done": words(ln["completed"]),
-        "tpm": words(round(ln["parts_per_min"])),
+        "ac": words(arms["completed"]),
+        "an": words(arms["tries"]),
+        "o0": words(opt["rounds"][0]["success"]),
+        "ob": words(best["success"]),
     }
     if r["retry"]:
         first = sim["rounds"][0]
