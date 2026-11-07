@@ -594,11 +594,11 @@ refresh();
 // Trained models | 3D models: the second face is the real-model library (web/assets.js), mounted on first use.
 {
   let panel = null;
-  document.getElementById("lib-mode")?.addEventListener("click", async (e) => {
+  document.getElementById("lib-face")?.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     const three = b.dataset.m === "3d";
-    document.querySelectorAll("#lib-mode button").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll("#lib-face button").forEach((x) => x.classList.toggle("on", x === b));
     document.getElementById("lib-trained").hidden = three;
     document.getElementById("lib-3d").hidden = !three;
     const lede = document.querySelector("#view-skills .doc-h p");
