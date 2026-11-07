@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory line</title>
+<style>
+  :root { --bg:#e7e8ea; --ink:#16181c; --mute:#5d636c; --card:#fff; --line:#d5d8dc; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#e7e8ea; } }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 Inter, system-ui, sans-serif; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .bar { position:fixed; left:16px; right:16px; bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+         background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 14px; box-shadow:0 4px 18px rgba(0,0,0,.07); }
+  .bar b { font-weight:600; }
+  .bar span { color:var(--mute); }
+  .bar .fill { flex:1; min-width:80px; height:4px; background:var(--line); border-radius:2px; overflow:hidden; }
+  .bar .fill i { display:block; height:100%; width:0; background:#2f6bff; }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); border-radius:9px; padding:4px 12px; cursor:pointer; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="bar"><b id="title">Factory line</b><span id="status">loading</span><div class="fill"><i id="fill"></i></div><button id="replay">Replay</button></div>
+<script type="module" src="/static/factory.js"></script>
+</body>
+</html>
