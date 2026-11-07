@@ -55,7 +55,7 @@ if (!reduced && innerWidth >= 760) {
 const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hits = (t) => Math.round(t.success_rate * t.n_eval);
-const thumb = (t) => `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent(t.replay_source || "")}`;
+const thumb = (t) => `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent((t.replay_source || "") + "." + t.thumb_v)}`;
 
 async function fill() {
   let tiles;
