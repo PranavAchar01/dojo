@@ -1,4 +1,4 @@
-"""Cut the live recording into the demo: 4x on the logged training waits only, narration placed on top.
+"""Cut the live recording into the demo: 4x on the logged waits only (training, part previews), narration placed on top.
 
     python3 -I scripts/edit_demo.py demo/vla-forge-YYYYMMDD-HHMMSS.webm demo/edit.mp4
 
@@ -23,31 +23,60 @@ CUES = [
     ("describe", "describe", 0.3),
     ("cards", "cards", 0.3),
     ("train", "speed0", 0.4),
-    ("round2", "speed2", 0.5),
+    ("round2", "mid", 0.0),
     ("trained", "replay", 0.3),
     ("replay", "replay", 9.0),
     ("results", "results", 0.3),
     ("library", "library", 0.3),
+    ("far", "far", 1.5),
+    ("robot", "robot", 0.5),
     ("close", "close", 0.5),
 ]
+
+
+# idle holds trimmed at the end of a segment, in recording seconds: (anchor in marks, offset after it, length).
+# "speed_last_end" is where the last logged wait ends. Narration cues all sit before these.
+DROPS = [
+    ("replay", 14.0, 2.5),
+    ("results", 5.0, 2.5),
+    ("library", 4.0, 2.0),
+    ("far", 10.0, 2.5),
+    ("speed_last_end", 4.0, 3.0),
+    ("close", 3.5, 1.5),
+]
+
+
+def has_retry() -> bool:
+    return json.loads((ROOT / "demo/v5-results.json").read_text())["retry"]
 
 
 def main() -> None:
     src, out = Path(sys.argv[1]), Path(sys.argv[2])
     marks = json.loads(src.with_suffix(".marks.json").read_text())
     spans = marks["speed"]
+    at = marks["at"]
+    last_end = max(b for _a, b in spans)
+    drops = [
+        ((last_end if k == "speed_last_end" else at[k]) + o, 0.0, ln)
+        for k, o, ln in DROPS
+    ]
+    segs = sorted(
+        [(a, b, FAST) for a, b in spans] + [(a, a + ln, 0.0) for a, _z, ln in drops],
+        key=lambda x: x[0],
+    )
 
     def to_out(t: float) -> float:
         saved = 0.0
-        for a, b in spans:
-            if t >= b:
-                saved += (b - a) * (1 - 1 / FAST)
-            elif t > a:
-                saved += (t - a) * (1 - 1 / FAST)
+        for a, b, f in segs:
+            if f == 1.0:
+                continue
+            keep = 1 / f if f else 0.0
+            saved += (min(t, b) - a) * (1 - keep) if t > a else 0.0
         return t - saved
 
     anchors = {
         "zero": 0.0,
+        "mid": (spans[0][0] + spans[1][1]) / 2 if len(spans) > 1 else spans[0][0],
         **({"ladder": marks["ladder"]} if "ladder" in marks else {}),
         **marks.get("at", {}),
         **{f"speed{i}": a for i, (a, _b) in enumerate(spans)},
@@ -66,8 +95,10 @@ def main() -> None:
     )
     fit = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
     cuts, t = [], 0.0
-    for a, b in spans:
-        cuts += [(t, a, 1.0), (a, b, FAST)]
+    for a, b, f in segs:
+        cuts.append((t, a, 1.0)) if a > t else None
+        if f:
+            cuts.append((a, b, f))
         t = b
     cuts.append((t, marks["end"], 1.0))
     # BADGE: style.css .speed sits fixed at top 64px, right 28px. It goes on the uncut source, lit only inside the
@@ -89,7 +120,13 @@ def main() -> None:
     # narration is mixed in its own pass, then muxed: one graph for both lost all but the first half second of
     # audio on a 6-minute capture
     inputs, agraph, amix = [], [], []
-    for k, (name, anchor, off) in enumerate(CUES):
+    cues = [
+        c
+        for c in CUES
+        if (ROOT / "demo/narration" / f"{c[0]}.wav").exists()
+        and (c[0] != "round2" or has_retry())
+    ]
+    for k, (name, anchor, off) in enumerate(cues):
         at = to_out(anchors[anchor]) + off
         inputs += ["-i", str(ROOT / "demo/narration" / f"{name}.wav")]
         ms = int(at * 1000)
