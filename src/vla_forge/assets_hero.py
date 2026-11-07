@@ -25,7 +25,7 @@ import mujoco
 import numpy as np
 
 from . import factory as F
-from .assets_scene import bind_product
+from .assets_scene import PITCH, bind_product
 from .sim import line as L
 from .sim.expert import Expert
 from .sim.scene import Layout, Look, Scene
@@ -278,13 +278,16 @@ def render_line(
     size=(1440, 900),
     camera=None,
     shift: float | None = None,
+    hide_front: bool = False,
 ) -> None:
     """One MuJoCo frame of the whole line: station 1's cell, and station 2's arm one pitch along the belt."""
     from PIL import Image
 
-    from .assets_scene import PITCH
-
     ma, mb = a.sc.model, b.sc.model
+    if hide_front:  # the guard panels, posts and gate nearest the camera
+        for g in range(ma.ngeom):
+            if ma.geom(g).name.startswith("gf_"):
+                ma.geom_group[g] = 5
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
     c = camera or CAMERA
@@ -320,12 +323,12 @@ def shots(out_dir: Path, prefix: str = "2026-11-07-dojo-assets") -> None:
         "azimuth": 150.0,
         "elevation": -30.0,
     }
-    cell = {"lookat": [0.3, 0.6, 0.08], "distance": 1.15, "azimuth": 180, "elevation": -34}
+    cell = {"lookat": [0.25, 0.25, 0.08], "distance": 0.95, "azimuth": 180, "elevation": -35}
     wide = {
-        "lookat": [0.2, 0.6, 0.03],
-        "distance": 1.9,
-        "azimuth": 150.0,
-        "elevation": -30.0,
+        "lookat": [0.25, 0.25, 0.05],
+        "distance": 1.15,
+        "azimuth": 160.0,
+        "elevation": -26.0,
     }
     size = (1200, 800)
 
@@ -337,7 +340,7 @@ def shots(out_dir: Path, prefix: str = "2026-11-07-dojo-assets") -> None:
         return (live, rest) if live_first else (rest, live)
 
     a, b = pair(True, KIT)
-    render_line(out_dir / f"{prefix}-factory-mujoco.png", a, b, size, cell)
+    render_line(out_dir / f"{prefix}-factory-mujoco.png", a, b, size, cell, hide_front=True)
     render_line(out_dir / f"{prefix}-factory-mujoco-wide.png", a, b, size, wide)
     a.close(), b.close()
 
@@ -358,7 +361,7 @@ def shots(out_dir: Path, prefix: str = "2026-11-07-dojo-assets") -> None:
     for _ in range(8):
         live.tick()
     render_line(
-        out_dir / f"{prefix}-cassette-done.png", live, rest, size, close1, shift=-1.2
+        out_dir / f"{prefix}-cassette-done.png", live, rest, size, close1, shift=-PITCH
     )
     live.close(), rest.close()
     print(json.dumps({"kit_ok": ok1, "insert_ok": ok2}))
