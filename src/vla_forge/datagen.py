@@ -91,8 +91,8 @@ def pool(workers: int | None = None) -> ProcessPoolExecutor:
     if _POOL is None:
         n = (
             workers
-            or int(os.environ.get("VLA_FORGE_DATA_WORKERS", 0))
-            or max(4, (os.cpu_count() or 8) - 3)
+            or int(os.environ.get("VLA_FORGE_DATA_WORKERS", "0"))
+            or 4
         )
         _POOL = ProcessPoolExecutor(n, mp_context=mp.get_context("spawn"))
         list(_POOL.map(_warm, range(n)))
