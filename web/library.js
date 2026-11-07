@@ -3,6 +3,7 @@
 // Also draws the router's verdict and the progress card for a run (parse, route, demos, train, eval, save).
 
 import { robotLabel } from "./builder.js";
+import { loadingNode } from "./loading.js";
 
 const F = () => window.forge;
 const $ = (s) => document.querySelector(s);
@@ -542,15 +543,7 @@ function draw() {
   if (!box) return;
   box.innerHTML = "";
   if (!loaded) {
-    for (let i = 0; i < 3; i++) {
-      const g = el("article", "tile is-loading");
-      const th = el("div", "tile-thumb");
-      th.append(el("div", "shimmer"));
-      const b = el("div", "tile-body");
-      b.append(el("div", "sk-line w70"), el("div", "sk-line w40"), el("div", "sk-line w55"));
-      g.append(th, b);
-      box.append(g);
-    }
+    box.append(loadingNode("Loading the models...", { layout: "fill col" }));
     return;
   }
   const byId = Object.fromEntries(tiles.map((t) => [t.id, t]));

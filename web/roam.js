@@ -16,7 +16,7 @@ import { spring, tick, reducedMotion, clamp } from "./spring.js";
 const W = 84, H = 66;
 // the pointing hand: one stroke from the right side of the face, mirrored on the left
 const SH = { x: 38, y: 6 }, ARM = 51;
-const KEEP = "[data-keepclear], .msg, .skill, .lib-bar, .top, .tabs, .composer, .sec, .ag-panel, .ag-pill, .pill:not(.hidden), #three";
+const KEEP = "[data-keepclear], .msg, .skill, .lib-bar, .top, .tabs, .composer, .dock-thread, .sec, .ag-panel, .ag-pill, .pill:not(.hidden), #three";
 const ARM_SVG = `<svg viewBox="0 0 64 28" aria-hidden="true"><path class="rb-hand" d="M7 14H58"/></svg>`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

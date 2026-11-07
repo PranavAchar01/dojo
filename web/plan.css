@@ -1,14 +1,18 @@
-.bp-head { padding-bottom: 18px; }
-.bp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.bp-head { padding-bottom: 12px; }
+.bp-head b { font: 700 17px var(--serif); color: var(--ink); }
+.bp-head p { margin: 4px 0 0; }
+.bp-ref:empty { display: none; }
+.bp-ref { font-weight: 600; color: var(--accent-700); }
+.bp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .bp-grid2 { grid-template-columns: 1fr 1fr; }
 .bp-card { background: var(--card); border-radius: var(--r); box-shadow: var(--ring); padding: 16px; min-width: 0; margin-bottom: 0; }
-.bp > .bp-card { margin-bottom: 16px; }
+.bp > .bp-card { margin-bottom: 12px; }
 .bp-lbl { display: flex; align-items: baseline; gap: 10px; font: 700 14px var(--ui); color: var(--ink); margin-bottom: 10px; }
 .bp-mt { margin-top: 16px; }
 .bp-grow { flex: 1; }
 .bp-dim { font: 500 12.5px/1.45 var(--ui); color: var(--ink3); }
-.bp-imgwrap { background: var(--stage); border-radius: 10px; display: grid; place-items: center; min-height: 260px; overflow: hidden; }
-.bp-imgwrap img { max-width: 100%; max-height: 420px; display: block; }
+.bp-imgwrap { background: var(--stage); border-radius: 10px; display: grid; place-items: center; min-height: 200px; overflow: hidden; }
+.bp-imgwrap img { max-width: 100%; max-height: 300px; display: block; }
 .bp-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
 .bp-btn { font: 600 13px var(--ui); padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line2); background: var(--bg); color: var(--ink); cursor: pointer; transition: background .15s, transform .15s var(--bounce); }
 .bp-btn:hover { background: var(--bg-hover); }
@@ -55,4 +59,4 @@
 .bp-use { margin-top: 14px; }
 .bp-table { width: 100%; max-width: 900px; margin-top: 12px; border-radius: 10px; }
 .bp-foot { margin-top: 8px; }
-@media (max-width: 900px) { .bp-grid, .bp-grid2 { grid-template-columns: 1fr; } .bp-rules { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .bp-grid, .bp-grid2 { grid-template-columns: 1fr; } .bp-rules { grid-template-columns: 1fr 1fr; } }

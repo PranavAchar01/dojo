@@ -80,8 +80,8 @@ a.brand:hover { color: var(--accent); }
 .ib.on { color: var(--accent-700); background: var(--accent-bg); }
 .ib.sm { width: 28px; height: 28px; border-radius: 8px; }
 .ib.sm svg { width: 15px; height: 15px; }
-.app:not(.no-left) #toggle-left, .app:not(.no-right) #toggle-right { color: var(--accent-700); background: var(--accent-bg); }
-.app.immersive #toggle-left, .app.immersive #toggle-right { opacity: 0; pointer-events: none; }
+.app:not(.no-right) #toggle-right { color: var(--accent-700); background: var(--accent-bg); }
+.app.immersive #toggle-right { opacity: 0; pointer-events: none; }
 .seg { display: flex; background: #eef1f4; border-radius: 11px; padding: 3px; gap: 2px; }
 .seg button { height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; font-weight: 600; color: var(--ink2); transition: background .2s var(--ease), color .2s, box-shadow .2s; }
 .seg button:hover { color: var(--ink); }
@@ -129,14 +129,11 @@ a.brand:hover { color: var(--accent); }
 @keyframes ag-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ag-eyes.breathe { animation: none; } .ag-spin { animation-duration: 1.6s; } }
 
-/* ---------- main: chat panel + stage + right panel ---------- */
+/* ---------- main: stage + right panel; the prompt docks at the bottom of the stage ---------- */
 .body { display: flex; min-height: 0; min-width: 0; position: relative; overflow: hidden; }
-.chat, .inspector { width: var(--panel); flex: none; background: var(--bg); display: flex; flex-direction: column; min-height: 0; position: relative; z-index: 15; transition: margin .22s cubic-bezier(.25, .8, .25, 1), opacity .18s ease; }
-.chat { border-right: 1px solid var(--line); }
+.inspector { width: var(--panel); flex: none; background: var(--bg); display: flex; flex-direction: column; min-height: 0; position: relative; z-index: 15; transition: margin .22s cubic-bezier(.25, .8, .25, 1), opacity .18s ease; }
 .inspector { border-left: 1px solid var(--line); overflow-y: auto; }
-.app.no-left .chat { margin-left: calc(-1 * var(--panel)); }
 .app.no-right .inspector { margin-right: calc(-1 * var(--panel)); }
-.app.immersive .chat { margin-left: calc(-1 * var(--panel)); opacity: 0; pointer-events: none; }
 .app.immersive .inspector { margin-right: calc(-1 * var(--panel)); opacity: 0; pointer-events: none; }
 .app.lib .inspector { margin-right: calc(-1 * var(--panel)); opacity: 0; pointer-events: none; }
 .app.lib #toggle-right { opacity: 0; pointer-events: none; }
@@ -144,20 +141,8 @@ a.brand:hover { color: var(--accent); }
 .view:not(.hidden) { animation: view-in .3s var(--soft) both; }
 @keyframes view-in { from { opacity: 0; translate: 0 10px; } }
 
-/* ---------- chat (Etch right-panel look, new-board composer and prompt cards) ---------- */
-.rp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 12px 6px 16px; }
-.rp-head h2 { margin: 0; font: 600 20px/1.2 var(--serif); }
+/* ---------- conversation (docked above the prompt) ---------- */
 .thread { flex: 1; overflow-y: auto; padding: 10px 16px 10px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
-.empty { margin-top: auto; }
-.hero-bot { position: relative; width: 64px; height: 64px; margin: 0 0 18px 2px; animation: rise .55s var(--soft) both; }
-.empty h1 { font: 700 34px/1.06 var(--serif); letter-spacing: -.02em; margin: 0 0 10px; text-wrap: balance; animation: rise .55s var(--soft) 80ms both; }
-.empty h1 em { font-style: normal; color: var(--accent); }
-.empty p { color: var(--ink2); margin: 0 0 16px; font-size: 14px; line-height: 1.5; animation: rise .55s var(--soft) 140ms both; }
-.examples { display: flex; flex-direction: column; gap: 8px; }
-.ex { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 12px 14px; border: 0; border-radius: 18px; background: #fff; font: 500 13.5px/1.35 var(--ui); color: var(--ink); box-shadow: var(--ring); transition: box-shadow .3s var(--ease), transform .45s var(--liquid); animation: rise .5s var(--soft) both; }
-.ex:nth-child(1) { animation-delay: 200ms; } .ex:nth-child(2) { animation-delay: 260ms; } .ex:nth-child(3) { animation-delay: 320ms; }
-.ex:hover { box-shadow: var(--ring-up); }
-.ex:active { transform: scale(.97); }
 .t { flex: none; font: 700 11px/1 var(--ui); color: var(--accent-700); background: var(--accent-bg); padding: 4px 6px; border-radius: 6px; }
 
 /* Etch's thought cloud, rising out of the bot */
@@ -192,10 +177,6 @@ a.brand:hover { color: var(--accent); }
 .spin { display: inline-block; width: 10px; height: 10px; border: 1.75px solid var(--accent-200); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; margin-right: 4px; }
 .sub-thread { margin: 8px 0 0 4px; padding-left: 10px; border-left: 2px solid var(--line); }
 .sub-thread .sub-h { font-size: 12px; color: var(--ink3); margin-bottom: 5px; }
-.composer { position: relative; margin: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; padding: 12px 10px 10px 16px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px #e4e9ee, 0 4px 14px rgba(17, 17, 17, .03); transition: box-shadow .2s; }
-.composer:focus-within { box-shadow: 0 0 0 1px var(--accent-200), 0 0 0 5px var(--accent-glow); }
-.composer textarea { width: 100%; border: 0; outline: none; resize: none; padding: 2px 0; font: 400 15px/1.4 var(--ui); color: var(--ink); background: transparent; caret-color: var(--accent); }
-.composer textarea::placeholder { color: #9aa3ad; }
 .composer-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .chip-mode { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px 0 5px; border: 0; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #dde5ec inset; font: 600 12.5px var(--ui); color: var(--ink2); transition: box-shadow .2s, color .2s; }
 .chip-mode:hover { color: var(--ink); box-shadow: 0 0 0 1px #c3d2df inset; }
@@ -317,7 +298,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .critic b { font-weight: 700; color: var(--ink); }
 
 /* ---------- library pages: Etch Explore (workplane grid, serif hero, white cards) ---------- */
-#view-ladder, #view-skills, #view-robot, #view-line {
+#view-rsi, #view-skills, #view-line {
   overflow-y: auto; background-color: var(--plane-bg);
   background-image: linear-gradient(var(--plane-major) 1px, transparent 1px), linear-gradient(90deg, var(--plane-major) 1px, transparent 1px),
     linear-gradient(var(--plane-line) 1px, transparent 1px), linear-gradient(90deg, var(--plane-line) 1px, transparent 1px);
@@ -393,7 +374,6 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 }
 
 /* ---------- robot builder (Explore cards) ---------- */
-.app.immersive .doc.build { max-width: none; }
 .build-grid { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 520px); gap: 20px; align-items: start; }
 .slots { display: flex; flex-direction: column; gap: 26px; }
 .slot-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; font-size: 13px; color: #6b6b70; }
@@ -421,7 +401,8 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .asm-cap { position: absolute; top: 12px; left: 14px; right: 14px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
 .asm-cap b { font: 600 18px/1.2 var(--serif); }
 .asm-cap .num { font-size: 12px; }
-.asm-load { position: absolute; right: 14px; bottom: 36px; font-size: 12.5px; color: var(--accent-700); }
+.asm-load { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(250, 250, 250, .82); }
+.asm-load.hidden { display: none; }
 .asm-legend { position: absolute; left: 14px; bottom: 10px; display: flex; gap: 12px; font-size: 11.5px; color: var(--ink3); pointer-events: none; }
 .asm-legend .k { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
 .asm-legend .k.ok { background: var(--ok); } .asm-legend .k.bad { background: var(--bad); } .asm-legend .k.tcp { background: var(--ink); }
@@ -466,14 +447,13 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   .tg.view { position: static; transform: none; min-width: 0; }
   .seg { overflow-x: auto; scrollbar-width: none; }
   .seg button { padding: 0 9px; flex: none; }
-  #toggle-left, #toggle-right { display: none; }
+  #toggle-right { display: none; }
   .body { flex-direction: column; overflow: visible; }
   .canvas { order: 1; }
-  .chat { order: 2; width: 100%; margin: 0 !important; border-right: 0; border-top: 1px solid var(--line); }
   .inspector { order: 3; width: 100%; margin: 0 !important; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
-  .app.immersive .chat, .app.immersive .inspector, .app.lib .chat, .app.lib .inspector { display: none; }
+  .app.immersive .inspector, .app.lib .inspector { display: none; }
   .view { flex: none; height: 62vh; min-height: 420px; }
-  #view-ladder, #view-skills, #view-robot, #view-line { height: auto; min-height: 60vh; }
+  #view-rsi, #view-skills, #view-line { height: auto; min-height: 60vh; }
   .doc, .app.immersive .doc { padding: 0 16px 64px; }
   .doc-h { padding: 32px 0 18px; }
   .doc-h p { font-size: 16px; }
@@ -491,7 +471,6 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   .pill { bottom: 10px; max-width: calc(100% - 20px); height: 44px; }
   .pill span { min-width: 0; }
   .pb-progress { width: 40px; }
-  .thread { max-height: 60vh; }
 }
 
 /* the run's workflow (workflow.js): Etch's timeline rows in a card at the bottom of the stage */
@@ -517,10 +496,6 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .sim-load[hidden] { display: none; }
 .view.auto #playbar { display: none; }
 
-/* empty chat: a hint and the small mascot */
-.empty { display: flex; align-items: center; gap: 10px; }
-.empty .mascot { flex: none; }
-.empty-hint { margin: 0; font-size: 13px; color: var(--ink3); }
 
 /* new model modal */
 .nm { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; opacity: 0; transition: opacity .2s var(--ease); }
@@ -535,7 +510,6 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .nm-x { position: absolute; right: 14px; top: 14px; }
 .nm-card textarea { width: 100%; resize: none; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font: 500 15px/1.4 var(--ui); color: var(--ink); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
 .nm-card textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
-.nm-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 16px; }
 .nm-go { height: 36px; border-radius: 999px; padding: 0 18px; }
 .nm-chips { display: flex; flex-direction: column; gap: 6px; }
 .mx { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: 500 13px/1.35 var(--ui); color: var(--ink); cursor: pointer; transition: border-color .15s, background .15s; }
@@ -543,3 +517,76 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .mx .t { flex: none; font-size: 11px; font-weight: 700; color: var(--accent-700); }
 .view.welcoming #three { visibility: hidden; }
 .view.welcoming .boot:not(.gone) { background: transparent; place-items: end center; padding-bottom: 56px; pointer-events: none; }
+
+
+/* ---------- loading: the mascot with one gentle look-around and a short line (loading.js, mascot.js) ---------- */
+.ld { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--ink2); font: 600 13px/1.3 var(--ui); }
+.ld.col { flex-direction: column; gap: 8px; text-align: center; }
+.ld.fill { grid-column: 1 / -1; min-height: 220px; }
+.ld.line { justify-content: flex-start; padding: 8px 2px; }
+.ld .ld-t { color: var(--ink2); }
+.sim-load .mascot { margin: -6px 0; }
+
+/* ---------- the docked prompt: one bar at the bottom of the stage, the conversation above it ---------- */
+.dock { position: absolute; left: 50%; bottom: 96px; z-index: 30; width: min(700px, calc(100% - 32px)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; pointer-events: none; transition: bottom .25s var(--soft); }
+.dock > * { pointer-events: auto; }
+.app[data-view="sim"] .dock { bottom: 112px; }
+.app.immersive .dock { display: none; }
+.dock-thread { display: flex; flex-direction: column; min-height: 0; border-radius: 18px; background: #fff; box-shadow: var(--ring-up), 0 12px 32px rgba(28, 43, 51, .08); overflow: hidden; animation: rise .3s var(--soft) both; }
+.dock-thread[hidden] { display: none; }
+.dock-th { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-bottom: 1px solid var(--line); }
+.dock-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: 600 13px var(--ui); color: var(--ink); text-align: left; }
+.dock-toggle:hover { background: #f3f6f8; }
+.dock-toggle .dim { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--ink3); }
+.dock-toggle svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s var(--soft); }
+.dock-thread.collapsed .dock-toggle svg { transform: rotate(180deg); }
+.dock-thread.collapsed .thread { display: none; }
+.dock-thread.collapsed .dock-th { border-bottom: 0; }
+.dock-thread .thread { max-height: min(34vh, 320px); flex: none; }
+.composer.dock-bar { position: relative; display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0; padding: 7px 8px 7px 7px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #e4e9ee, 0 10px 30px rgba(28, 43, 51, .12); transition: box-shadow .2s; }
+.composer.dock-bar:focus-within { box-shadow: 0 0 0 1px var(--accent-200), 0 0 0 5px var(--accent-glow), 0 10px 30px rgba(28, 43, 51, .12); }
+.dock-plus { flex: none; width: 38px; height: 38px; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--accent-bg); color: var(--accent-700); transition: background-color .15s, transform .45s var(--liquid); }
+.dock-plus:hover { background: var(--accent-100); }
+.dock-plus:active { transform: scale(.9); }
+.dock-plus svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.dock-bar textarea { flex: 1; min-width: 0; width: auto; height: 24px; border: 0; outline: none; resize: none; padding: 0; font: 400 15px/24px var(--ui); color: var(--ink); background: transparent; caret-color: var(--accent); }
+.dock-bar textarea::placeholder { color: #9aa3ad; }
+.dock-bar .composer-row { flex: none; gap: 8px; }
+
+/* ---------- the new-model window: robot builder, reference and build plan live inside it ---------- */
+.nm-card { transition: width .25s var(--soft), transform .25s var(--soft); }
+.nm-card[data-pane="robot"], .nm-card[data-pane="models"], .nm-card.has-plan { width: min(1120px, 100%); }
+.nm-card.has-plan:not([data-pane="robot"]):not([data-pane="models"]) { width: min(860px, 100%); }
+.nm-pane { display: none; }
+.nm-card[data-pane="main"] .nm-main, .nm-card[data-pane="robot"] .nm-robot, .nm-card[data-pane="models"] .nm-models { display: block; }
+.nm-card { height: auto; }
+.nm-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+.nm-foot { display: flex; justify-content: flex-end; margin: 12px 0 16px; }
+.nm-attach { gap: 6px; padding: 0 12px 0 9px; }
+.nm-attach svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.nm-attach-wrap { position: relative; display: inline-flex; }
+.nm-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 5; min-width: 180px; padding: 5px; border-radius: 12px; background: #fff; box-shadow: var(--ring-up), 0 12px 28px rgba(28, 43, 51, .14); display: flex; flex-direction: column; }
+.nm-menu[hidden] { display: none; }
+.nm-menu button { height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; font: 600 13px var(--ui); color: var(--ink); }
+.nm-menu button:hover { background: var(--accent-bg); color: var(--accent-700); }
+.nm-ref { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px 0 4px; border-radius: 999px; background: var(--accent-bg); box-shadow: 0 0 0 1px var(--accent-200) inset; font: 600 12.5px var(--ui); color: var(--accent-700); max-width: 260px; }
+.nm-ref[hidden] { display: none; }
+.nm-ref img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #fff; flex: none; }
+.nm-ref img[hidden] { display: none; }
+.nm-ref span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.nm-ref button { width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 16px; line-height: 1; }
+.nm-ref button:hover { background: rgba(8, 102, 255, .14); }
+.nm-plan { margin: 4px 0 0; padding: 14px; border-radius: 16px; background: #f6f8fa; box-shadow: 0 0 0 1px var(--line) inset; }
+.nm-plan[hidden] { display: none; }
+.nm-back-btn { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px 0 6px; margin: 0 0 12px; border: 0; border-radius: 999px; background: #eef1f4; font: 600 12.5px var(--ui); color: var(--ink2); }
+.nm-back-btn:hover { color: var(--ink); background: #e4e9ee; }
+.nm-back-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nm-robot .nm-rh { margin: 0 0 16px; padding-right: 36px; }
+.nm-robot .nm-rh h2, .nm-models h2 { margin: 0 0 8px; }
+.nm-robot .slot-h .lbl { font-size: 19px; }
+.nm-robot .assembly { top: 0; }
+.nm-robot .asm-view { height: clamp(240px, 34vh, 340px); }
+.nm-robot .parts { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.nm-robot .not-offered { margin-top: 16px; }
+@media (max-width: 900px) { .nm-robot .build-grid { grid-template-columns: 1fr; } .nm-robot .assembly { position: static; } }
+@media (max-width: 760px) { .dock { bottom: 88px; } .app[data-view="sim"] .dock { bottom: 104px; } .dock-bar .chip-mode #robot-chip { display: none; } }

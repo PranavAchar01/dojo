@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
 import { initBuilder, showBuilder } from "./builder.js";
+import { loadingNode } from "./loading.js";
 import { HAZE, setupRenderer, makeEnvironment, makeStage, addStudioLights, buildLab, basePlate, floorLabel, cellBrackets, robotMaterial as studioMaterial, partsMesh } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -385,11 +386,23 @@ $("#welcome-video").addEventListener("timeupdate", (ev) => {
   if (n.textContent !== WELCOME_TASKS[k][1]) n.textContent = WELCOME_TASKS[k][1];
 });
 
-// ---------------------------------------------------------------- new model modal
+// ---------------------------------------------------------------- new model window
+// One window holds the whole prompt: the text, the robot (its builder opens inline), an attached reference (an image
+// or a 3D model) and, when there is a reference, the build plan. Panes: main, robot, models.
 const nm = $("#new-modal");
+const nmCard = $("#nm-card");
+let ref = null; // { kind: "image" | "model" | "bridge", name, image?: data URL, thumb?: url }
+function setPane(p) {
+  nmCard.dataset.pane = p;
+  showBuilder(p === "robot");
+  if (p === "models") openModels();
+  nmCard.scrollTop = 0;
+  if (p === "main") $("#nm-prompt").focus();
+}
 function openNew() {
   $("#nm-prompt").placeholder = $("#prompt").placeholder;
   $("#nm-robot").textContent = $("#robot-chip").textContent;
+  setPane("main");
   nm.hidden = false;
   requestAnimationFrame(() => nm.classList.add("on"));
   $("#nm-prompt").focus();
@@ -397,26 +410,88 @@ function openNew() {
 function closeNew() {
   if (nm.hidden) return;
   nm.classList.remove("on");
+  showBuilder(false);
+  $("#nm-menu").hidden = true;
   setTimeout(() => { if (!nm.classList.contains("on")) nm.hidden = true; }, 220);
 }
 nm.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeNew));
-document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !nm.hidden) { ev.preventDefault(); closeNew(); } });
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || nm.hidden) return;
+  ev.preventDefault();
+  if (!$("#nm-menu").hidden) $("#nm-menu").hidden = true;
+  else if (nmCard.dataset.pane !== "main") setPane("main");
+  else closeNew();
+});
+nm.querySelectorAll("[data-pane-go]").forEach((b) => b.addEventListener("click", () => setPane(b.dataset.paneGo)));
 $("#nm-prompt").addEventListener("input", () => { $("#nm-go").disabled = !$("#nm-prompt").value.trim(); });
 $("#nm-prompt").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("#nm-form").requestSubmit(); } });
-$("#nm-form").addEventListener("submit", (ev) => {
+// Enter inside the plan's fields edits the plan; it never sends the prompt
+$("#nm-plan").addEventListener("keydown", (ev) => { if (ev.key === "Enter") ev.preventDefault(); });
+$("#nm-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const text = $("#nm-prompt").value.trim();
   if (!text || $("#go").disabled) return;
+  const go = $("#nm-go");
+  go.disabled = true;
+  if (ref && window.forgePlan && !(await window.forgePlan.use())) { go.disabled = false; return; } // the plan's build becomes the table task first
   $("#nm-prompt").value = "";
-  $("#nm-go").disabled = true;
+  setRef(null);
   closeNew();
   submit(text);
 });
-$("#nm-arm").addEventListener("click", () => { closeNew(); setView("robot"); });
+$("#nm-arm").addEventListener("click", () => setPane("robot"));
+$("#robot-open").addEventListener("click", () => { openNew(); setPane("robot"); });
+$("#dock-plus").addEventListener("click", openNew);
+window.addEventListener("robot-chosen", () => { $("#nm-robot").textContent = $("#robot-chip").textContent; if (!nm.hidden) setPane("main"); });
+
+// reference: an image you upload, a 3D model, or the brick bridge suggestion; any of them opens the plan inline
+function setRef(r) {
+  ref = r;
+  $("#nm-ref").hidden = !r;
+  const img = $("#nm-ref-img");
+  const src = r && (r.image || r.thumb);
+  img.hidden = !src;
+  if (src) img.src = src;
+  if (r) $("#nm-ref-name").textContent = r.name;
+  nmCard.classList.toggle("has-plan", !!r);
+  $("#nm-plan").hidden = !r;
+  if (!r) return window.forgePlan?.close();
+  const note = r.kind === "model" ? `Reference: the 3D model "${r.name}". The plan below is the brick bridge.` : r.kind === "image" ? `Reference: your image "${r.name}". Read it into steps below.` : "";
+  window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note });
+}
+$("#nm-attach").addEventListener("click", () => {
+  const m = $("#nm-menu");
+  m.hidden = !m.hidden;
+  $("#nm-attach").setAttribute("aria-expanded", String(!m.hidden));
+});
+document.addEventListener("click", (ev) => { if (!ev.target.closest(".nm-attach-wrap")) $("#nm-menu").hidden = true; });
+$("#nm-pick-img").addEventListener("click", () => { $("#nm-menu").hidden = true; $("#nm-file").click(); });
+$("#nm-pick-3d").addEventListener("click", () => { $("#nm-menu").hidden = true; setPane("models"); });
+$("#nm-file").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f || !f.type.startsWith("image/")) return;
+  const fr = new FileReader();
+  fr.onload = () => setRef({ kind: "image", name: f.name, image: String(fr.result) });
+  fr.readAsDataURL(f);
+});
+$("#nm-ref-x").addEventListener("click", () => setRef(null));
+let assetsPanel = null;
+async function openModels() {
+  const host = $("#nm-assets");
+  if (assetsPanel) return assetsPanel.refresh();
+  host.replaceChildren(loadingNode("Loading the 3D models...", { layout: "fill col" }));
+  const { mountAssets } = await import("/static/assets.js");
+  host.replaceChildren();
+  assetsPanel = mountAssets(host, {
+    onUse(m) { setRef({ kind: "model", name: m.name, thumb: m.has_thumb ? m.thumb : "" }); setPane("main"); },
+  });
+}
 nm.querySelectorAll(".mx").forEach((b) => b.addEventListener("click", () => {
   $("#nm-prompt").value = b.dataset.say;
   $("#nm-go").disabled = false;
   $("#nm-prompt").focus();
+  if (b.dataset.ref === "bridge") setRef({ kind: "bridge", name: "Brick bridge" });
 }));
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
@@ -566,13 +641,14 @@ setInterval(() => {
 
 // ---------------------------------------------------------------- chat thread
 const thread = $("#thread");
-const emptyState = $("#empty").cloneNode(true);
+const dockThread = $("#dock-thread");
 const toolEls = {}; // `${run}:${agent}` -> element
 const toolLists = {}; // run id -> tools-list element
 let forgeMsg = null;
 function scrollThread() { thread.scrollTop = thread.scrollHeight; }
 function youMsg(text) {
-  $("#empty")?.remove();
+  dockThread.classList.remove("collapsed");
+  $("#dock-toggle").setAttribute("aria-expanded", "true");
   const m = el("div", "msg you");
   m.append(el("div", "who", "You"), el("div", "txt", text));
   thread.append(m);
@@ -620,12 +696,22 @@ function settle(run, agent, state = "done") {
   if (t) tool(run, agent, undefined, state);
   else settledEarly[`${run}:${agent}`] = state;
 }
+// the conversation panel only exists while there is a conversation; its header folds it down to one line
+function syncDock() {
+  const has = thread.children.length > 0;
+  dockThread.hidden = !has;
+  const last = [...thread.querySelectorAll(".msg.you .txt")].pop();
+  $("#dock-last").textContent = last ? last.textContent : "";
+}
+new MutationObserver(syncDock).observe(thread, { childList: true });
+$("#dock-toggle").addEventListener("click", () => {
+  const on = dockThread.classList.toggle("collapsed");
+  $("#dock-toggle").setAttribute("aria-expanded", String(!on));
+});
 $("#new-chat").addEventListener("click", () => {
-  openNew();
   thread.innerHTML = "";
   for (const k of Object.keys(toolEls)) delete toolEls[k];
   if (current && !runDone) return; // a run in flight keeps its scene
-  thread.append(emptyState.cloneNode(true));
   window.dispatchEvent(new CustomEvent("forge:newchat"));
   clearWorld();
   current = null;
@@ -825,13 +911,12 @@ function setView(v) {
   const app = $("#app");
   const prev = app.dataset.view;
   app.dataset.view = v;
-  // the library keeps the chat beside it, so a new task can be typed straight from it
+  // the Library and the Sim keep the prompt docked under them, so a new task can be typed straight from either
   app.classList.toggle("immersive", v !== "sim" && v !== "skills");
   app.classList.toggle("lib", v === "skills");
-  for (const k of ["sim", "robot", "ladder", "agents", "skills", "plan"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
-  showBuilder(v === "robot");
+  for (const k of ["sim", "rsi", "agents", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   $(".tabs").classList.toggle("hidden", v !== "sim");
-  if (v === "ladder") renderLadder();
+  if (v === "rsi") renderRsi();
   if (v === "skills") refreshSkills();
   // the panels slide away over ~220ms; resize the 3D canvases once the layout has settled
   resize();
@@ -844,7 +929,6 @@ function setView(v) {
   else stopWelcome(); // nothing builds worlds behind a hidden floor
 }
 window.setView = setView;
-$("#toggle-left").onclick = () => { $("#app").classList.toggle("no-left"); setTimeout(resize, 240); };
 $("#toggle-right").onclick = () => { $("#app").classList.toggle("no-right"); setTimeout(resize, 240); };
 $("#app").dataset.view = "skills";
 
@@ -853,10 +937,11 @@ const TIER_NAMES = {
   2: ["Tier 2", "carry a block somewhere: place, stack"],
   3: ["Tier 3", "several steps, chained from published models"],
 };
-async function renderLadder() {
+async function renderRsi() {
+  const box = $("#ladder");
+  if (!box.children.length) box.replaceChildren(loadingNode("Loading the finished prompts...", { layout: "fill col" }));
   const st = await (await fetch("/api/state")).json();
   const skills = Object.fromEntries(st.skills.map((s) => [s.id, s]));
-  const box = $("#ladder");
   box.innerHTML = "";
   const done = st.runs.filter((r) => r.status === "published");
   if (!done.length) { box.append(el("div", "empty-note", "No prompts finished yet.")); return; }
@@ -933,6 +1018,7 @@ window.addEventListener("robot-change", (e) => {
   const changed = e.detail.id !== robotNow;
   robotNow = e.detail.id;
   $("#robot-chip").textContent = `${e.detail.label} · sim`;
+  $("#nm-robot").textContent = $("#robot-chip").textContent;
   const live = current && !runDone; // a run in flight keeps its own arm on screen
   if (changed && !live && world) {
     play = null;
@@ -947,7 +1033,7 @@ async function idleScene() {
   initBuilder(robotNow);
   renderSkills(st.skills);
   setReady(st.ready);
-  // the canvas stays bare until a prompt has a scene; finished runs live in the Library and the Ladder
+  // the canvas stays bare until a prompt has a scene; finished runs live in the Library and the RSI page
 }
 function setTier(t) {
   const e = $("#tier");
@@ -1240,12 +1326,11 @@ function openStage(k) {
     sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
     return pulse(sec);
   }
-  $("#app").classList.remove("no-left");
   if (k === "scene") setCam("orbit");
   const line = current && toolEls[`${current}:${k}`];
   if (line) { line.scrollIntoView({ block: "center", behavior: "smooth" }); return pulse(line); }
   if (k === "task") $("#prompt").focus();
-  pulse($("#thread"));
+  pulse($("#dock"));
 }
 for (const [k, li] of Object.entries(rail)) {
   li.addEventListener("click", () => openStage(k));

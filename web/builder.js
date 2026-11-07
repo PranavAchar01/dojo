@@ -1,8 +1,10 @@
-// Robot tab: pick an arm, a wrist and an end effector from sourced models, see each part and the assembled robot,
-// run the checks (MJCF compiles, joint limits, finger opening, reach over the table, holding torque), then make it
-// the embodiment the next skill trains on.
+// Robot builder, inside the new-model window: pick an arm, a wrist and an end effector from sourced models, see each
+// part and the assembled robot, run the checks (MJCF compiles, joint limits, finger opening, reach over the table,
+// holding torque), then make it the embodiment the next model trains on. The page calls showBuilder(true) when the
+// robot pane opens and showBuilder(false) when it closes.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { loadingNode } from "./loading.js";
 import { setupRenderer, makeEnvironment, addStudioLights, robotMaterial as studioMaterial } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -313,8 +315,8 @@ async function assemble() {
   $("#asm-name").textContent = robotLabel(rid);
   const slow = setTimeout(() => { if (n === assembling) $("#asm-load").classList.remove("hidden"); }, 150);
   $("#use-robot").disabled = true;
-  $("#checks").innerHTML = "";
-  $("#feas").innerHTML = "";
+  $("#checks").replaceChildren(loadingNode("Running the checks...", { size: "xs", layout: "line" }));
+  $("#feas").replaceChildren(loadingNode("Working out which models fit...", { size: "xs", layout: "line" }));
   $("#asm-fail").classList.add("hidden");
   $("#asm-sum").textContent = "assembling and checking...";
   performance.mark(`rv-start-${rid}`);
@@ -323,6 +325,8 @@ async function assemble() {
   if (n !== assembling) return;
   performance.mark(`rv-fetched-${rid}`);
   $("#asm-load").classList.add("hidden");
+  $("#checks").replaceChildren();
+  $("#feas").replaceChildren();
   if (view.status === "fulfilled") showAssembly(rid, view.value);
   performance.mark(`rv-shown-${rid}`);
   if (rep.status !== "fulfilled") {
@@ -369,7 +373,7 @@ function renderReport(rid, rep) {
   else if (!any) failCard("No model fits this robot", "Every model fails a reach or grip check; see the list below.");
   const ub = $("#use-robot");
   ub.disabled = !usable || rid === active;
-  ub.textContent = rid === active ? "Models train on this robot" : "Train a model on this robot";
+  ub.textContent = rid === active ? "In use" : "Use this robot";
   const note = $("#use-note");
   const limits = usable && rep.usable_reason && rep.usable_reason !== "every skill fits" ? `It ${rep.usable_reason}. ` : "";
   note.textContent = limits + (usable && rep.act_dim && rep.act_dim !== 6
@@ -393,7 +397,8 @@ async function useRobot() {
     return;
   }
   setActive(rid);
-  b.textContent = "Models train on this robot";
+  b.textContent = "In use";
+  window.dispatchEvent(new CustomEvent("robot-chosen", { detail: { id: rid } }));
 }
 
 function setActive(rid) {
@@ -416,6 +421,8 @@ export async function showBuilder(on) {
   built = true;
   performance.mark("rv-tab");
   prefetch(robotId()); // the selected robot's preview and checks download while the cards draw
+  $("#asm-load").append(loadingNode("Loading the robot...", { layout: "col" }));
+  $("#asm-load").classList.remove("hidden");
   const box = $("#slots");
   // never a blank left side: grey placeholder cards hold the grid until the catalog (a few ms) is in
   const sk = el("div", "parts");

@@ -1,14 +1,16 @@
 // Build plan: the bridge as stud-grid steps, checked by rules, with a live three.js render of the real LDraw bricks.
-// Left: the instruction image (rendered from the rules, or one you upload) that Muse Spark can read into steps.
-// Right: the live render. Below: the rules you can change, each rule's live pass/fail, the editable step list and
-// "fix in words". Every row is labelled by who made it: the rules, Muse Spark's read, or your edit.
+// It lives inside the new-model window (#nm-plan) and opens when a reference is attached to the prompt.
+// Left: the instruction image (rendered from the rules, or the reference image you attached) that Muse Spark can read
+// into steps. Right: the live render. Below: the rules you can change, each rule's live pass/fail, the editable step
+// list and "fix in words". Every row is labelled by who made it: the rules, Muse Spark's read, or your edit.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+import { loadingNode } from "./loading.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const ROOT = () => $("#view-plan");
+const ROOT = () => $("#nm-plan");
 const STUD = 0.008, PLATE = 0.0032;
 const SRC = { rules: "From the rules", muse: "Muse Spark's read", user: "Your edit" };
 
@@ -31,9 +33,10 @@ const api = async (path, body) => {
 
 function dom() {
   ROOT().innerHTML = `
-  <div class="bp doc">
-    <div class="doc-h bp-head"><h2>Build <em>plan</em></h2>
-      <p>A bridge made from rules: two pillars, a deck across them and an optional brick on top. Each rule below is checked by code, live. Change a number and the steps are rebuilt from the rules; edit a step by hand and the rules tell you what broke.</p></div>
+  <div class="bp">
+    <div class="bp-head"><b>Build plan</b>
+      <p class="bp-dim">A bridge made from rules: two pillars, a deck across them and an optional brick on top. Each rule below is checked by code, live. Change a number and the steps are rebuilt from the rules; edit a step by hand and the rules tell you what broke.</p>
+      <p class="bp-ref bp-dim" id="bp-ref"></p></div>
     <div class="bp-grid">
       <section class="bp-card bp-img">
         <div class="bp-lbl">Instruction image <span id="bp-img-src" class="bp-dim"></span></div>
@@ -116,7 +119,7 @@ function initThree() {
   controls.enableDamping = true;
   controls.target.set(2.5, 1.2, -0.6);
   const resize = () => {
-    const w = host.clientWidth || 600, h = Math.max(320, Math.round(w * 0.62));
+    const w = host.clientWidth || 600, h = Math.max(240, Math.round(w * 0.6));
     renderer.setSize(w, h);
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
@@ -126,7 +129,7 @@ function initThree() {
   let raf = 0;
   const loop = () => {
     raf = requestAnimationFrame(loop);
-    if (ROOT().classList.contains("hidden")) return;
+    if (ROOT().hidden || !host.offsetParent) return;
     controls.update();
     renderer.render(scene, cam);
   };
@@ -286,6 +289,7 @@ async function doFix() {
 
 async function useBuild() {
   const note = $("#bp-use-note");
+  let ok = false;
   note.textContent = "Sending to the table...";
   try {
     const r = await api("/use", { rules, bricks });
@@ -294,9 +298,11 @@ async function useBuild() {
     img.onload = () => { img.hidden = false; note.textContent = `Sent: ${r.bricks} bricks are the MuJoCo task (two SO-101 arms, loose bricks on the table).`; };
     img.onerror = () => { note.textContent = `Sent: ${r.bricks} bricks are the MuJoCo task. The table preview failed to render.`; };
     img.src = r.table + "?t=" + Date.now();
+    ok = true;
   } catch (e) {
     note.textContent = "Not sent: " + e.message;
   }
+  return ok;
 }
 
 // ------------------------------------------------------------------ wiring
@@ -334,24 +340,43 @@ function wire() {
   $("#bp-use").addEventListener("click", useBuild);
 }
 
-let booted = false;
-async function boot() {
-  if (booted) return;
-  booted = true;
-  dom();
-  S = await api("/state");
-  rules = S.rules;
-  bricks = S.bricks;
-  upto = bricks.length;
-  const m = S.muse;
-  $("#bp-muse-note").textContent = m.live ? "Muse Spark is on: reads and revisions are real model calls." : `Muse Spark is off here: ${m.why}. Everything else works.`;
-  $("#bp-read").disabled = $("#bp-fix-go").disabled = !m.live;
-  $("#bp-foot").textContent = `Parts: LDraw Parts Library (${S.licence}). ${S.attribution} Settle test: ${S.settle.seconds} s of gravity, no brick may move more than ${S.settle.max_mm} mm.`;
-  wire();
-  initThree();
-  syncRules();
-  edited();
+let booted = null;
+function boot() {
+  booted ||= (async () => {
+    const root = ROOT();
+    root.replaceChildren(loadingNode("Loading the build plan...", { layout: "fill" }));
+    try {
+      S = await api("/state");
+    } catch (e) {
+      booted = null;
+      root.textContent = "The build plan could not load: " + e.message;
+      throw e;
+    }
+    dom();
+    rules = S.rules;
+    bricks = S.bricks;
+    upto = bricks.length;
+    const m = S.muse;
+    $("#bp-muse-note").textContent = m.live ? "Muse Spark is on: reads and revisions are real model calls." : `Muse Spark is off here: ${m.why}. Everything else works.`;
+    $("#bp-read").disabled = $("#bp-fix-go").disabled = !m.live;
+    $("#bp-foot").textContent = `Parts: LDraw Parts Library (${S.licence}). ${S.attribution} Settle test: ${S.settle.seconds} s of gravity, no brick may move more than ${S.settle.max_mm} mm.`;
+    wire();
+    initThree();
+    syncRules();
+    edited();
+  })();
+  return booted;
 }
 
-window.addEventListener("forge:view", (e) => { if (e.detail === "plan") boot(); });
-if ($("#app")?.dataset.view === "plan") boot();
+// what the new-model window calls: open the plan for a reference (an image to read, or none), close it, send the build
+window.forgePlan = {
+  async open({ image = null, ref = "" } = {}) {
+    ROOT().hidden = false;
+    await boot();
+    imageData = image;
+    $("#bp-ref").textContent = ref;
+    syncRules();
+  },
+  close() { ROOT().hidden = true; },
+  use: async () => { await boot(); return useBuild(); },
+};

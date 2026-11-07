@@ -70,7 +70,7 @@ export function mountBot(host) {
 // ---------------------------------------------------------------- the roaming robot (roam.js)
 // where the bot goes while a stage runs: the part of the screen that stage is working on
 export const TARGET = {
-  task: "#thread", router: "#rail", planner: "#plan-sec", scene: "#three", data: "#three", trainer: "#loss-sec",
+  task: "#dock", router: "#rail", planner: "#plan-sec", scene: "#three", data: "#three", trainer: "#loss-sec",
   eval: "#rounds-sec", critic: "#critic-sec", optimizer: "#optimizer-root .opt-grid-card, #optimizer-root", executor: "#three", registry: "#rail",
 };
 export const roamer = createRoamer({ mountBot, slot: document.querySelector(".ag-pill-eyes") });
@@ -154,6 +154,7 @@ function decorate(root) {
     if (bots.has(h)) continue;
     const bot = mountBot(h);
     if (bot && h.hasAttribute("data-follow")) { arrive(bot, 120 + 160 * i++); bot.eyes.setState(want.state); bot.eyes.setActivity(want.act); }
+    else if (bot && h.hasAttribute("data-loading")) { bot.eyes.setState("working"); bot.eyes.setActivity("wait"); } // the loading look (loading.js)
   }
 }
 

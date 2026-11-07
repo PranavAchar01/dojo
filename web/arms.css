@@ -39,12 +39,10 @@
 /* the canvas before a task: bare floor and grid, no playbar or caption */
 #view-sim.blank #playbar, #view-sim.blank #vp-caption, #view-sim.noplay #playbar { display: none; }
 
-/* Robot tab: a card image is a still from the server; a shimmer holds its place for the few ms it takes to arrive,
-   and the assembled preview shows a skeleton (not a spinner) only when it takes longer than 150 ms */
-.part-fig.sk, #asm-load { background: linear-gradient(100deg, #f1f2f4 30%, #fafbfc 50%, #f1f2f4 70%) 0 0 / 200% 100%; animation: sk 1.2s linear infinite; }
-#asm-load { inset: 0; right: 0; bottom: 0; font-size: 0; color: transparent; border-radius: 0; opacity: .55; pointer-events: none; }
-#asm-load .spin { display: none; }
+/* Robot builder: a card image is a still from the server; a shimmer holds its place for the few ms it takes to arrive,
+   and the assembled preview shows the mascot loader only when it takes longer than 150 ms */
+.part-fig.sk { background: linear-gradient(100deg, #f1f2f4 30%, #fafbfc 50%, #f1f2f4 70%) 0 0 / 200% 100%; animation: sk 1.2s linear infinite; }
 .part-fig img { transition: opacity .15s; }
 @keyframes sk { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .part-fig.sk, #asm-load { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .part-fig.sk { animation: none; } }
 .part-sk { min-height: 170px; box-shadow: var(--ring); }
