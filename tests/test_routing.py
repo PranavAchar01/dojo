@@ -57,5 +57,7 @@ def test_unpinned_run_takes_the_chosen_arm_and_pinned_run_keeps_its_own():
     held = SimpleNamespace(robot="so101", pinned=True)
     spec = TaskSpec("pack", "")
     Forge._judge(None, held, spec)
-    assert spec.routing["pinned"]["ok"] is True
+    assert spec.routing["pinned"]["ok"] is False
+    assert "pipe_wrench" in spec.routing["pinned"]["message"]
+    assert held.robot == "so101"
     assert TaskSpec.from_json(spec.to_json()).routing == spec.routing
