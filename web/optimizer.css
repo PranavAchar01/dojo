@@ -123,3 +123,6 @@
 .opt-table td { padding: 6px 8px; border-bottom: 1px solid var(--o-grey); }
 .opt-table td.res.kept { color: var(--o-blue); font-weight: 600; }
 .opt-table td.res.reverted { color: var(--o-mute); }
+
+.opt-test { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #F1F4F7; font-size: 13px; line-height: 1.45; }
+.opt-test b { display: block; margin-bottom: 4px; }
