@@ -501,7 +501,9 @@ def main():
 
     uvicorn.run(
         app,
-        host="127.0.0.1",
+        host=os.environ.get(
+            "VLA_FORGE_HOST", "127.0.0.1"
+        ),  # the mini's Tailscale IP to reach it from the Air
         port=int(os.environ.get("VLA_FORGE_PORT", "8100")),
         log_level="warning",
     )
