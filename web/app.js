@@ -361,43 +361,63 @@ async function startPlayback(payload, auto = false) {
 }
 let playTok = 0;
 
-// ---------------------------------------------------------------- welcome: with nothing picked, the floor plays what Dojo has learned
-let welcome = null;
-const WELCOME = [/touch|reach/i, /bowl/i, /sort/i, /push/i, /stack|lift/i, /kit|insert|rotate/i];
-async function startWelcome() {
-  if (welcome || (current && !runDone) || selSkill || $("#app").dataset.view !== "sim") return;
-  const me = (welcome = { i: 0, timer: 0, list: null });
-  const lib = await (await fetch("/api/library")).json().catch(() => ({ tiles: [] }));
-  const have = lib.tiles.filter((t) => t.replay && !t.steps?.length);
-  const list = [];
-  for (const re of WELCOME) { const t = have.find((x) => re.test(x.instruction) && !list.includes(x)); if (t) list.push(t); }
-  if (welcome !== me) return;
-  if (!list.length) { welcome = null; return; }
-  me.list = list;
+// ---------------------------------------------------------------- welcome: with nothing picked, the floor is never blank; it loops real recorded rollouts
+let welcomeOn = false;
+const WELCOME_TASKS = [[0, "touch the yellow block"], [2.13, "put the blue block in the blue bowl"], [10.07, "push the green block onto the blue square"], [16.1, "stack the yellow block on the red block"]];
+function startWelcome() {
+  if (welcomeOn || (current && !runDone) || selSkill || !$("#sim-load").hidden || $("#app").dataset.view !== "sim") return;
+  welcomeOn = true;
   $("#welcome").hidden = false;
-  nextWelcome(me);
-}
-async function nextWelcome(me) {
-  const t = me.list[me.i++ % me.list.length];
-  replayData(me.list[me.i % me.list.length].id, 0, me.list[me.i % me.list.length].replay_source); // the next one, ahead of time
-  const p = await replayData(t.id, 0, t.replay_source);
-  if (welcome !== me) return;
-  if (!p) { me.timer = setTimeout(() => nextWelcome(me), 300); return; }
-  await startPlayback(p, true);
-  if (welcome !== me) return;
-  const held = `${Math.round(t.success_rate * (t.n_eval || 20))}/${t.n_eval || 20}`;
-  $("#vp-caption").textContent = `“${t.instruction}” · ${held} held-out, in simulation`;
-  $("#welcome-now").textContent = `Now playing: ${t.instruction}`;
-  $("#vp-badge").classList.add("hidden");
-  me.timer = setTimeout(() => nextWelcome(me), (1000 * p.frames.length) / p.fps + 900);
+  $("#view-sim").classList.add("welcoming");
+  $("#welcome-video").play().catch(() => {});
 }
 function stopWelcome() {
-  if (!welcome) return;
-  clearTimeout(welcome.timer);
-  welcome = null;
+  if (!welcomeOn) return;
+  welcomeOn = false;
   $("#welcome").hidden = true;
+  $("#view-sim").classList.remove("welcoming");
+  $("#welcome-video").pause();
 }
-document.querySelectorAll(".wl-chip").forEach((b) => b.addEventListener("click", () => { $("#app").classList.remove("no-left"); $("#prompt").value = b.dataset.say; $("#prompt").focus(); }));
+$("#welcome-video").addEventListener("timeupdate", (ev) => {
+  let k = 0;
+  WELCOME_TASKS.forEach(([t], i) => { if (ev.target.currentTime >= t) k = i; });
+  const n = $("#welcome-now");
+  if (n.textContent !== WELCOME_TASKS[k][1]) n.textContent = WELCOME_TASKS[k][1];
+});
+
+// ---------------------------------------------------------------- new model modal
+const nm = $("#new-modal");
+function openNew() {
+  $("#nm-prompt").placeholder = $("#prompt").placeholder;
+  $("#nm-robot").textContent = $("#robot-chip").textContent;
+  nm.hidden = false;
+  requestAnimationFrame(() => nm.classList.add("on"));
+  $("#nm-prompt").focus();
+}
+function closeNew() {
+  if (nm.hidden) return;
+  nm.classList.remove("on");
+  setTimeout(() => { if (!nm.classList.contains("on")) nm.hidden = true; }, 220);
+}
+nm.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeNew));
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !nm.hidden) { ev.preventDefault(); closeNew(); } });
+$("#nm-prompt").addEventListener("input", () => { $("#nm-go").disabled = !$("#nm-prompt").value.trim(); });
+$("#nm-prompt").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("#nm-form").requestSubmit(); } });
+$("#nm-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const text = $("#nm-prompt").value.trim();
+  if (!text || $("#go").disabled) return;
+  $("#nm-prompt").value = "";
+  $("#nm-go").disabled = true;
+  closeNew();
+  submit(text);
+});
+$("#nm-arm").addEventListener("click", () => { closeNew(); setView("robot"); });
+nm.querySelectorAll(".mx").forEach((b) => b.addEventListener("click", () => {
+  $("#nm-prompt").value = b.dataset.say;
+  $("#nm-go").disabled = false;
+  $("#nm-prompt").focus();
+}));
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
   if (!r.width || !r.height) return; // the sim view is hidden on the other tabs
@@ -508,7 +528,7 @@ const replays = new Map();
 function replayData(id, i = 0, src = "") {
   const k = `${id}:${i}:${src}`;
   if (!replays.has(k)) {
-    replays.set(k, fetch(`/api/skills/${id}/replay/${i}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+    replays.set(k, fetch(`/api/skills/${id}/replay/${i}`, { priority: "high" }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
     if (replays.size > 24) replays.delete(replays.keys().next().value);
   }
   return replays.get(k);
@@ -601,11 +621,11 @@ function settle(run, agent, state = "done") {
   else settledEarly[`${run}:${agent}`] = state;
 }
 $("#new-chat").addEventListener("click", () => {
+  openNew();
   thread.innerHTML = "";
   for (const k of Object.keys(toolEls)) delete toolEls[k];
   if (current && !runDone) return; // a run in flight keeps its scene
   thread.append(emptyState.cloneNode(true));
-  wireExamples();
   window.dispatchEvent(new CustomEvent("forge:newchat"));
   clearWorld();
   current = null;
@@ -1156,17 +1176,10 @@ $("#prompt-form").addEventListener("submit", (ev) => { ev.preventDefault(); subm
 $("#prompt").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); submit($("#prompt").value.trim()); }
 });
-function wireExamples() {
-  document.querySelectorAll(".ex").forEach((b) => b.addEventListener("click", () => {
-    $("#prompt").value = b.dataset.say || b.childNodes[b.childNodes.length - 1].textContent;
-    $("#prompt").focus();
-  }));
-}
-wireExamples();
 window.submitPrompt = submit;
 // what the library (library.js) needs from the sim view and the chat thread
 window.forge = {
-  el, fmt, stage, setView, submit, startPlayback, scrollThread,
+  el, fmt, stage, setView, submit, openNew, startPlayback, scrollThread,
   toolList: (run) => toolLists[run],
   current: () => current,
   setBadge(text, ok) {
