@@ -94,42 +94,41 @@ a.brand:hover { color: var(--accent); }
 .primary:disabled { opacity: .35; cursor: default; }
 .primary svg { width: 13px; height: 13px; }
 
-/* ---------- the mascot: original monochrome bot (mascot.js) ---------- */
-.mascot { position: relative; display: inline-block; flex: none; line-height: 0; width: 22px; height: 22px; vertical-align: middle; color: var(--accent-600); --paper: #fff; --frame: #0f1a22; }
-.mascot svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: none; }
-.mascot.xs { width: 18px; height: 18px; }
-.mascot.sm { width: 20px; height: 20px; }
-.mascot.md { width: 34px; height: 34px; }
-.mascot.lg { width: 64px; height: 64px; }
-.mascot.xl { width: 72px; height: 72px; }
-.mb-head { fill: currentColor; }
-.mb-arm { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
-.mb-loop { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linejoin: round; }
-.mb-lens { fill: var(--frame); }
-.mb-temple { fill: none; stroke: var(--frame); stroke-width: 2.6; stroke-linecap: round; }
-.mb-cam { fill: var(--accent-300); }
-.mb-eyes rect { fill: var(--paper); }
-.mb-eyes path { fill: none; stroke: var(--paper); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
-.mb-body { transform-origin: 24px 44px; animation: bb-float 3.2s ease-in-out infinite; }
-.mb-antenna { transform-origin: 24px 16px; transition: transform .3s var(--bounce); }
-.mb-bulb { transform-box: fill-box; transform-origin: 50% 100%; }
-.mb-look { transform: translate(var(--look-x, 0), var(--look-y, 0)); transition: transform 140ms ease-out; }
-.mb-eyes.open { transform-box: fill-box; transform-origin: 50% 60%; animation: cta-blink 4.6s infinite; }
-.mb-eyes.happy, .mb-eyes.sad { opacity: 0; }
-/* think: eyes scan, the gripper opens and closes */
-.mascot[data-mood="think"] .mb-eyes.open { animation: mb-scan 1.6s ease-in-out infinite; }
-.mascot[data-mood="think"] .mb-bulb { animation: mb-grip .9s ease-in-out infinite; }
-.mascot[data-mood="think"] .mb-body { animation-duration: 1.4s; }
-/* ok: chevron eyes, a cheer and a ripple */
-.mascot[data-mood="ok"] .mb-eyes.open { opacity: 0; }
-.mascot[data-mood="ok"] .mb-eyes.happy { opacity: 1; }
-.mascot.cheer .mb-body { animation: bs-cheer .5s ease-in-out 3; }
-.mascot.cheer::after { content: ""; position: absolute; inset: -20%; border-radius: 30%; border: 2px solid var(--accent); opacity: 0; animation: bs-ripple .6s ease-out 2; pointer-events: none; }
-/* fail: flat eyes, the mast tips over, a small droop */
-.mascot[data-mood="fail"] .mb-eyes.open { opacity: 0; }
-.mascot[data-mood="fail"] .mb-eyes.sad { opacity: 1; }
-.mascot[data-mood="fail"] .mb-body { animation: mb-droop 600ms var(--bounce) both; }
-.mascot[data-mood="fail"] .mb-antenna { transform: rotate(-16deg); }
+/* ---------- the mascot: Etch's eyes rig in Meta blues (mascot.js, eyes.js, spring.js, goo.js) ---------- */
+.mascot { position: relative; display: inline-block; flex: none; line-height: 0; width: 24px; aspect-ratio: 92 / 72; vertical-align: middle; transform-origin: 50% 100%;
+  --ag-ink: #1c2b33; --ag-text: #2b3a45; --ag-muted: #5d6c7b; --ag-faint: #a0a9b3; --ag-surface: #fff; --ag-accent: #0866ff; --ag-ok: #1a8f4e; --ag-fail: #d64545; --ag-sans: var(--ui); }
+.mascot.xs { width: 22px; }
+.mascot.sm { width: 26px; }
+.mascot.md { width: 40px; }
+.mascot.lg { width: 82px; }
+.mascot.xl { width: 92px; }
+.ag-eyes { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 85%; }
+.ag-eyes .ag-eye { fill: #f6f8fc; }
+.ag-eyes .ag-eyes-dots circle { fill: #0064e0; }
+.ag-eyes.breathe { animation: ag-breathe 4.4s ease-in-out infinite; }
+@keyframes ag-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
+/* the Meta nod: smart glasses over Etch's eyes, an infinity-loop antenna on top */
+.ag-eyes .ag-lens { fill: #04183f; fill-opacity: .55; }
+.ag-eyes .ag-frame { fill: none; stroke: #0a1d45; stroke-opacity: .85; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ag-eyes .ag-cam { fill: #9fc9ff; }
+.ag-eyes .ag-ant-arm { fill: none; stroke: #0064e0; stroke-width: 3.2; stroke-linecap: round; }
+.ag-eyes .ag-ant-loop { fill: none; stroke: #0064e0; stroke-width: 3.2; stroke-linejoin: round; }
+
+/* bubbles: a blob buds off the bot, carries the step and drops back in (goo.js) */
+.mb-bubbles { position: fixed; z-index: 60; width: 360px; height: 64px; pointer-events: none; }
+.mb-bubbles .mb-goo, .mb-bubbles .mb-bubs { position: absolute; inset: 0; }
+.lq-goo { isolation: isolate; }
+.lq-blob { position: absolute; left: 0; top: 0; background: #fff; will-change: transform; }
+.lq-fade { transition: opacity .18s ease; }
+.ag-bub { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; width: max-content; max-width: 340px; font: 500 13.5px/1.3 var(--ui); color: #2b3a45; opacity: 0; will-change: transform, opacity; }
+.ag-bub-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-bub .ag-ic { display: inline-flex; width: 16px; height: 16px; flex: none; }
+.ag-bub .ag-ic svg { display: block; width: 100%; height: 100%; }
+.ag-bub.done .ag-ic { color: var(--ok); }
+.ag-bub.failed .ag-ic { color: var(--bad); }
+.ag-spin { display: inline-block; width: 12px; height: 12px; margin: 1px; flex: none; border-radius: 50%; border: 2px solid #e1ecff; border-top-color: #0866ff; animation: ag-spin .8s linear infinite; }
+@keyframes ag-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ag-eyes.breathe { animation: none; } .ag-spin { animation-duration: 1.6s; } }
 
 /* ---------- main: chat panel + stage + right panel ---------- */
 .body { display: flex; min-height: 0; min-width: 0; position: relative; overflow: hidden; }
@@ -344,7 +343,6 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .skill:hover { box-shadow: var(--ring-up); }
 .skill.new { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px var(--accent-glow); }
 .skill > .lbl { display: flex; align-items: center; gap: 7px; color: #6b6b70; font-size: 13px; font-weight: 500; }
-.skill:hover > .lbl .mascot .mb-body { animation: bs-cheer .5s ease-in-out 1; }
 .skill .ins { font-weight: 600; font-size: 17px; line-height: 1.35; color: #141414; }
 .skill .meta { display: flex; gap: 10px; align-items: center; font-size: 13px; color: #6b6b70; flex-wrap: wrap; }
 .skill .meta .pct { font-weight: 700; color: var(--ok); background: var(--ok-soft); padding: 2px 8px; border-radius: 999px; }
@@ -376,14 +374,8 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 @keyframes dk-pulse { 50% { opacity: .3; } }
 @keyframes vp-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 @keyframes ct-pulse { 50% { opacity: .35; } }
-@keyframes cta-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
 @keyframes bb-pop { 0% { transform: scale(.2) rotate(-25deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
 @keyframes bb-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
-@keyframes bs-cheer { 50% { transform: translateY(-6px) rotate(-4deg); } }
-@keyframes bs-ripple { from { opacity: .45; transform: scale(.3); } to { opacity: 0; transform: scale(1.4); } }
-@keyframes mb-scan { 0%, 100% { transform: translateX(-1.6px); } 50% { transform: translate(1.6px, -1px); } }
-@keyframes mb-grip { 50% { transform: scaleX(.6); } }
-@keyframes mb-droop { to { transform: translateY(2px) rotate(-6deg); } }
 @keyframes draw { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
 @keyframes grow-x { from { transform: scaleX(0); } }
 

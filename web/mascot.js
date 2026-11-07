@@ -1,69 +1,151 @@
-// The forge bot: an original robot drawn for VLA Forge, in the Meta palette. A chamfered head plate in Meta blue, smart
-// glasses (dark wayfarer-style lenses with a small camera dot on the corner), two tall eyes in the lenses, and an
-// antenna that ends in a small open loop (the thing it learns to use is still a gripper: the loop opens and closes).
-// Head ink is currentColor, the eyes are var(--paper) and the glasses are var(--frame), so the same mark works on
-// light pages and in a tinted tile. It reads the page's own state (agent rail, rollout badge, ready dot) and shows one
-// mood: idle, think (agents working or warming up), ok (a finished rollout) or fail.
+// The forge bot. Etch's character rig (eyes.js, spring.js, goo.js, carried over from deploy/etch-app at a0bb241d) in
+// Meta blues, wired to what VLA Forge is doing. This file plays the part of Etch's dock: it reads the page (stage
+// rail, rollout badge, composer, chat thread, optimizer chips and the SSE stream re-broadcast as "forge:event"), picks
+// the bot's state and activity, fires its one-shot emotes, and shows the running step in a bubble that buds off the
+// bot and drops back in.
+//
+// Etch trigger            -> VLA Forge trigger
+//   userTalking           -> typing in the task box (level follows keystrokes)
+//   heard (nod, blink)    -> the task is sent
+//   thinking (+ think)    -> Task / Route / Plan stages live
+//   working + pick        -> Scene stage live (building the scene)
+//   working + scan        -> Demos stage live (collecting demonstrations)
+//   working + render      -> Train stage live
+//   working + inspect     -> Eval stage live (measuring on held-out scenes)
+//   working + read        -> Critic stage live (reading the failures)
+//   working + repair      -> Optimizer stage live (a round is running)
+//   working + route       -> Run stage live (a composed plan executing)
+//   working + export      -> Publish stage live (saving the skill)
+//   working + wait        -> agents warming up
+//   success (hop, delight)-> a finished skill or a successful rollout
+//   confused (tilt)       -> a failed rollout, a refused or rejected task
+//   error (squish)        -> an error event from the pipeline
+//   emote wince, nod      -> a step fails, then the retrain starts; a kept optimizer round nods, a reverted one winces
+//   emote pleased / speak -> the forge answers in chat
+//   emote surprise + hop  -> arriving on a page (Etch's arrived()), clicking the bot
+//   emote delight         -> hovering a skill card (Etch's pick())
+//   wobble                -> hover, and every bubble dropping back in
+//   yawn, glances, blinks -> idle, built into eyes.js
+import { createEyes } from "./eyes.js";
+import { spring, reducedMotion } from "./spring.js";
+import { gooLayer, spawnBlob } from "./goo.js";
 
-const EYES = `<g class="mb-eyes open"><rect x="14.5" y="24" width="6" height="12" rx="3"/><rect x="27.5" y="24" width="6" height="12" rx="3"/></g>
-    <g class="mb-eyes happy"><path d="M14 31.5 L17.5 27 L21 31.5"/><path d="M27 31.5 L30.5 27 L34 31.5"/></g>
-    <g class="mb-eyes sad"><rect x="14" y="30" width="7" height="4" rx="2"/><rect x="27" y="30" width="7" height="4" rx="2"/></g>`;
-
-export function mascotSVG() {
-  return `<svg viewBox="0 0 48 48" aria-hidden="true">
-  <g class="mb-body">
-    <g class="mb-antenna"><path class="mb-arm" d="M24 16 V10"/><g class="mb-bulb"><path class="mb-loop" d="M24 6.2 C22.2 2.2 16.4 2.2 16.4 6.2 C16.4 10.2 22.2 10.2 24 6.2 C25.8 2.2 31.6 2.2 31.6 6.2 C31.6 10.2 25.8 10.2 24 6.2 Z"/></g></g>
-    <path class="mb-head" d="M12 16 H36 L44 24 V37 L37 44 H11 L4 37 V24 Z"/>
-    <g class="mb-glasses"><rect class="mb-lens" x="10.5" y="21" width="13.5" height="18" rx="5.5"/><rect class="mb-lens" x="24" y="21" width="13.5" height="18" rx="5.5"/><path class="mb-temple" d="M10.8 25 L4.6 24.4 M37.2 25 L43.4 24.4"/><circle class="mb-cam" cx="36" cy="23.2" r="1.1"/></g>
-    <g class="mb-look">${EYES}</g>
-  </g>
-</svg>`;
-}
-
-function mount(host) {
-  if (host.querySelector(":scope > svg")) return host;
-  host.insertAdjacentHTML("afterbegin", mascotSVG());
-  if (!host.dataset.mood) host.dataset.mood = "idle";
-  return host;
-}
-function make(cls) {
-  const s = document.createElement("span");
-  s.className = `mascot ${cls}`;
-  return mount(s);
-}
-
-// ---------------------------------------------------------------- global mood
 const $ = (s) => document.querySelector(s);
-let mood = "idle";
-function readMood() {
-  if (!$("#ready-dot")?.classList.contains("on")) return "think";
-  if (document.querySelector("#rail li.live, .tool.live")) return "think";
-  const badge = $("#vp-badge");
-  if (badge && !badge.classList.contains("hidden")) {
-    if (badge.classList.contains("ok")) return "ok";
-    if (badge.classList.contains("bad")) return "fail";
-  }
-  return "idle";
+
+// ---------------------------------------------------------------- what each stage looks like
+// [state, activity, line while it runs, line when it finishes]
+const STAGE = {
+  task: ["thinking", "think", "Reading the task", "Task parsed"],
+  router: ["thinking", "think", "Routing the task", "Routed"],
+  planner: ["thinking", "think", "Planning the steps", "Plan ready"],
+  scene: ["working", "pick", "Building the scene", "Scene ready"],
+  data: ["working", "scan", "Collecting demos", "Demos collected"],
+  trainer: ["working", "render", "Training the policy", "Policy trained"],
+  eval: ["working", "inspect", "Testing on held-out scenes", "Eval"],
+  critic: ["working", "read", "Reading the failures", "Critic"],
+  optimizer: ["working", "repair", "Optimizing the skill", "Optimizer"],
+  executor: ["working", "route", "Running the plan", "Plan ran"],
+  registry: ["working", "export", "Saving the skill", "Skill saved"],
+};
+const ORDER = Object.keys(STAGE);
+
+// ---------------------------------------------------------------- bots on the page
+const bots = new Map(); // host -> { eyes, wob }
+function mount(host) {
+  if (bots.has(host)) return bots.get(host);
+  if (!host.isConnected) return null;
+  host.querySelector(":scope > svg")?.remove();
+  const eyes = createEyes(host);
+  // Etch wobbles the pill whenever something changes under the eyes
+  const wob = spring({ x: 1, y: 1 }, { preset: "wobbly", precision: 0.0008, onUpdate: (v) => { host.style.scale = v.x === 1 && v.y === 1 ? "" : `${v.x} ${v.y}`; } });
+  const bot = { eyes, wob, host, wobble(s = 1) { wob.impulse({ x: 0.9 * s, y: -1.4 * s }); } };
+  bots.set(host, bot);
+  host.addEventListener("pointerenter", () => bot.wobble(0.6));
+  host.addEventListener("click", () => { eyes.react("surprise"); bot.wobble(1); setTimeout(() => eyes.emote("hop"), 520); });
+  return bot;
 }
-function followers() {
+// a still of the idle face as markup, for places that cannot run script
+export function mascotSVG() {
+  const h = document.createElement("div");
+  const e = createEyes(h);
+  const html = h.innerHTML;
+  e.destroy();
+  return html;
+}
+
+// Etch's arrived(): a start, then a hop
+function arrive(bot, delay = 0) {
+  setTimeout(() => { bot.eyes.emote("surprise"); setTimeout(() => bot.eyes.emote("hop"), 520); bot.wobble(0.8); }, delay);
+}
+
+const followers = () => {
   const forge = document.querySelectorAll(".msg.forge .who .mascot");
-  return [...document.querySelectorAll(".mascot[data-follow]"), ...(forge.length ? [forge[forge.length - 1]] : [])];
-}
-function apply() {
-  const next = readMood();
-  const changed = next !== mood;
-  mood = next;
-  document.documentElement.dataset.mood = mood;
-  for (const m of followers()) {
-    if (m.dataset.mood === mood && !changed) continue;
-    m.dataset.mood = mood;
-    if (changed && mood === "ok") {
-      m.classList.remove("cheer");
-      void m.offsetWidth; // restart the cheer when two successes play back to back
-      m.classList.add("cheer");
-      setTimeout(() => m.classList.remove("cheer"), 1600);
-    }
+  return [...document.querySelectorAll(".mascot[data-follow]"), ...(forge.length ? [forge[forge.length - 1]] : [])]
+    .map((h) => bots.get(h)).filter(Boolean);
+};
+const each = (f) => followers().forEach(f);
+
+function decorate(root) {
+  const hosts = [];
+  if (root.matches?.(".mascot")) hosts.push(root);
+  root.querySelectorAll?.(".mascot").forEach((h) => hosts.push(h));
+  root.querySelectorAll?.(".msg.forge .who").forEach((w) => { if (!w.querySelector(".mascot")) { const s = document.createElement("span"); s.className = "mascot xs"; w.prepend(s); hosts.push(s); } });
+  // every published skill is its own agent, so each card gets its own little bot
+  root.querySelectorAll?.(".skill > .lbl").forEach((l) => {
+    if (l.querySelector(".mascot")) return;
+    const s = document.createElement("span"); s.className = "mascot xs"; l.prepend(s); hosts.push(s);
+    const card = l.closest(".skill");
+    card.addEventListener("pointerenter", () => bots.get(s)?.eyes.emote("delight"));
+  });
+  root.querySelectorAll?.(".empty-note").forEach((n) => {
+    if (n.querySelector(".mascot")) return;
+    const s = document.createElement("span"); s.className = "mascot md"; n.prepend(s); hosts.push(s);
+  });
+  let i = 0;
+  for (const h of hosts) {
+    if (bots.has(h)) continue;
+    const bot = mount(h);
+    if (bot && h.hasAttribute("data-follow")) { arrive(bot, 120 + 160 * i++); bot.eyes.setState(want.state); bot.eyes.setActivity(want.act); }
   }
+}
+
+// ---------------------------------------------------------------- the state machine
+const want = { state: "idle", act: null };
+const hold = { state: null, until: 0, timer: 0 }; // short-lived states: heard, success, confused, error
+let typingUntil = 0, typingTimer = 0, speakUntil = 0, speakTimer = 0, speakLevel = 0;
+const t0 = performance.now();
+
+function holdState(state, ms) {
+  clearTimeout(hold.timer);
+  hold.state = state;
+  hold.until = ms ? performance.now() + ms : Infinity;
+  if (ms) hold.timer = setTimeout(() => { hold.state = null; apply(); }, ms);
+  apply();
+}
+function liveStage() {
+  let key = null;
+  for (const li of document.querySelectorAll("#rail li.live")) { const k = li.dataset.stage; if (k && ORDER.indexOf(k) >= ORDER.indexOf(key)) key = k; }
+  return key;
+}
+function compute() {
+  const ready = $("#ready-dot") ? $("#ready-dot").classList.contains("on") : true;
+  const k = liveStage();
+  const now = performance.now();
+  if (!ready) return { state: "working", act: "wait", words: "Warming up the agents" };
+  if (k) { hold.state === "error" && clearHold(); const [state, act, words] = STAGE[k]; return { state, act, words, key: k }; }
+  if (document.querySelector(".tool.live")) return { state: "working", act: "think", words: "Working" };
+  if (hold.state && now < hold.until) return { state: hold.state, act: null, words: "" };
+  if (speakUntil > now) return { state: "speaking", act: null, words: "" };
+  if (typingUntil > now) return { state: "userTalking", act: null, words: "" };
+  return { state: "idle", act: null, words: "" };
+}
+function clearHold() { clearTimeout(hold.timer); hold.state = null; }
+function apply() {
+  const next = compute();
+  const changed = next.state !== want.state || next.act !== want.act;
+  want.state = next.state; want.act = next.act;
+  document.documentElement.dataset.mood = next.state;
+  if (changed) each((b) => { b.eyes.setState(next.state); b.eyes.setActivity(next.act); });
   const boot = $("#boot");
   if (boot && !boot.classList.contains("gone") && $("#ready-dot")?.classList.contains("on")) {
     boot.classList.add("gone");
@@ -71,47 +153,192 @@ function apply() {
   }
 }
 
-// ---------------------------------------------------------------- placements
-function decorate(root) {
-  root.querySelectorAll?.(".mascot").forEach(mount);
-  root.querySelectorAll?.(".msg.forge .who").forEach((w) => {
-    if (!w.querySelector(".mascot")) w.prepend(make("xs"));
-  });
-  // every published skill is its own agent, so each card gets its own little bot
-  root.querySelectorAll?.(".skill > .lbl").forEach((l) => {
-    if (!l.querySelector(".mascot")) l.prepend(make("xs"));
-  });
-  root.querySelectorAll?.(".empty-note").forEach((n) => {
-    if (!n.querySelector(".mascot")) {
-      const m = make("md");
-      m.dataset.mood = "idle";
-      n.prepend(m);
-    }
-  });
+// ---------------------------------------------------------------- bubbles (Etch's showBubble / dropBubble)
+const ICON_DONE = '<svg viewBox="0 0 16 16"><path d="m4.2 8.4 2.5 2.5 5.1-5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_FAIL = '<svg viewBox="0 0 16 16"><path d="m5 5 6 6M11 5l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+let layer = null, bub = null, bubT = 0;
+function anchorBot() {
+  const vis = (b) => { const r = b.host.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; };
+  const f = followers().filter(vis);
+  return f.find((b) => b.host.matches(".lg, .xl")) || f[0] || null;
+}
+function ensureLayer() {
+  if (layer) return layer;
+  const root = document.createElement("div");
+  root.className = "mb-bubbles";
+  root.setAttribute("aria-hidden", "true");
+  const goo = document.createElement("div"); goo.className = "mb-goo";
+  const bubs = document.createElement("div"); bubs.className = "mb-bubs";
+  root.append(goo, bubs);
+  gooLayer(goo, { id: "ag-goo-dock", blur: 9, alpha: 22, shift: -10, after: "drop-shadow(0 10px 22px rgba(22,28,45,.13)) drop-shadow(0 1px 2px rgba(22,28,45,.12))" });
+  document.body.append(root);
+  return (layer = { root, goo, bubs });
+}
+function showBubble(text, { id = null, done = false, failed = false } = {}) {
+  const a = anchorBot();
+  if (!a || !text) return;
+  clearTimeout(bubT);
+  const L = ensureLayer(), r = a.host.getBoundingClientRect();
+  const below = r.top < 110, H = 64, W = 360;
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - 30, innerWidth - W - 8));
+  L.root.style.left = left + "px";
+  L.root.style.top = (below ? r.bottom + 8 : r.top - 8 - H) + "px";
+  if (!bub) {
+    const c = document.createElement("div");
+    L.bubs.append(c);
+    bub = { c, id, blob: null, bot: a };
+  }
+  bub.id = id; bub.bot = a;
+  const c = bub.c;
+  c.className = "ag-bub" + (done ? " done" : "") + (failed ? " failed" : "");
+  c.replaceChildren();
+  if (done || failed) { const i = document.createElement("span"); i.className = "ag-ic"; i.innerHTML = failed ? ICON_FAIL : ICON_DONE; c.append(i); }
+  else { const sp = document.createElement("span"); sp.className = "ag-spin"; c.append(sp); }
+  const tx = document.createElement("span"); tx.className = "ag-bub-t"; tx.textContent = text; c.append(tx);
+  const w = c.offsetWidth, h = c.offsetHeight;
+  const cx = r.left + r.width / 2 - left;
+  const to = { x: Math.max(w / 2, Math.min(W - w / 2, cx - 22 + w / 2)), y: below ? 4 + h / 2 : H - 4 - h / 2 };
+  if (!bub.blob) bub.blob = spawnBlob(L.goo, { from: { x: cx, y: below ? -r.height * 0.4 : H + r.height * 0.4 }, to, w, h, radius: Math.min(h / 2, 20), content: c, className: "ag-blob-bub" });
+  else { bub.blob.resize(w, h); bub.blob.moveTo(to.x, to.y); }
+}
+function dropBubble(delay = 0) {
+  clearTimeout(bubT);
+  if (!bub) return;
+  const b = bub;
+  bubT = setTimeout(() => {
+    if (bub !== b) return;
+    bub = null;
+    const r = b.bot.host.getBoundingClientRect(), L = layer.root.getBoundingClientRect();
+    b.blob.absorb({ x: r.left + r.width / 2 - L.left, y: r.top + r.height / 2 - L.top }).then(() => { b.c.remove(); b.bot.wobble(1); b.bot.eyes.react("blink"); });
+  }, delay);
 }
 
-document.querySelectorAll(".mascot").forEach(mount);
-decorate(document);
+// ---------------------------------------------------------------- reading the page for edges
+const prev = {};      // stage key -> "live" | "done" | "fail" | ""
+const metric = {};    // stage key -> last metric text
+let booted = performance.now(), failAt = 0, optKept = 0, optBad = 0, forgeMsgs = 0;
+const stageName = (li) => li.dataset.stage;
+function railState(li) { return li.classList.contains("live") ? "live" : li.classList.contains("fail") ? "fail" : li.classList.contains("done") ? "done" : ""; }
+
+function watchRail() {
+  for (const li of document.querySelectorAll("#rail li[data-stage]")) {
+    const k = stageName(li), st = railState(li), was = prev[k] ?? "", m = li.querySelector(".m")?.textContent || "";
+    metric[k] = m;
+    if (st === was) continue;
+    prev[k] = st;
+    if (!STAGE[k]) continue;
+    if (st === "live") {
+      showBubble(STAGE[k][2], { id: k });
+    } else if (st === "done" && was === "live") {
+      const line = k === "eval" || k === "critic" || k === "optimizer" ? `${STAGE[k][3]}${m ? ": " + m : ""}` : STAGE[k][3];
+      showBubble(line, { id: k, done: true }); dropBubble(650);
+      each((b) => b.eyes.react("nod"));
+      if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); }
+      if (k === "critic" && /retrain/i.test(m)) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); }
+    } else if (st === "fail") {
+      failAt = performance.now();
+      showBubble(`${li.querySelector("span")?.textContent || k} failed`, { id: k, failed: true }); dropBubble(1400);
+      each((b) => b.eyes.emote("wince"));
+      setTimeout(() => { if (want.state === "working") each((b) => b.eyes.emote("nod")); else if (!hold.state) holdState("confused", 4000); }, 900);
+    }
+  }
+}
+
+function watchBadge() {
+  const badge = $("#vp-badge");
+  if (!badge || badge.classList.contains("hidden") || performance.now() - booted < 2500) return;
+  const ok = badge.classList.contains("ok"), bad = badge.classList.contains("bad");
+  const sig = ok ? "ok" : bad ? "bad" : "";
+  if (sig === watchBadge.sig) return;
+  watchBadge.sig = sig;
+  if (ok) { each((b) => { b.eyes.emote("delight"); b.wobble(0.8); }); if (!liveStage()) holdState("success", 2500); }
+  else if (bad) { if (!liveStage()) holdState("confused", 4000); else each((b) => b.eyes.emote("wince")); }
+}
+
+function watchOptimizer() {
+  const kept = document.querySelectorAll("#optimizer-root .opt-chip.kept").length;
+  const bad = document.querySelectorAll("#optimizer-root .opt-chip.reverted").length;
+  if (kept > optKept) { each((b) => { b.eyes.emote("pleased"); b.eyes.react("nod"); }); showBubble("Round kept", { id: "opt", done: true }); dropBubble(900); }
+  if (bad > optBad) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); showBubble("Round reverted", { id: "opt", failed: true }); dropBubble(1200); }
+  optKept = kept; optBad = bad;
+}
+
+function watchThread() {
+  const n = document.querySelectorAll(".msg.forge").length;
+  if (n > forgeMsgs && performance.now() - booted > 1500) {
+    const last = [...document.querySelectorAll(".msg.forge")].pop();
+    const words = (last?.textContent || "").trim().split(/\s+/).length;
+    each((b) => b.eyes.emote("pleased"));
+    // the forge "speaks" its answer: the eyes bounce with a level that rises and falls like a voice
+    speakUntil = performance.now() + Math.min(2600, 500 + words * 70);
+    clearInterval(speakTimer);
+    const s0 = performance.now();
+    speakTimer = setInterval(() => {
+      const k = performance.now() - s0;
+      if (performance.now() > speakUntil) { clearInterval(speakTimer); each((b) => b.eyes.setLevel(0)); apply(); return; }
+      each((b) => b.eyes.setLevel(0.25 + 0.3 * Math.abs(Math.sin(k / 95))));
+    }, 50);
+    apply();
+  }
+  forgeMsgs = n;
+}
+
+// ---------------------------------------------------------------- the composer: typing, sending
+const prompt = $("#prompt");
+if (prompt) {
+  prompt.addEventListener("input", () => {
+    typingUntil = performance.now() + 1500;
+    each((b) => b.eyes.setLevel(0.3 + Math.random() * 0.45));
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => { each((b) => b.eyes.setLevel(0)); apply(); }, 1500);
+    apply();
+    setTimeout(() => each((b) => b.eyes.setLevel(0.12)), 110);
+  });
+  prompt.addEventListener("blur", () => { typingUntil = 0; each((b) => b.eyes.setLevel(0)); apply(); });
+}
+$("#prompt-form")?.addEventListener("submit", () => {
+  typingUntil = 0; each((b) => b.eyes.setLevel(0));
+  holdState("heard", 1100);
+  showBubble("Got it", { id: "sent", done: true }); dropBubble(900);
+});
+
+// ---------------------------------------------------------------- the SSE stream the app re-broadcasts
+addEventListener("forge:event", (ev) => {
+  const e = ev.detail || {};
+  if (e.kind === "error" && !e.child) { each((b) => b.eyes.react("squish")); holdState("error", 0); showBubble("Something broke", { id: "err", failed: true }); dropBubble(1600); }
+  else if (e.kind === "rejected" || (e.kind === "route" && e.refused)) { each((b) => b.eyes.emote("wince")); holdState("confused", 4000); }
+  else if (e.kind === "reused") { each((b) => { b.eyes.emote("pleased"); b.wobble(0.8); }); holdState("success", 2500); }
+  else if (e.kind === "published" && !e.child) { each((b) => b.eyes.emote("delight")); }
+});
+
+// ---------------------------------------------------------------- watching the page
+let pend = 0;
+function schedule() { if (!pend) pend = requestAnimationFrame(() => { pend = 0; watchRail(); watchBadge(); watchOptimizer(); watchThread(); apply(); }); }
 new MutationObserver((recs) => {
   for (const r of recs) for (const n of r.addedNodes) if (n.nodeType === 1) decorate(n.parentElement || n);
-  apply();
-}).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
-apply();
+  schedule();
+}).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"], characterData: false });
 
-// ---------------------------------------------------------------- eyes follow the pointer (Etch's --look-x)
-let px = 0, py = 0, raf = 0;
-addEventListener("pointermove", (e) => {
-  px = e.clientX; py = e.clientY;
-  if (raf) return;
-  raf = requestAnimationFrame(() => {
-    raf = 0;
-    for (const m of document.querySelectorAll(".mascot")) {
-      const r = m.getBoundingClientRect();
-      if (!r.width) continue;
-      const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height / 2);
-      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 260);
-      m.style.setProperty("--look-x", `${((dx / d) * 2.6 * k).toFixed(2)}px`);
-      m.style.setProperty("--look-y", `${((dy / d) * 2 * k).toFixed(2)}px`);
-    }
-  });
-}, { passive: true });
+// ---------------------------------------------------------------- landing page: no app behind it, so the bot shows its range
+function showreel() {
+  const seq = [
+    ["idle", null, 3200], ["userTalking", null, 2200], ["heard", null, 900],
+    ["thinking", "think", 2600], ["working", "pick", 1800], ["working", "scan", 2200], ["working", "render", 2400],
+    ["working", "inspect", 2200], ["working", "read", 2000], ["working", "repair", 2000], ["working", "export", 1600],
+    ["success", null, 2600], ["idle", null, 2000], ["confused", null, 2600], ["idle", null, 2200], ["error", null, 2200],
+  ];
+  let i = 0;
+  const step = () => {
+    const [state, act, ms] = seq[i++ % seq.length];
+    each((b) => { b.eyes.setState(state); b.eyes.setActivity(act); if (state === "userTalking") b.eyes.setLevel(0.5); else b.eyes.setLevel(0); });
+    if (state === "userTalking") { let n = 0; const iv = setInterval(() => { each((b) => b.eyes.setLevel(0.2 + Math.random() * 0.5)); if (++n > ms / 120) clearInterval(iv); }, 120); }
+    setTimeout(step, ms);
+  };
+  setTimeout(step, 2800);
+}
+
+// ---------------------------------------------------------------- go
+decorate(document);
+apply();
+watchRail(); watchOptimizer(); forgeMsgs = document.querySelectorAll(".msg.forge").length;
+if (!$("#rail") && !reducedMotion()) showreel();

@@ -39,6 +39,7 @@ const rail = {};
 for (const [key, name, icon] of STAGES) {
   if (key === "executor") $("#rail").append(el("li", "sep"));
   const li = el("li");
+  li.dataset.stage = key;
   li.append(svgIcon(icon), el("span", "", name), el("span", "m"));
   if (key === "planner" || key === "executor") li.classList.add("off");
   if (key === "optimizer") { li.classList.add("tap"); li.setAttribute("role", "button"); li.tabIndex = 0; li.title = "Open the optimizer"; }
