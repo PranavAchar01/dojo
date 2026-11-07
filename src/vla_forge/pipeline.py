@@ -184,8 +184,9 @@ class Forge:
 
     # events
     def emit(self, run_id: str, kind: str, agent: str = "", **data) -> None:
+        now = round(time.time(), 3)
         ev = {
-            "t": round(time.time(), 3),
+            "t": now,
             "run": run_id,
             "kind": kind,
             "agent": agent,
@@ -194,7 +195,7 @@ class Forge:
         run = self.runs.get(run_id)
         if run is not None and len(run.events) < 8000:
             # "t" can be overwritten by the event's own data (loss carries training seconds), so the clock is "ts"
-            run.events.append({**ev, "ts": ev["t"]})
+            run.events.append({**ev, "ts": now})
         if self.loop is None:
             return
         self.loop.call_soon_threadsafe(self._fanout, ev)

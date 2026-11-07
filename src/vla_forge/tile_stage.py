@@ -1,7 +1,7 @@
 """Trained-model tile thumbnails, shot on the shared stage from the engine's own recorded rollout.
 
 A tile's saved replay (tiles.load_replay: the exported scene plus body-pose frames) gives the scene state in the
-grasp-to-place stretch of its first successful rollout; web/tile-thumb.html draws that exact state in the Sim tab's
+grasp-to-place stretch of its first successful rollout (a re-run's own rollouts when it has one); web/tile-thumb.html draws that exact state in the Sim tab's
 light look and scripts/tile_thumbs.mjs stamps the PNG with the stage tag.
 """
 
@@ -21,6 +21,18 @@ BUILD_PHASE = 0.9  # the bridge build: late enough that the bricks stand in thei
 PHASE = 0.999  # the end of a successful rollout: the task done, the object where it belongs
 
 
+def _rerun_rolls(sid: str) -> list[dict]:
+    """The best round's rollouts of a re-run, so the card shows what its replay plays; empty when it was not re-run."""
+    from . import records
+
+    rec = records.load_rerun(sid)
+    f = records.RECORDS / f"{sid}.rerun.media.json.gz"
+    if not rec or not f.exists():
+        return []
+    with gzip.open(f, "rt") as fh:
+        return json.load(fh)["rollouts"].get(str(rec["best_round"])) or []
+
+
 def shoot(ids: list[str] | None = None) -> list[str]:
     """Shoot thumb.png for the given tiles (default: every tile with a replay); returns the ids shot."""
     found = [d.name for d in sorted(TILES_DIR.iterdir()) if (d / "replay.json.gz").exists()]
@@ -28,8 +40,10 @@ def shoot(ids: list[str] | None = None) -> list[str]:
     robots: set[str] = set()
     with tempfile.TemporaryDirectory() as tmp:
         for tid in ids:
-            with gzip.open(TILES_DIR / tid / "replay.json.gz", "rt") as fh:
-                rolls = json.load(fh)
+            rolls = _rerun_rolls(tid)
+            if not rolls:
+                with gzip.open(TILES_DIR / tid / "replay.json.gz", "rt") as fh:
+                    rolls = json.load(fh)
             r = next((x for x in rolls if x["success"]), rolls[0])
             robot = r["scene"].get("robot_id", "so101")
             try:

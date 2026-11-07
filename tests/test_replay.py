@@ -268,3 +268,66 @@ def test_live_capture_round_trips_into_the_event_list(tmp_path, monkeypatch):
     )
     assert out["events"][2]["decision"] == "train"
     assert not out["paced"]
+
+
+def _groups(events):
+    """(agent, seconds on screen) for each run of consecutive events from the same stage; the last has no end."""
+    out = []
+    for e in events:
+        if not out or out[-1][0] != e["agent"]:
+            out.append([e["agent"], e["ts"], e["ts"]])
+        out[-1][2] = e["ts"]
+    starts = [g[1] for g in out] + [events[-1]["ts"]]
+    return [(g[0], starts[i + 1] - g[1]) for i, g in enumerate(out)]
+
+
+def test_rebuilt_pacing_never_shorter_than_a_live_stage(tmp_path):
+    _disk(tmp_path)
+    out = replay.build(_skill(), tmp_path)
+    ev = out["events"]
+    for agent, seconds in _groups(ev)[:-1]:
+        assert seconds >= replay.LIVE_MIN[agent] - 1e-6, (agent, seconds)
+    assert out["paced"]  # the page plays a rebuilt record at exactly these times, with no silence shortened
+    trainer = next(s for a, s in _groups(ev) if a == "trainer")
+    assert trainer >= 91  # training plays for the seconds it really took (91.2)
+    evals = [e for e in ev if e["kind"] == "eval"]
+    assert all(
+        e["ts"] - prev["ts"] >= replay.LIVE_MIN["eval"]
+        for e, prev in zip(evals, [ev[0], *evals], strict=False)
+    )
+
+
+def test_a_rerun_is_played_before_the_rebuild_and_leaves_the_original_alone(tmp_path, monkeypatch):
+    monkeypatch.setattr(records, "RECORDS", tmp_path / "runs")
+    sid = "put-the-red-block-in-the-tray-abcd"
+    records.save(sid, {"run": "185611-abcd", "eval": [{"round": 0, "succeeded": 14, "n": 20}]})
+    before = (tmp_path / "runs" / f"{sid}.json").read_text()
+    run = Run(id="185611-abcd", prompt="put the red block in the tray", t0=1000.0)
+    run.rounds = [Round(0, demos=18, eval={"succeeded": 12, "n": 20}, successes=[True] * 12 + [False] * 8)]
+    run.best_round, run.seconds = 0, 160.0
+    run.events = [
+        {"ts": 1000.0, "run": run.id, "kind": "log", "agent": "task", "text": 'chat message from the page: "put the red block in the tray"'},
+        {"ts": 1001.0, "run": run.id, "kind": "task", "agent": "task", "spec": SPEC, "tier": 2},
+        {"ts": 1030.0, "run": run.id, "kind": "eval", "agent": "eval", "round": 0, "succeeded": 12, "n": 20, "successes": [True] * 12 + [False] * 8},
+    ]
+    meta = {"date": "2026-11-07", "seed": "original run id from the ladder", "original": {"success_rate": 0.7, "n_eval": 20, "seconds": 171.5}}
+    run.layouts = []
+    records.save_rerun(sid, run, forge=None, meta=meta)
+    out = replay.build(_skill(replay=""), tmp_path)
+    assert out["source"] == "rerun" and not out["paced"]
+    assert out["rerun"]["date"] == "2026-11-07" and (out["rerun"]["succeeded"], out["rerun"]["n"]) == (12, 20)
+    pub = out["events"][-1]
+    assert pub["kind"] == "published" and pub["success_rate"] == 12 / 20
+    assert [e["kind"] for e in out["events"]].count("published") == 1
+    assert (tmp_path / "runs" / f"{sid}.json").read_text() == before  # the published record is never overwritten
+    assert records.load_rerun(sid)["original"]["success_rate"] == 0.7
+
+
+def test_a_loss_event_is_stamped_with_the_wall_clock_not_its_training_seconds():
+    from vla_forge.pipeline import Forge
+
+    forge = Forge()
+    run = Run(id="999999-zzzz", prompt="x")
+    forge.runs[run.id] = run
+    forge.emit(run.id, "loss", "trainer", round=0, t=3.0, loss=0.5, ema=0.5, step=10)
+    assert run.events[0]["t"] == 3.0 and run.events[0]["ts"] > 1e9

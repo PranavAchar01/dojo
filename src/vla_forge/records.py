@@ -81,13 +81,13 @@ def capture_stages(events: list[dict]) -> dict:
     return {k: ("captured" if k in seen else "not_recorded") for k in keys}
 
 
-def save_capture(sid: str, run, forge) -> None:
-    """The event stream plus the scene and rollout frames the page fetched for this run, next to its record."""
+def _write_capture(sid: str, run, forge, tag: str) -> list[dict]:
+    """Events and media files for a run: `<sid>.events.json` / `.media.json.gz`, or `<sid>.rerun.*` when tag is 'rerun.'."""
     from .viz import preview
 
     events = [e for e in run.events if e.get("kind") not in SKIP_KINDS]
     RECORDS.mkdir(parents=True, exist_ok=True)
-    (RECORDS / f"{sid}.events.json").write_text(
+    (RECORDS / f"{sid}.{tag}events.json").write_text(
         json.dumps({"run": run.id, "prompt": run.prompt, "t0": run.t0, "events": events})
     )
     media: dict = {"scene": None, "rollouts": {}}
@@ -97,13 +97,49 @@ def save_capture(sid: str, run, forge) -> None:
         media["scene"] = preview(Layout.from_json(run.layouts[0]), run.robot)
     for rnd, rolls in run.rollouts.items():
         media["rollouts"][str(rnd)] = [forge.rollout_payload(run, rnd, i) for i in range(len(rolls))]
-    tmp = RECORDS / f"{sid}.media.json.gz.tmp"
+    tmp = RECORDS / f"{sid}.{tag}media.json.gz.tmp"
     with gzip.open(tmp, "wt") as fh:
         json.dump(media, fh)
-    tmp.replace(RECORDS / f"{sid}.media.json.gz")
+    tmp.replace(RECORDS / f"{sid}.{tag}media.json.gz")
+    return events
+
+
+def save_capture(sid: str, run, forge) -> None:
+    """The event stream plus the scene and rollout frames the page fetched for this run, next to its record."""
+    events = _write_capture(sid, run, forge, "")
     rec = json.loads((RECORDS / f"{sid}.json").read_text())
     rec["replay"] = {"source": "live", "stages": capture_stages(events), "events": len(events)}
     save(sid, rec)
+
+
+def save_rerun(sid: str, run, forge, meta: dict) -> dict:
+    """A re-run of an old skill's pipeline in simulation, kept beside (never over) its published record.
+
+    `meta` carries what only the caller knows: the date, the published numbers and how the seeds were found."""
+    events = _write_capture(sid, run, forge, "rerun.")
+    best = run.rounds[run.best_round].eval if run.best_round >= 0 else {}
+    rec = {
+        **meta,
+        "source": "rerun",
+        "run": run.id,
+        "succeeded": best.get("succeeded"),
+        "n": best.get("n"),
+        "rounds": [f"{r.eval.get('succeeded')}/{r.eval.get('n')}" for r in run.rounds if r.eval],
+        "best_round": run.best_round,
+        "seconds": run.seconds,
+        "stages": capture_stages(events),
+        "events": len(events),
+    }
+    RECORDS.mkdir(parents=True, exist_ok=True)
+    tmp = RECORDS / f"{sid}.rerun.json.tmp"
+    tmp.write_text(json.dumps(rec))
+    tmp.replace(RECORDS / f"{sid}.rerun.json")
+    return rec
+
+
+def load_rerun(sid: str) -> dict:
+    f = RECORDS / f"{sid}.rerun.json"
+    return json.loads(f.read_text()) if f.exists() else {}
 
 
 def save(sid: str, rec: dict) -> None:

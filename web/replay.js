@@ -3,8 +3,7 @@
 // all move as they did. It reads /api/skills/<id>/replay-events and writes nothing.
 const $ = (s) => document.querySelector(s);
 const F = () => window.forge;
-const CAP = 1.2; // longest idle gap kept, in seconds of recording
-const TARGET = 85; // seconds a long run is squeezed into at 1x
+const CAP = 4; // longest idle gap kept, in seconds: only waiting with nothing on screen is shortened, never an animation
 const LEAD = 0.5;
 const TAIL = 1.5;
 const STAGE_NAME = { task: "Task", router: "Route", scene: "Scene", data: "Demos", trainer: "Train", eval: "Eval", critic: "Critic", optimizer: "Optimize", registry: "Publish" };
@@ -34,15 +33,16 @@ function buildBar() {
   sc.addEventListener("input", () => R && seek((sc.value / 1000) * R.total));
 }
 
-// recording seconds -> playback seconds: idle gaps are capped, and a long run is scaled into TARGET
-function compress(times) {
-  const gaps = times.map((t, i) => (i ? Math.min(Math.max(t - times[i - 1], 0), CAP) : 0));
-  let at = [];
+// recording seconds -> playback seconds: the recording's own pacing, with idle gaps capped at CAP
+// (a rebuilt record is already paced for playback and is kept exactly)
+function compress(times, paced) {
+  const at = [];
   let acc = LEAD;
-  for (const g of gaps) { acc += g; at.push(acc); }
-  const k = acc > TARGET ? TARGET / acc : 1;
-  at = at.map((a) => a * k);
-  return { at, total: acc * k + TAIL };
+  times.forEach((t, i) => {
+    acc += i ? (paced ? Math.max(t - times[i - 1], 0) : Math.min(Math.max(t - times[i - 1], 0), CAP)) : 0;
+    at.push(acc);
+  });
+  return { at, total: acc + TAIL };
 }
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -50,9 +50,13 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 function note(d) {
   const miss = Object.entries(d.stages).filter(([, v]) => v === "not_recorded").map(([k]) => STAGE_NAME[k]);
   const part = Object.entries(d.stages).filter(([, v]) => v === "partial").map(([k]) => STAGE_NAME[k]);
-  const src = d.source === "live"
-    ? "Captured live while this skill was trained."
-    : "Rebuilt from what was saved on disk, not captured live. The pacing here is for playback; the numbers are the saved ones.";
+  const rr = d.rerun;
+  const pub = rr && `${Math.round(rr.original.success_rate * rr.original.n_eval)}/${rr.original.n_eval}`;
+  const src = d.source === "rerun"
+    ? `Re-run ${rr.date}: ${rr.succeeded}/${rr.n} on held-out scenes in simulation, captured live. Published result: ${pub}.`
+    : d.source === "live"
+      ? "Captured live while this skill was trained."
+      : "Rebuilt from what was saved on disk, not captured live. The pacing here is for playback; the numbers are the saved ones.";
   const bits = [`<b>${src}</b>`];
   if (part.length) bits.push(`Partly recorded: ${part.join(", ")}.`);
   if (miss.length) bits.push(`Not recorded: ${miss.join(", ")}.`);
@@ -68,7 +72,7 @@ async function open(tile) {
   if (!bar) buildBar();
   F().setView("sim");
   const thread = $("#thread");
-  const { at, total } = compress(d.events.map((e) => e.ts));
+  const { at, total } = compress(d.events.map((e) => e.ts), d.paced);
   R = { sid: d.sid, d, at, total, pos: 0, next: 0, gen: 0, speed: 1, playing: true, raf: 0, last: 0, base: thread.children.length, thread };
   bar.querySelector(".rp-note").innerHTML = note(d);
   bar.hidden = false;

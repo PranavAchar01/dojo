@@ -341,6 +341,7 @@ function clearWorld() {
   window.forgeArms?.exit();
   if (world) { scene3.remove(world.root); scene3.remove(world.mirror); world = null; }
   play = null;
+  shownFrame = null;
   plate.visible = cellMarks.visible = false;
   staged = true;
   setStaged(false);
@@ -350,8 +351,11 @@ function clearWorld() {
   $("#vp-badge").classList.add("hidden");
   $("#pb-fill").style.width = "0";
 }
+let shownFrame = null; // the pose last put on the floor, so the next rollout eases from it instead of jumping
 function applyFrame(frame) {
   if (!world || !frame) return;
+  shownFrame = frame;
+  window.__forgeProbe?.push([performance.now(), frame]); // set only by a test harness: the poses actually drawn
   const n = world.n;
   for (let i = 0; i < n; i++) {
     const k = i * 7; // per body: x y z, then quaternion w x y z (MuJoCo order)
@@ -361,6 +365,42 @@ function applyFrame(frame) {
     }
   }
 }
+// u of the way from pose a to pose b: positions blend linearly, orientations along the short arc
+function mixFrame(a, b, u) {
+  if (u <= 0.001) return a;
+  if (u >= 0.999) return b;
+  const out = new Array(a.length);
+  for (let k = 0; k + 6 < a.length; k += 7) {
+    for (let j = 0; j < 3; j++) out[k + j] = a[k + j] + (b[k + j] - a[k + j]) * u;
+    const dot = a[k + 3] * b[k + 3] + a[k + 4] * b[k + 4] + a[k + 5] * b[k + 5] + a[k + 6] * b[k + 6];
+    const sg = dot < 0 ? -1 : 1;
+    let len = 0;
+    for (let j = 3; j < 7; j++) { out[k + j] = a[k + j] + (sg * b[k + j] - a[k + j]) * u; len += out[k + j] ** 2; }
+    len = Math.sqrt(len) || 1;
+    for (let j = 3; j < 7; j++) out[k + j] /= len;
+  }
+  return out;
+}
+const ease = (x) => x * x * (3 - 2 * x);
+const EASE_IN = 0.5; // seconds a new rollout takes to ease in from the pose on screen
+const EASE_OUT = 0.5; // seconds the end of a loop takes to ease back to the start
+// the pose at `ms` after the playback began, and how far into the rollout it is (seconds)
+function poseAt(pl, ms) {
+  const dur = pl.frames.length / pl.fps;
+  const hold = 1.2;
+  const last = pl.frames.length - 1;
+  let s = ms / 1000;
+  const lead = pl.from ? EASE_IN : 0;
+  if (s < lead) return { frame: mixFrame(pl.from, pl.frames[0], ease(s / lead)), t: 0 };
+  s = (s - lead) % (dur + hold);
+  if (s >= dur) {
+    const back = s - (dur + hold - EASE_OUT);
+    return { frame: back > 0 ? mixFrame(pl.frames[last], pl.frames[0], ease(back / EASE_OUT)) : pl.frames[last], t: dur };
+  }
+  const x = s * pl.fps;
+  const i = Math.min(last, Math.floor(x));
+  return { frame: mixFrame(pl.frames[i], pl.frames[Math.min(last, i + 1)], x - i), t: s };
+}
 
 // playback of the policy's own recorded rollout (body poses at 30 Hz)
 let play = null; // { frames, fps, t0 }
@@ -369,9 +409,10 @@ async function startPlayback(payload, auto = false) {
   $("#view-sim").classList.toggle("auto", auto); // saved tiles play on their own: no replay pill
   await buildWorld(payload.scene, true);
   if (tok !== playTok) return;
-  play = { frames: payload.frames, fps: payload.fps, t0: performance.now(), phases: payload.phase_frames || null, instructions: payload.instructions || [], step: -1 };
+  const from = shownFrame && world && shownFrame.length === world.n * 7 ? shownFrame : null;
+  play = { frames: payload.frames, fps: payload.fps, t0: performance.now(), phases: payload.phase_frames || null, instructions: payload.instructions || [], step: -1, from };
   $("#step-badge").classList.add("hidden");
-  applyFrame(payload.frames[0]);
+  applyFrame(from || payload.frames[0]);
   simLoading(null);
   performance.mark("dojo-frame");
 }
@@ -577,11 +618,10 @@ function tick() {
   stageStep(performance.now());
   window.forgeArms?.tick(performance.now());
   if (play) {
-    const hold = 1.2;
     const dur = play.frames.length / play.fps;
-    const t = ((performance.now() - play.t0) / 1000) % (dur + hold);
+    const { frame, t } = poseAt(play, performance.now() - play.t0);
     const fi = Math.min(play.frames.length - 1, Math.floor(t * play.fps));
-    applyFrame(play.frames[fi]);
+    applyFrame(frame);
     $("#pb-fill").style.width = `${(100 * Math.min(t, dur)) / dur}%`;
     if (play.phases) {
       let k = 0;
@@ -1280,7 +1320,7 @@ function handle(e) {
       break;
     }
     case "stage_mark": // a recorded run only: a stage whose result was kept as a number, not as a stream
-      settle(e.run, e.stage, e.state === "fail" ? "fail" : "done");
+      if (e.state !== "live") settle(e.run, e.stage, e.state === "fail" ? "fail" : "done");
       stage(e.stage, e.state, e.metric);
       break;
     case "not_recorded": // a recorded run only: nothing of this stage was kept, so none is shown
