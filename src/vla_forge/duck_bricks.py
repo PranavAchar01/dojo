@@ -66,19 +66,19 @@ class Brick:
         return np.array([math.cos(h), 0.0, 0.0, math.sin(h)])
 
 
-# Build order is bottom-up. The head sits across the body and the beak (3004); the tail slope falls toward the head
+# Build order is bottom-up. The head is the top brick, the beak rides the neck's front studs, the tail slope falls toward the head
 # (its low edge faces +x).
 DUCK: tuple[Brick, ...] = (
-    Brick("base", "3001", YELLOW, 1, 0, 0, 0, "body, bottom"),
-    Brick("body", "3001", YELLOW, 0, 0, 1, 0, "body, top (one stud back for the tail)"),
-    Brick("beak", "3004", ORANGE, 4, 0, 1, 90, "beak, on the front stud row of the base"),
-    Brick("back", "3002", YELLOW, 0, 0, 2, 0, "back and wing"),
-    Brick("head", "3003", YELLOW, 3, 0, 2, 0, "head, bridges body and beak"),
-    Brick("tail", "3039", YELLOW, 0, 0, 3, 90, "tail, slope rises to the rear"),
+    Brick("base", "3001", YELLOW, 0, 0, 0, 0, "body, bottom"),
+    Brick("body", "3001", YELLOW, -1, 0, 1, 0, "body, top (one stud back so the rear sticks out)"),
+    Brick("neck", "3002", YELLOW, 1, 0, 2, 0, "neck, front of the body"),
+    Brick("head", "3003", YELLOW, 1, 0, 3, 0, "head, the highest brick"),
+    Brick("beak", "3004", ORANGE, 3, 0, 3, 90, "beak, on the neck's front studs, one stud past the head"),
+    Brick("tail", "3039", YELLOW, -1, 0, 2, 90, "tail, slope rises to the rear"),
 )
 
 # Duck centre in the camera and exploded views, metres.
-CENTRE = np.array([2.5 * STUD, STUD, 2.0 * LAYER])
+CENTRE = np.array([1.5 * STUD, STUD, 2.0 * LAYER])
 
 
 def brick_map() -> dict[str, Brick]:
