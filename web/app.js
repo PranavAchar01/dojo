@@ -386,13 +386,6 @@ async function welcomeStep(k) {
   }
   if (!welcomeOn || !welcomeTiles.length) return;
   const t = welcomeTiles[k % welcomeTiles.length];
-<<<<<<< HEAD
-=======
-  const img = $("#welcome-img");
-  img.src = `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent((t.replay_source || "") + "." + t.thumb_v)}`;
-  img.hidden = false;
-  $("#welcome-now").textContent = `${t.instruction}: ${Math.round(t.success_rate * t.n_eval)} / ${t.n_eval} on held-out scenes`;
->>>>>>> 05c6053 (Trained-model tiles are shot from the engine's own recorded rollout at the grasp-to-place stretch, framed on the arm and its objects on the shared stage, and the Library cache-busts a thumbnail by its file time)
   // the rail, the inspector and any open step card follow the model the loop is showing
   welcomeShown = t;
   const held = `${Math.round(t.success_rate * t.n_eval)}/${t.n_eval}`;
