@@ -115,6 +115,47 @@ def _batch(p: dict, n: int, b: int, dev: torch.device):
     )
 
 
+# which layers a fine-tune updates: the perception half reads the cameras and the instruction, the action half
+# is the transformer, the queries and the output layers that turn that reading into joint targets
+SCOPES = {
+    "all": None,
+    "action_layers": (
+        "enc",
+        "norm",
+        "out",
+        "aux_out",
+        "queries",
+        "state_proj",
+        "type_emb",
+    ),
+    "perception_layers": (
+        "vis_proj",
+        "vis_pos",
+        "lang_proj",
+        "film",
+        "lat",
+        "lat_lang",
+        "xattn",
+        "xnorm_q",
+        "xnorm_kv",
+        "xmlp",
+    ),
+}
+
+
+def scoped_params(model: VLA, scope: str) -> list[torch.nn.Parameter]:
+    """The parameters a fine-tune of this scope updates (head module names, split on the first dot)."""
+    prefixes = SCOPES[scope]
+    out = []
+    for name, p in model.head.named_parameters():
+        top = name.split(".")[0]
+        keep = prefixes is None or top in prefixes
+        p.requires_grad_(keep)
+        if keep:
+            out.append(p)
+    return out
+
+
 def train(
     model: VLA,
     data: Demos,
@@ -127,15 +168,20 @@ def train(
     should_stop: Callable[[], bool] | None = None,
     replay: Demos | None = None,
     replay_frac: float = 0.5,
+    weight_decay: float = 1e-4,
+    scope: str = "all",
 ) -> dict:
-    """Train for a wall-clock budget. L1 on normalised joint targets, AdamW, cosine decay over the budget."""
+    """Train for a wall-clock budget. L1 on normalised joint targets, AdamW, cosine decay over the budget.
+
+    `scope` picks which layers learn: see SCOPES."""
     dev = device()
     model.to(dev).train()
+    params = scoped_params(model, scope)
     p = data.pack(dev)
     n = p["vis"].shape[0]
     r = replay.pack(dev) if replay is not None and replay.episodes else None
     nr = int(batch * replay_frac)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
     t0 = time.time()
     last = t0
     step, ema = 0, None
@@ -167,7 +213,7 @@ def train(
         loss = loss_act + AUX_WEIGHT * F.l1_loss(model.head.last_aux.float(), aux)
         opt.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         step += 1
         if time.time() - last >= log_every:
