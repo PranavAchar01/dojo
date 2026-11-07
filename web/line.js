@@ -317,11 +317,8 @@ async function buildLine3D() {
     bodies[part.body].traverse((o) => { if (!cube && o.isMesh) cube = o; });
     const partMat = cube.material;
     const st = line.stations[k];
-    // a tinted floor zone per station (orange: a trained VLA, graphite: a scripted cell) with its stencil in front
-    const zone = new THREE.Mesh(new THREE.PlaneGeometry(1.0, pitch - 0.03), new THREE.MeshBasicMaterial({ color: st.controller === "vla" ? 0xff6a2b : 0x2c2f35, transparent: true, opacity: 0.07, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
-    zone.position.set(0.2, root.position.y - 0.0, 0.0005);
-    lab.add(zone);
-    floorLabel(lab, `${String(k + 1).padStart(2, "0")}  ${st.name}`.toUpperCase(), 0.8, root.position.y - 0.3, Math.PI / 2, 0.05, st.controller === "vla" ? "rgba(214,80,24,0.95)" : "rgba(44,47,53,0.95)");
+    // the station's stencil on the floor beside its belt, orange for a trained VLA, graphite for a scripted cell
+    floorLabel(lab, `${String(k + 1).padStart(2, "0")}  ${st.name}`.toUpperCase(), 0.5, root.position.y - 0.3, Math.PI / 2, 0.042, st.controller === "vla" ? "rgba(224,86,26,0.95)" : "rgba(44,47,53,0.95)");
     if (k > 0) hazardStrip(lab, -0.3, root.position.y - pitch / 2, 0.74, root.position.y - pitch / 2, 0.012);
     const binBody = sc.bins?.[0]?.body;
     cells.push({ root, bodies, belt, cube, partMat, partBody: part.body, home: sc.home, binBody, done: [] });
