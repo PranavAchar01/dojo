@@ -473,7 +473,7 @@ def run_pack(ex) -> None:
     order = sorted(tools, key=lambda n: ["target", "tool1", "tool2"].index(n))
     for k, name in enumerate(order):
         tool = tools[name][0]
-        com, centre, yaw, pts = _tool_state(sc, name, tool)
+        com, _centre, yaw, pts = _tool_state(sc, name, tool)
         # half-width of the tool where the jaws close: the hull points within 2.5 cm of the grasp point along the length
         along = (pts[:, :2] - com[:2]) @ np.array([math.cos(yaw), math.sin(yaw)])
         near = pts[np.abs(along) < 0.025]
@@ -515,8 +515,8 @@ def run_pack(ex) -> None:
         goal_xy = bp[:2] + Rb[:2, :2] @ np.array([bx, by])
         out_dir = Rb[:2, :2] @ np.array([0.0, -1.0])  # the box's open side, in the world
 
-        def to_slot(extra=0.0):
-            _c, _ce, _y, p = _tool_state(sc, name, tool)
+        def to_slot(extra=0.0, name=name, tool=tool, goal_xy=goal_xy, out_dir=out_dir):
+            _c, _ce, _y, _p = _tool_state(sc, name, tool)
             return sc.ee_pos()[:2] + (goal_xy + extra * out_dir + (_c[:2] - _ce[:2]) - _c[:2])
 
         _c, _ce, _y, p = _tool_state(sc, name, tool)

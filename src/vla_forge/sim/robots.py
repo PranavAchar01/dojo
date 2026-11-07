@@ -1046,9 +1046,16 @@ def robot_spec(robot_id: str, _r: Robot | None = None) -> mujoco.MjSpec:
 
 # ------------------------------------------------------------------ checks and feasibility
 
-# the table workspace the task sampler uses (tasks.BLOCK_R / GOAL_R, BLOCK_ANG / GOAL_ANG)
+# the SO-101's table workspace, the one the stock task sampler and every saved seed use (tasks.DEFAULT_WS mirrors
+# it); other arms are fitted from their own measured reach (workspace())
 WS_R = (0.125, 0.285)
 WS_ANG = math.radians(38)
+# the band searched when fitting a workspace, and the table's outer limits for task objects
+SEARCH_R = (0.08, 0.40, 0.01)
+SEARCH_ANG_DEG = (50, 10)
+TABLE_R_MAX = 0.34
+TABLE_ANG_MAX = math.radians(42)
+FIT_FRACTION = 0.95
 GRASP_Z = 0.015 - 0.012  # tool frame height when gripping a block (expert GRIP_DEPTH)
 HOVER_Z = 0.07
 PUSH_Z = 0.012
@@ -1058,40 +1065,160 @@ REACH_TOL = 0.006
 ORI_TOL = {"grasp": 0.12, "push": 0.2, "hover": 0.5}
 
 
+def _reaches(m, d, site, r, seeds, xy, radial, name, z) -> bool:
+    _q, ep, eo = solve_topdown(
+        m,
+        d,
+        site,
+        r.arm_joints,
+        r.home,
+        np.array([*xy, z]),
+        radial,
+        seeds,
+        w_ori=0.02 if name == "hover" else 0.1,
+    )
+    return bool(ep < REACH_TOL and eo < ORI_TOL[name])
+
+
 @lru_cache(maxsize=32)
-def reachability(robot_id: str, n_r: int = 7, n_a: int = 9) -> dict:
-    """Top-down reach over the table workspace at grasp, push and hover height."""
+def reach_grid(robot_id: str) -> tuple:
+    """Top-down reach on a dense polar grid over the whole search band, at grasp and hover height (the two the fit needs).
+    Rows are (r, angle degrees, {grasp, hover}) in a fixed order: r outermost, angle inner."""
     r = calibrate(robot_id)
     m = robot_spec(robot_id).compile()
     fix_qpos0(m)
     d = mujoco.MjData(m)
     site = m.site(r.tcp_site).id
     seeds = seeds_for(robot_id, m, site, r.arm_joints)
-    pts = []
-    for rr in np.linspace(*WS_R, n_r):
-        for aa in np.linspace(-WS_ANG, WS_ANG, n_a):
+    rows = []
+    for rr in np.arange(SEARCH_R[0], SEARCH_R[1] + 1e-9, SEARCH_R[2]):
+        for ad in range(-SEARCH_ANG_DEG[0], SEARCH_ANG_DEG[0] + 1, SEARCH_ANG_DEG[1]):
+            aa = math.radians(ad)
             xy = np.array([rr * math.cos(aa), rr * math.sin(aa)])
             radial = np.array([*xy / np.linalg.norm(xy), 0.0])
-            row = {"x": round(float(xy[0]), 4), "y": round(float(xy[1]), 4)}
-            for name, z in (("grasp", GRASP_Z), ("push", PUSH_Z), ("hover", HOVER_Z)):
-                _q, ep, eo = solve_topdown(
-                    m,
-                    d,
-                    site,
-                    r.arm_joints,
-                    r.home,
-                    np.array([*xy, z]),
-                    radial,
-                    seeds,
-                    w_ori=0.02 if name == "hover" else 0.1,
-                )
-                row[name] = bool(ep < REACH_TOL and eo < ORI_TOL[name])
-            pts.append(row)
+            ok = {}
+            for name, z in (("grasp", GRASP_Z), ("hover", HOVER_Z)):
+                ok[name] = _reaches(m, d, site, r, seeds, xy, radial, name, z)
+            rows.append((round(float(rr), 3), ad, ok))
+    return tuple(rows)
+
+
+def fit_workspace(rows) -> dict | None:
+    """The largest annular sector [r_lo, r_hi] x [-ang, ang] (by area) where grasp AND hover succeed on at least
+    FIT_FRACTION of the grid points; None when no sector qualifies."""
+    rs = sorted({r for r, _a, _o in rows})
+    angs = sorted({a for _r, a, _o in rows if a >= 0})
+    good = {(r, a): o["grasp"] and o["hover"] for r, a, o in rows}
+    best, best_area = None, 0.0
+    for j in range(len(rs)):
+        for k in range(j + 1, len(rs)):
+            for ang in angs[1:]:
+                cells = [
+                    good[(r, a)]
+                    for r in rs[j : k + 1]
+                    for a in range(-ang, ang + 1, SEARCH_ANG_DEG[1])
+                ]
+                if sum(cells) / len(cells) < FIT_FRACTION:
+                    continue
+                area = (rs[k] ** 2 - rs[j] ** 2) * math.radians(ang)
+                if area > best_area:
+                    best, best_area = (rs[j], rs[k], ang), area
+    if best is None:
+        return None
+    return {"r_lo": best[0], "r_hi": best[1], "ang": math.radians(best[2])}
+
+
+@lru_cache(maxsize=32)
+def workspace(robot_id: str) -> dict:
+    """The table workspace the tasks use for this robot: {r_lo, r_hi, ang (rad), fitted: the raw fit}.
+
+    The SO-101 keeps the stock numbers (every trained model and saved scene was drawn from them). Any other arm
+    gets its measured sector, cut back to the table (r <= 34 cm, +/-42 deg); empty when it reaches nowhere."""
+    fit = fit_workspace(reach_grid(robot_id))
+    if is_default(robot_id):
+        return {"r_lo": WS_R[0], "r_hi": WS_R[1], "ang": WS_ANG, "fitted": fit}
+    if fit is None:
+        return {"r_lo": 0.0, "r_hi": 0.0, "ang": 0.0, "fitted": None}
+    ws = {
+        "r_lo": fit["r_lo"],
+        "r_hi": min(fit["r_hi"], TABLE_R_MAX),
+        "ang": min(fit["ang"], TABLE_ANG_MAX),
+    }
+    return {**ws, "fitted": fit}
+
+
+def task_workspace(robot_id: str | None):
+    """tasks.Workspace for a robot id; None (the stock numbers) for the SO-101 or no robot."""
+    from .tasks import Workspace
+
+    if robot_id is None or is_default(robot_id):
+        return None
+    w = workspace(robot_id)
+    return Workspace(w["r_lo"], w["r_hi"], w["ang"])
+
+
+@lru_cache(maxsize=32)
+def reachability(robot_id: str) -> dict:
+    """Reach preview over the task workspace: the fractions count every grid point inside it, the dots are every
+    other radius and angle step (the format the Build tab reads)."""
+    ws = workspace(robot_id)
+    r = calibrate(robot_id)
+    m = robot_spec(robot_id).compile()
+    fix_qpos0(m)
+    d = mujoco.MjData(m)
+    site = m.site(r.tcp_site).id
+    seeds = seeds_for(robot_id, m, site, r.arm_joints)
+    pts, inside = [], []
+    for rr, ad, ok in reach_grid(robot_id):
+        a = math.radians(ad)
+        if not (
+            ws["r_lo"] - 1e-9 <= rr <= ws["r_hi"] + 1e-9 and abs(a) <= ws["ang"] + 1e-9
+        ):
+            continue
+        xy = np.array([rr * math.cos(a), rr * math.sin(a)])
+        radial = np.array([*xy / rr, 0.0])
+        row = {
+            **ok,
+            "push": _reaches(m, d, site, r, seeds, xy, radial, "push", PUSH_Z),
+        }
+        inside.append(row)
+        if ad % 10 == 0 and round(rr * 100) % 2 == 0:
+            pts.append({"x": round(xy[0], 4), "y": round(xy[1], 4), **row})
     frac = {
-        k: round(sum(p[k] for p in pts) / len(pts), 3)
+        k: round(sum(o[k] for o in inside) / max(len(inside), 1), 3)
         for k in ("grasp", "push", "hover")
     }
     return {"points": pts, "fraction": frac, "tol_m": REACH_TOL}
+
+
+def workspace_check(robot_id: str) -> tuple[bool, str]:
+    """(ok, plain-words detail): is the arm's fitted workspace big enough for what the tasks need?"""
+    from .tasks import required_workspace
+
+    ws = workspace(robot_id)
+    need_depth, need_ang = required_workspace(ws["r_lo"], ws["r_hi"])
+    depth = ws["r_hi"] - ws["r_lo"]
+    f = reachability(robot_id)["fraction"]
+    if ws["fitted"] is None:
+        return False, (
+            "no stretch of the table is reached at both grasp and hover height pointing down "
+            f"(searched {SEARCH_R[0] * 100:.0f}-{SEARCH_R[1] * 100:.0f} cm, +/-{SEARCH_ANG_DEG[0]} deg)"
+        )
+    works = (
+        f"works blocks {round(ws['r_lo'] * 100, 1):g}-{round(ws['r_hi'] * 100, 1):g} cm out, "
+        f"+/-{math.degrees(ws['ang']):.0f} deg; the tasks need at least {need_depth * 100:.0f} cm of depth "
+        f"and +/-{math.degrees(need_ang):.0f} deg"
+    )
+    gaps = []
+    if depth < need_depth - 1e-6:
+        gaps.append(f"{(need_depth - depth) * 100:.0f} cm too shallow")
+    if ws["ang"] < need_ang - 1e-6:
+        gaps.append(f"{math.degrees(need_ang - ws['ang']):.0f} deg too narrow")
+    if f["grasp"] < 0.9 or f["hover"] < 0.9:
+        gaps.append(f"reaches only {min(f['grasp'], f['hover']):.0%} of it (needs 90%)")
+    if gaps:
+        return False, f"{works}; this arm is " + " and ".join(gaps)
+    return True, f"{works}; reaches {f['grasp']:.0%} at grasp height and {f['hover']:.0%} at hover height"
 
 
 @lru_cache(maxsize=32)
@@ -1173,19 +1300,16 @@ def report(robot_id: str) -> dict:
     )
     reach = reachability(robot_id)
     out["reach"] = reach
-    f = reach["fraction"]
-    short = [k for k in ("grasp", "hover") if f[k] < 0.9]
-    check(
-        "Reaches the table workspace",
-        not short,
-        (
-            f"reaches {f['grasp']:.0%} of grasp points and {f['hover']:.0%} of hover points"
-            if not short
-            else " and ".join(f"reaches only {f[k]:.0%} of {k} points" for k in short)
-            + " (needs 90%; red dots on the preview are the misses)"
-        )
-        + f" in a {WS_R[0] * 100:.0f}-{WS_R[1] * 100:.0f} cm, +/-{math.degrees(WS_ANG):.0f} deg arc in front of the base",
-    )
+    ws = workspace(robot_id)
+    out["workspace"] = {
+        "r_lo": ws["r_lo"],
+        "r_hi": ws["r_hi"],
+        "ang": round(ws["ang"], 4),
+        "ang_deg": round(math.degrees(ws["ang"]), 1),
+        "fitted": ws["fitted"],
+    }
+    ok_ws, detail = workspace_check(robot_id)
+    check("Reaches the table workspace", ok_ws, detail)
     tq = holding_torque(robot_id)
     out["torque"] = tq
     check(
@@ -1239,7 +1363,7 @@ def holding_torque(robot_id: str) -> dict:
         site,
         r.arm_joints,
         r.home,
-        np.array([WS_R[1], 0.0, HOVER_Z]),
+        np.array([workspace(robot_id)["r_hi"] or WS_R[1], 0.0, HOVER_Z]),
         np.array([1.0, 0, 0]),
         seeds_for(robot_id, m, site, r.arm_joints),
     )
@@ -1270,7 +1394,7 @@ def holding_torque(robot_id: str) -> dict:
         hi = max(lims, key=lambda x: x["torque_nm"] / x["limit_nm"])
         detail = (
             f"worst joint {hi['joint']}: {hi['torque_nm']:.2f} of {hi['limit_nm']:.2f} N m "
-            f"({worst:.0%} of the model's actuator limit) with a 30 g block at {WS_R[1]:.2f} m"
+            f"({worst:.0%} of the model's actuator limit) with a 30 g block at {workspace(robot_id)["r_hi"] or WS_R[1]:.2f} m"
         )
     return {
         "ok": bool(ok),
@@ -1288,7 +1412,7 @@ def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
 
     Returns (ok, reason). Used by the router (skill library) and the Build tab. Reasons are plain sentences.
     Checks, in order: the model composes; the fingers open wider than a 3 cm block and close below it (grasping
-    skills); top-down reach over the table workspace at the height the skill works at (>= 90% of points);
+    skills); top-down reach over the table workspace at the height the skill works at (its fitted workspace big enough for the tasks, >= 90% of points reached);
     gravity torque with a held block within the source model's actuator limits.
     """
     skill = (
@@ -1324,11 +1448,13 @@ def robot_feasibility(robot_id: str, task) -> tuple[bool, str]:
         )
     f = rep["reach"]["fraction"]
     need = {"reach": "hover", "push": "push"}.get(skill, "grasp")
+    ok_ws, why_ws = workspace_check(robot_id)
+    if not ok_ws:
+        return False, why_ws
     for h in (need, "hover"):
         if f[h] < 0.9:
             return False, (
-                f"it reaches only {f[h]:.0%} of the table workspace at {h} height pointing down "
-                f"(needs 90%); blocks sit {WS_R[0]:.2f}-{WS_R[1]:.2f} m from the base"
+                f"it reaches only {f[h]:.0%} of its table workspace at {h} height pointing down (needs 90%)"
             )
     if not rep["torque"]["ok"]:
         return (
