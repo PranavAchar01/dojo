@@ -33,6 +33,9 @@ from . import (
     thumbs,
     tiles,
 )
+from . import (
+    replay as replay_mod,
+)
 from .agents import Forge as Agents
 from .agents import describe_run_reply, run_once
 from .pipeline import FORGE
@@ -193,6 +196,33 @@ def replay(sid: str, index: int):
         json.dumps({**rolls[index], "all": summary, "source": sk.replay_source}),
         media_type="application/json",
     )
+
+
+def _replay_args(sid: str) -> tuple[dict, str]:
+    sk = _skill(sid)
+    parent = FORGE.registry.skills.get(sk.parent or "")
+    return sk.__dict__, parent.instruction if parent else ""
+
+
+@app.get("/api/skills/{sid}/replay-events")
+def replay_events(sid: str):
+    """The whole development of a saved skill as the page's own event list; read-only, nothing is trained or written."""
+    skill, parent = _replay_args(sid)
+    return replay_mod.build(skill, parent_instruction=parent)
+
+
+@app.get("/api/replays/{sid}/scene")
+def replay_scene(sid: str):
+    sc = replay_mod.media(_replay_args(sid)[0])["scene"]
+    return sc or {"pending": True}
+
+
+@app.get("/api/replays/{sid}/rollout/{rnd}/{index}")
+def replay_rollout(sid: str, rnd: int, index: int):
+    rolls = replay_mod.media(_replay_args(sid)[0])["rollouts"].get(str(rnd)) or _404()
+    if not 0 <= index < len(rolls):
+        _404()
+    return rolls[index]
 
 
 @app.patch("/api/skills/{sid}")

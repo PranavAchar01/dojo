@@ -238,6 +238,9 @@ function onEvent(e, mine) {
     case "critic":
       if (e.plan.action === "retrain") setPhase("demos", `Critic: another round`, 0, e.plan.rationale.slice(0, 60));
       break;
+    case "published": // a recorded run reaches its end: the card settles, nothing is saved or announced
+      if (String(e.run).startsWith("rp:")) progEnd("saved", "Replay finished", `${pct(e.success_rate)} held-out, as recorded`);
+      break;
     case "saving":
       setPhase("save", "Saving to the library: rendering the thumbnail", 0.6);
       break;
@@ -505,6 +508,7 @@ function tileEl(t, byId) {
   };
   const tb = mk(testing[t.id] ? "Testing..." : "Test", () => startTest(t.id));
   tb.disabled = !!testing[t.id];
+  mk("Replay", () => window.forgeReplay.open(t), "replay-btn");
   if (t.origin !== "chain") mk("Remix", () => setMode("remix", t.id, t.name));
   const reply = el("div", "tile-reply mono");
   const cb = mk("Call agent", async () => {
