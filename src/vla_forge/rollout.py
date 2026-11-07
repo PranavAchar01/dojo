@@ -28,6 +28,7 @@ HOLD_STEPS = {
     "kit": 5,
     "insert": 5,
     "rotate": 5,
+    "pack": 5,
 }
 MAX_STEPS = {
     "reach": 80,
@@ -38,6 +39,9 @@ MAX_STEPS = {
     "kit": 170,
     "insert": 200,
     "rotate": 200,
+    # the scripted expert needs 369-394 policy steps for the three tools (4 seeds); the budget keeps the 1.5x
+    # headroom insert has over its expert (200 steps vs 124-133)
+    "pack": 600,
 }
 ENSEMBLE_M = 0.1
 
