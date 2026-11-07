@@ -103,6 +103,8 @@ class Layout:
     # factory-line cells (sim/line.py): totes name -> (color, x, y), and whether a conveyor runs past the arm
     bins: dict[str, tuple[str, float, float]] = field(default_factory=dict)
     belt: bool = False
+    # fixtures from sim/props.py (kitting tray, sockets, ...): name -> (kind, color, x, y, yaw)
+    props: dict[str, tuple[str, str, float, float, float]] = field(default_factory=dict)
 
     def key(self) -> tuple:
         """Structure only (names and colours): layouts with the same key share a compiled model."""
@@ -112,16 +114,28 @@ class Layout:
             tuple((n, v[0]) for n, v in sorted(self.pads.items())),
             tuple((n, v[0]) for n, v in sorted(self.bins.items())),
             self.belt,
+            *(
+                [tuple((n, v[0], v[1]) for n, v in sorted(self.props.items()))]
+                if self.props
+                else []
+            ),
         )
 
     def fixtures(self) -> dict[str, tuple[str, float, float]]:
-        """Every mocap fixture (bowls, squares, totes)."""
-        return {**self.bowls, **self.pads, **self.bins}
+        """Every mocap fixture (bowls, squares, totes, props) as name -> (color, x, y)."""
+        return {
+            **self.bowls,
+            **self.pads,
+            **self.bins,
+            **{n: (v[1], v[2], v[3]) for n, v in self.props.items()},
+        }
 
     def to_json(self) -> dict:
         d = {"blocks": self.blocks, "bowls": self.bowls, "pads": self.pads}
         if self.bins or self.belt:
             d.update(bins=self.bins, belt=self.belt)
+        if self.props:
+            d["props"] = self.props
         return d
 
     @staticmethod
@@ -132,6 +146,7 @@ class Layout:
             {k: tuple(v) for k, v in d.get("pads", {}).items()},
             {k: tuple(v) for k, v in d.get("bins", {}).items()},
             bool(d.get("belt", False)),
+            {k: tuple(v) for k, v in d.get("props", {}).items()},
         )
 
 
@@ -314,6 +329,12 @@ def build_spec(
                 material=f"{name}_mat",
             )
 
+    if layout.props:
+        from .props import add_prop
+
+        for name, (kind, color, *_pose) in layout.props.items():
+            add_prop(spec, name, kind, color)
+
     if layout.belt or layout.bins:
         from . import line
 
@@ -481,6 +502,13 @@ class Scene:
             d.qpos[adr + 3 : adr + 7] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
         for name, (_c, x, y) in layout.fixtures().items():
             d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
+        for name, (*_k, yaw) in layout.props.items():
+            d.mocap_quat[m.body(name).mocapid[0]] = [
+                np.cos(yaw / 2),
+                0,
+                0,
+                np.sin(yaw / 2),
+            ]
         self.layout = layout
         self.apply_look(look or Look())
         mujoco.mj_forward(m, d)

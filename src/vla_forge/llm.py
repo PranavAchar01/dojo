@@ -17,6 +17,7 @@ from functools import lru_cache
 import openai
 
 from .compose import Step, validate
+from .sim.props import KIT_SLOTS
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS
 from .sim.tasks import PREDICATES, SKILLS, TaskSpec, default_success
 
@@ -108,18 +109,24 @@ def _chat_json(system: str, user: str, schema: dict) -> tuple[dict, str]:
 # ------------------------------------------------------------------ task parsing
 
 TASK_SYSTEM = f"""You turn a request for a robot into a task for a simulated SO-101 arm on a tabletop.
-The arm can learn exactly five skills:
+The arm can learn exactly eight skills:
 - reach: move the closed gripper down to hover just above a block ("touch", "point at", "go to"). target = null.
 - push: push a block across the table onto a taped square. target = square colour, one of {list(PAD_COLORS)}.
 - lift: pick a block up and hold it in the air. target = null.
 - pick_place: pick a block and put it in a bowl. target = bowl colour, one of {list(BOWL_COLORS)}.
 - stack: put one block on top of another block. target = the lower block's colour.
+- kit: put a block into one slot of a 2 x 2 kitting tray ("in the front-left slot of the tray"). target = the
+  slot, one of {list(KIT_SLOTS)} (front is toward the camera, left is the viewer's left; default "front-left").
+- insert: push a block down into a square socket that fits it with a few millimetres to spare ("insert the
+  block into the socket", "peg in hole"). target = null.
+- rotate: pick a block up, turn it a quarter-turn-ish and seat it in the socket that is turned 45 degrees
+  ("rotate it and set it in the diamond socket"). target = null.
 Blocks are 3 cm cubes coloured one of {list(BLOCK_COLORS)}.
 
 kind = "single" when the request is one skill: fill `steps` with exactly that one step.
 kind = "composite" when the request needs several skills in a row ("sort the blocks into the bowls of the
 same colour", "clear the table", "put X in the bowl and push Y onto the square", "build a tower"). Then
-`steps` lists 2-3 steps in the order the arm should do them, each one of push / pick_place / stack only.
+`steps` lists 2-3 steps in the order the arm should do them, each one of push / pick_place / stack only (kit, insert and rotate are single tasks).
 Composite rules: each block is moved once; each bowl or square receives one block; towers are two blocks.
 If the request is vague ("clear the table"), choose concrete colours yourself and say which in `note`.
 
@@ -131,7 +138,7 @@ empty table.
 checks (single tasks only): extra predicates for the success check from {json.dumps(PREDICATES)};
 usually [] or ["undisturbed"] when the user asks not to touch the other blocks.
 mentions: every physical object or place the request names, exactly as the user wrote it (phrase), with kind
-"block", "bowl" or "square" when it is one of those, else "other" (a cup, the floor, a shelf, the laundry, a
+"block", "bowl", "square", "tray", "socket" or "slot" when it is one of those, else "other" (a cup, the floor, a shelf, the laundry, a
 drawer...), and the colour word the user used for it (null if none). Report what the user said here, not the
 substitute you picked: a "pink block" stays color "pink" even though the steps use another colour.
 """
@@ -180,7 +187,15 @@ TASK_SCHEMA = {
                     "phrase": {"type": "string"},
                     "kind": {
                         "type": "string",
-                        "enum": ["block", "bowl", "square", "other"],
+                        "enum": [
+                            "block",
+                            "bowl",
+                            "square",
+                            "tray",
+                            "socket",
+                            "slot",
+                            "other",
+                        ],
                     },
                     "color": {"type": ["string", "null"]},
                 },
@@ -191,11 +206,16 @@ TASK_SCHEMA = {
 
 
 def _valid_target(skill: str, color: str | None) -> str | None:
-    table = {"pick_place": BOWL_COLORS, "push": PAD_COLORS, "stack": BLOCK_COLORS}.get(
-        skill
-    )
+    table = {
+        "pick_place": BOWL_COLORS,
+        "push": PAD_COLORS,
+        "stack": BLOCK_COLORS,
+        "kit": dict.fromkeys(KIT_SLOTS),
+    }.get(skill)
     if table is None:
         return None
+    if skill == "kit" and isinstance(color, str):
+        color = color.lower().replace(" ", "-")
     if color in table:
         return color
     return next(iter(table))
@@ -274,6 +294,9 @@ def parse_task(prompt: str) -> tuple[TaskSpec | list[Step] | None, dict]:
 
 MOTION_WORDS = (
     ("stack", ("stack", " on top")),
+    ("rotate", ("rotate", "diamond", "twist", "turn it")),
+    ("insert", ("insert", "socket", "peg", "plug in")),
+    ("kit", ("slot", "tray", "kitting", "kit ")),
     ("push", ("push", "slide", "shove", "nudge")),
     ("pick_place", ("bowl", "put", "place", "drop")),
     ("reach", ("touch", "reach", "point")),
@@ -303,6 +326,10 @@ def rule_parse(prompt: str) -> TaskSpec:
     obj = next((c for c in colors if c in BLOCK_COLORS), "red")
     rest = colors[colors.index(obj) + 1 :] if obj in colors else colors
     target = _valid_target(skill, rest[0] if rest else None)
+    if skill == "kit":
+        fb = "back" if re.search(r"\b(back|rear|far)\b", p) else "front"
+        lr = "right" if re.search(r"\bright\b", p) else "left"
+        target = f"{fb}-{lr}"
     if skill == "stack" and target == obj:
         target = next(c for c in BLOCK_COLORS if c != obj)
     return TaskSpec(skill=skill, obj=obj, target=target)

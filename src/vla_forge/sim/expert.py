@@ -42,6 +42,12 @@ JAW_REACH = 0.05
 BOWL_CLEAR = 0.02
 CARRY_Z = 0.075
 RELEASE_Z = 0.048
+TURN_STEP = 0.02  # rad per 20 ms control tick while turning a carried block
+ROLL_SAFE = 2.3  # rad: the SO-101 wrist roll stops at about +-2.8
+HARD_SQUEEZE = 0.12
+HARD_SQ_SKILLS = ("kit", "insert", "rotate")
+KIT_RELEASE_Z = 0.034  # block centre when released over a tray slot (jaw tips clear the 1.6 cm dividers)
+SOCKET_RELEASE_Z = 0.040  # block bottom 5 mm over the 2 cm socket plate
 TRANSIT_SPEED = 0.12
 APPROACH_SPEED = 0.05
 LIFT_SPEED = 0.06
@@ -163,6 +169,10 @@ class Expert:
             else GRIP_RATE * abs(r.g_open - r.g_closed) / (GRIP_OPEN - GRIPPER_CLOSED)
         )
         self.step = 0
+        # a firmer squeeze than the default keeps the block from sliding in the long carry of the hard skills
+        self.squeeze: float | None = (
+            HARD_SQUEEZE if r.default and spec.skill in HARD_SQ_SKILLS else None
+        )
         self.calm = False
         self.max_ik_err = 0.0
         self.max_seconds = max_seconds
@@ -243,7 +253,9 @@ class Expert:
             APPROACH_SPEED * 0.5,
             settle=0.05,
         )
-        self.grip(self.r.g_squeeze, settle=0.4)
+        self.grip(
+            self.r.g_squeeze if self.squeeze is None else self.squeeze, settle=0.4
+        )
         self.calm = False
         c = sc.body_pos("target")
         self.goto(
@@ -252,13 +264,65 @@ class Expert:
             settle=0.1,
         )
 
-    def place_at(self, xy, release_z, correct_slip=False):
+    def _roll_after(self, xy, turn: float) -> float:
+        """Wrist roll the IK needs over xy with the jaws' axis turned by `turn` more radians."""
+        h, ca, sa = self.ik.heading, np.cos(turn), np.sin(turn)
+        turned = np.array([ca * h[0] - sa * h[1], sa * h[0] + ca * h[1], 0.0])
+        keep, self.ik.heading = h, turned
+        q, _err = self.ik.solve(
+            site_for_block([*xy, CARRY_Z], turned, self.r.centre_grasp), self.q_cmd
+        )
+        self.ik.heading = keep
+        return float(q[4]) if len(q) > 4 else 0.0
+
+    def turn_to(self, xy, yaw_goal: float):
+        """Turn the carried block about the vertical until its yaw matches `yaw_goal` modulo a quarter turn:
+        the jaws' closing axis is turned by the measured yaw error, a few times over, at carry height over xy.
+        The block is a cube, so a quarter turn less or more also fits; when the wrist roll would run into its
+        joint limit the other way round is taken."""
+        for k in range(5):
+            err = (yaw_goal - self.sc.body_yaw("target")) % (np.pi / 2)
+            if err > np.pi / 4:
+                err -= np.pi / 2
+            if k == 0:
+                alt = err - np.pi / 2 if err > 0 else err + np.pi / 2
+                if (
+                    abs(self._roll_after(xy, err))
+                    > ROLL_SAFE
+                    > abs(self._roll_after(xy, alt))
+                ):
+                    err = alt
+            if abs(err) < 0.03:
+                break
+            a = float(err)
+            h0 = self.ik.heading.copy()
+            n = max(1, int(np.ceil(abs(a) / TURN_STEP)))
+            for i in range(
+                1, n + 1
+            ):  # turn the jaws gradually: a jump would fling the block out of them
+                ca, sa = np.cos(a * i / n), np.sin(a * i / n)
+                self.ik.heading = np.array(
+                    [ca * h0[0] - sa * h0[1], sa * h0[0] + ca * h0[1], 0.0]
+                )
+                self.tick(
+                    site_for_block(
+                        [*xy, CARRY_Z], self.ik.heading, self.r.centre_grasp
+                    ),
+                    TRANSIT_SPEED,
+                )
+            self.hold(0.25)
+
+    def place_at(
+        self, xy, release_z, correct_slip=False, yaw_goal=None, measured=False
+    ):
         """Carry over xy, correct for slip in the grasp, lower and release. DART noise fades out over the
         target (a perturbed release is a dropped block, and those demos would just be thrown away)."""
         over = site_for_block([*xy, CARRY_Z], self.ik.heading, self.r.centre_grasp)
         self.goto(over, TRANSIT_SPEED, settle=0.15)
         self.calm = True
         self.hold(0.3)
+        if yaw_goal is not None:
+            self.turn_to(xy, yaw_goal)
         if correct_slip:
             for _ in range(4):
                 err = np.asarray(xy) - self.sc.body_pos("target")[:2]
@@ -269,9 +333,23 @@ class Expert:
                 )
         aim = self.ee_cmd.copy()
         aim[2] += release_z - CARRY_Z
+        if measured:  # the block may hang lower in the jaws than the grasp assumed: lower to where it ends up
+            aim[2] = release_z - (self.sc.body_pos("target")[2] - self.sc.ee_pos()[2])
         self.goto(aim, LIFT_SPEED, settle=0.1)
         self.grip(self.r.g_open, settle=0.4)
         self.goto([*self.ee_cmd[:2], HOVER_Z + 0.02], LIFT_SPEED, settle=0.0)
+        self.calm = False
+
+    def seat(self):
+        """Closed jaws come down on the released block and press it to the bottom of the socket."""
+        c = self.sc.body_pos("target")
+        self.calm = True
+        self.g_goal = self.r.g_closed
+        tip = np.array([*c[:2], 0.0]) - self.r.centre_closed * self.ik.heading
+        self.goto([*tip[:2], HOVER_Z], TRANSIT_SPEED, settle=0.05)
+        self.goto([*tip[:2], 2 * CUBE_HALF + 0.004], APPROACH_SPEED, settle=0.1)
+        self.goto([*tip[:2], 2 * CUBE_HALF - 0.008], APPROACH_SPEED * 0.5, settle=0.3)
+        self.goto([*tip[:2], HOVER_Z], LIFT_SPEED, settle=0.0)
         self.calm = False
 
     def run(self):
@@ -290,6 +368,24 @@ class Expert:
                 2 * CUBE_HALF + CUBE_HALF + 0.008 + (g[2] - CUBE_HALF),
                 correct_slip=True,
             )
+            self.home()
+        elif sk == "kit":
+            goal = self.sc.body_pos("goal")[:2]
+            self.grasp()
+            self.place_at(goal, KIT_RELEASE_Z, correct_slip=True, measured=True)
+            self.home()
+        elif sk in ("insert", "rotate"):
+            sock = self.sc.body_pos("goal")[:2]
+            yaw = self.sc.body_yaw("goal")
+            self.grasp()
+            self.place_at(
+                sock,
+                SOCKET_RELEASE_Z,
+                correct_slip=True,
+                yaw_goal=yaw,
+                measured=True,
+            )
+            self.seat()
             self.home()
         elif sk == "lift":
             self.grasp()

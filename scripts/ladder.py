@@ -6,12 +6,13 @@ Appends one JSON line per prompt to runs/ladder.jsonl (tier, wall clock, rounds,
 """
 
 import json
+import os
 import sys
 import time
 import urllib.request
 from pathlib import Path
 
-API = "http://127.0.0.1:8100/api"
+API = f"http://127.0.0.1:{os.environ.get('VLA_FORGE_PORT', '8100')}/api"
 OUT = Path(__file__).resolve().parents[1] / "runs" / "ladder.jsonl"
 
 

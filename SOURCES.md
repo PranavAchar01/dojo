@@ -45,6 +45,15 @@ from scratch.
 | Conveyor | MuJoCo issue #547, "Conveyor belt", answer by maintainer Yuval Tassa: a box on a slide joint with large damping driven by a constant force settles at force / damping and carries what rests on it by friction, https://github.com/google-deepmind/mujoco/issues/547 | recipe (MuJoCo itself is Apache-2.0) | `sim/line.py add_belt`: same construction (slide joint, damping 1000 N s/m), force applied through `qfrc_applied` so the policy's action vector keeps its size; a contact exclude keeps the belt off the table. 0.12 m/s while running; it stops when a part reaches the station's photo-eye. |
 | Arms | `so101` and `vx300s` above | as above | Stations use the same arm models as the rest of the app. |
 
+## Fixtures for the harder skills
+
+| Item | Source | Licence | Note |
+|---|---|---|---|
+| Kitting tray (2 x 2 slots) | built procedurally from boxes in `src/vla_forge/sim/props.py` | none needed | No downloaded mesh. Slots are 5.5 cm inside, dividers 1.6 cm tall. |
+| Insertion socket (and the 45 degree "diamond" socket) | built procedurally from boxes in `props.py` | none needed | Square hole with 3.5 mm clearance around the 3 cm cube and a 45 degree lead-in made of thin tilted boxes. No downloaded mesh. |
+
+No outside mesh was used, so nothing here is attributed to an outside source.
+
 ## Looked at and left out
 
 - **Suction cup.** No open-source MuJoCo model of a suction gripper was found in these sources, and MuJoCo has no

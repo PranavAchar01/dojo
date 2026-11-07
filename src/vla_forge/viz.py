@@ -75,6 +75,10 @@ def export_scene(layout: Layout, robot: str = "so101") -> dict:
             {
                 "body": int(m.geom_bodyid[g]) - 1,
                 "mesh": int(m.geom_dataid[g]),
+                "name": mujoco.mj_id2name(
+                    m, mujoco.mjtObj.mjOBJ_MESH, int(m.geom_dataid[g])
+                )
+                or "",
                 "pos": m.geom_pos[g].round(6).tolist(),
                 "quat": m.geom_quat[g].round(6).tolist(),
                 "rgba": rgba.round(4).tolist(),
@@ -116,8 +120,26 @@ def export_scene(layout: Layout, robot: str = "so101") -> dict:
             }
             for n, (c, *_r) in layout.pads.items()
         ],
+        "props": _props(layout, idx),
         **_line_parts(layout, idx),
     }
+
+
+def _props(layout: Layout, idx: dict) -> list[dict]:
+    """Table fixtures from sim/props.py: the exact physics boxes of each, in the body frame (markers have none)."""
+    from .sim.props import prop_parts, prop_rgb
+
+    return [
+        {
+            "body": idx[n],
+            "name": n,
+            "kind": kind,
+            "rgb": list(prop_rgb(color)),
+            "parts": prop_parts(kind),
+        }
+        for n, (kind, color, *_pose) in layout.props.items()
+        if kind != "marker"
+    ]
 
 
 def _line_parts(layout: Layout, idx: dict) -> dict:
@@ -179,6 +201,10 @@ def _static_view(m: mujoco.MjModel, d: mujoco.MjData) -> dict:
         geoms.append(
             {
                 "mesh": int(m.geom_dataid[g]),
+                "name": mujoco.mj_id2name(
+                    m, mujoco.mjtObj.mjOBJ_MESH, int(m.geom_dataid[g])
+                )
+                or "",
                 "pos": d.geom_xpos[g].round(5).tolist(),
                 "quat": q.round(5).tolist(),
                 "rgba": rgba.round(4).tolist(),
