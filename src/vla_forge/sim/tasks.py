@@ -30,7 +30,7 @@ from .scene import (
     Scene,
 )
 
-SKILLS = ("reach", "push", "lift", "pick_place", "stack", "kit", "insert", "rotate")
+SKILLS = ("reach", "push", "lift", "pick_place", "stack", "kit", "insert", "rotate", "pack")
 # the complexity ladder: tier 1 single motions, tier 2 pick-and-carry (kit: into a named tray slot); tier 3
 # composes published skills, and also holds the precision insertions (3.5 mm clearance, yaw-aligned)
 TIER = {
@@ -42,6 +42,7 @@ TIER = {
     "kit": 2,
     "insert": 3,
     "rotate": 3,
+    "pack": 3,
 }
 
 # predicates the success DSL understands
@@ -56,6 +57,7 @@ PREDICATES = {
     "seated": "block sunk to the bottom of the socket, centred within its clearance",
     "aligned": "block yaw matches the socket's yaw (modulo a quarter turn) within 0.17 rad",
     "still": "block not moving (speed below 2 cm/s)",
+    "packed": "every library tool inside the toolbox's measured cavity, below the rim, and resting",
     "undisturbed": "every distractor within 3 cm of where it started",
 }
 
@@ -71,7 +73,7 @@ class TaskSpec:
 
     def __post_init__(self):
         assert self.skill in SKILLS, self.skill
-        assert self.obj in BLOCK_COLORS, self.obj
+        assert self.obj in BLOCK_COLORS or self.skill == "pack", self.obj
         if not self.instruction:
             self.instruction = canonical_instruction(self.skill, self.obj, self.target)
         if not self.success:
@@ -99,6 +101,8 @@ class TaskSpec:
 
 
 def canonical_instruction(skill: str, obj: str, target: str | None) -> str:
+    if skill == "pack":
+        return "pack the ratchet wrench, pliers and screwdriver into the toolbox"
     if skill == "pick_place":
         return f"put the {obj} block in the {target} bowl"
     if skill == "push":
@@ -117,6 +121,8 @@ def canonical_instruction(skill: str, obj: str, target: str | None) -> str:
 
 
 def default_success(skill: str) -> list[dict]:
+    if skill == "pack":
+        return [{"op": "packed"}]
     if skill == "pick_place":
         return [
             {"op": "in_bowl", "block": "target", "bowl": "goal"},
@@ -180,6 +186,10 @@ def _pred(p: dict, scene: Scene, start: Layout | None) -> bool:
             ):
                 return False
         return True
+    if op == "packed":
+        from .toolbox import packed
+
+        return packed(scene)
     c = scene.body_pos(blk)
     if op == "in_bowl":
         b = scene.body_pos(p.get("bowl", "goal"))
@@ -281,6 +291,11 @@ def sample_layout(
     With probability extra_p each, a distractor bowl and a distractor square of other colours share the table,
     so the policy has to read the goal's colour from the instruction, and scenes with several fixtures (the
     composed tasks) stay inside the training distribution."""
+    if spec.skill == "pack":
+        from .toolbox import sample
+
+        box, tools = sample(rng)
+        return Layout(props=box, tools=tools)
     if spec.skill in HARD_SKILLS:
         return _sample_hard(spec, rng, near, tries)
     others = [

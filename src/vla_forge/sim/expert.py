@@ -387,6 +387,10 @@ class Expert:
             )
             self.seat()
             self.home()
+        elif sk == "pack":
+            from .toolbox import run_pack
+
+            run_pack(self)
         elif sk == "lift":
             self.grasp()
             c = self.sc.body_pos("target")
