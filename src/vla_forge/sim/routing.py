@@ -177,7 +177,7 @@ def for_spec(
     from . import toolbox
 
     if cont:
-        cxy = toolbox.BOX_CENTRE
+        cxy = toolbox.box_centre()
     return route(
         list(f["checks"]["objects"]),
         cont,

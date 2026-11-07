@@ -2,8 +2,8 @@
 
 from vla_forge.sim import routing, toolbox
 
-XY = (0.25, -0.15)
-TOOLS = list(toolbox.TOOLS)
+XY = toolbox.box_centre()
+TOOLS = ["ratchet_wrench", "pliers", "screwdriver"]
 ALL = list(toolbox.ALL_TOOLS)
 
 
@@ -40,3 +40,22 @@ def test_pinned_infeasible_robot_gets_a_clear_message():
     assert "cannot do pipe_wrench" in r["pinned"]["message"]
     ok = routing.route(TOOLS, toolbox.TOOLBOX, XY, pinned="so101")
     assert ok["pinned"]["ok"] is True
+
+
+def test_unpinned_run_takes_the_chosen_arm_and_pinned_run_keeps_its_own():
+    from types import SimpleNamespace
+
+    from vla_forge.pipeline import Forge
+    from vla_forge.sim.tasks import TaskSpec
+
+    free = SimpleNamespace(robot="so101", pinned=False)
+    spec = TaskSpec("pack", "")
+    Forge._judge(None, free, spec)
+    assert spec.routing["chosen"] == ["so101"] and free.robot == "so101"
+    assert spec.routing["pinned"] is None
+
+    held = SimpleNamespace(robot="so101", pinned=True)
+    spec = TaskSpec("pack", "")
+    Forge._judge(None, held, spec)
+    assert spec.routing["pinned"]["ok"] is True
+    assert TaskSpec.from_json(spec.to_json()).routing == spec.routing
