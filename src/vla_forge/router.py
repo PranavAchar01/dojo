@@ -107,6 +107,7 @@ class Route:
     expected: float | None = None  # success rate the library's history points to
     skill_id: str = ""  # reuse: the tile; remix: the tile it starts from
     steps: list[dict] = field(default_factory=list)  # chain: per step, reuse or train
+    routing: dict = field(default_factory=dict)  # sim/routing.py: which arm (or arms) do the task, ranked
 
     @property
     def refused(self) -> bool:
@@ -386,7 +387,15 @@ def check_robot(parsed: TaskSpec | list[Step], robot: str) -> Check:
 # ------------------------------------------------------------------ the decision
 
 
-def route(
+def route(*args, **kw) -> Route:
+    """The decision, with the arm routing of the parsed task (sim/routing.py) attached."""
+    r = _decide(*args, **kw)
+    parsed = args[1] if len(args) > 1 else kw.get("parsed")
+    r.routing = getattr(parsed, "routing", None) or {}
+    return r
+
+
+def _decide(
     prompt: str,
     parsed: TaskSpec | list[Step] | None,
     info: dict,
@@ -445,6 +454,17 @@ def route(
 
     fit = check_robot(parsed, robot)
     checks.append(fit)
+    arms = getattr(parsed, "routing", None)
+    if arms:
+        picked = ", ".join(robot_label(c) for c in arms["chosen"]) or "no arm"
+        pin = arms.get("pinned")
+        checks.append(
+            Check(
+                "arm routing",
+                pin["ok"] if pin else bool(arms["chosen"]),
+                pin["message"] if pin else f"routed to {picked}, from the measured checks of {len(arms['ranked'])} arms",
+            )
+        )
     if not fit.ok:
         return Route(
             "not_feasible", fit.detail, checks, suggestion=_suggest(None, registry)
