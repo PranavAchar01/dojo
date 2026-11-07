@@ -8,7 +8,7 @@ from vla_forge import duck_bricks as db
 
 parts = {}
 for part, name in db.PART_NAME.items():
-    if part == "3039":
+    if part not in {b.part for b in db.DUCK}:
         continue
     src = db.LIB / "parts" / f"{part}.dat"
     head = {}
