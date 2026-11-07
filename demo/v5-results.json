@@ -1,0 +1,49 @@
+{
+ "recorded": "2026-11-07T02:03:00.661Z",
+ "line_id": "175754-4b06",
+ "prompt": "Kitting line: red parts go to the blue tote, then yellow parts to the green tote, and a scripted ViperX at the end of the line catches everything else in the gray tote.",
+ "stations": [
+  {
+   "name": "Red to Blue",
+   "part": "red",
+   "bin": "blue",
+   "train_seconds": 88.7,
+   "held_out_success": 0.95,
+   "n_eval": 20,
+   "rounds": [
+    {
+     "succeeded": 19,
+     "n": 20
+    }
+   ],
+   "from": "put-the-blue-block-in-the-blue-bin-e2dc"
+  },
+  {
+   "name": "Yellow to Green",
+   "part": "yellow",
+   "bin": "green",
+   "train_seconds": 167.7,
+   "held_out_success": 0.75,
+   "n_eval": 20,
+   "rounds": [
+    {
+     "succeeded": 14,
+     "n": 20
+    },
+    {
+     "succeeded": 15,
+     "n": 20
+    }
+   ],
+   "from": "put-the-green-block-in-the-green-bin-b802"
+  }
+ ],
+ "line": {
+  "parts": 30,
+  "completed": 30,
+  "success_rate": 1,
+  "parts_per_min": 7.21,
+  "makespan_s": 249.7
+ },
+ "retry": true
+}

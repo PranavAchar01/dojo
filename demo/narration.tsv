@@ -1,10 +1,12 @@
-hook	hook	This is VLA Forge. A factory describes its line in plain words, and each station on it gets its own trained robot policy. All of this runs in simulation.
-describe	explain	Here's a new kitting line. Blue parts go to the yellow tote, red parts to the green one, and a ViperX at the end catches the rest.
-cards	explain	The planner turns that into three stations. The two sorting stations each get a VLA, fine-tuned from the closest skill in the library. The last one is a scripted cell, and its card says so.
-train	explain	Now both stations train for real. The forge collects demos, fine-tunes, then tests each policy on scenes it never saw. I sped the waiting up four times.
-round2	honest	The red station got fifteen of twenty on its first round. That's under the eighty percent bar, so the critic sent it back for another round.
-trained	proud	The blue station trained in ninety-three seconds and the red one in a hundred and sixty-seven. Each worked in seventeen of twenty held-out scenes.
-replay	explain	Then thirty parts go down the belt. This replay runs at four times.
-results	proud	All thirty ended up in the right tote, about seven parts a minute in simulated time.
+hook	hook	This is VLA Forge. A company describes its line in plain words, and gets a trained robot policy for each station in minutes. All of this runs in simulation.
+describe	explain	Here's a new kitting line. Red parts go to the blue tote, yellow parts to the green one, and a ViperX at the end catches the rest.
+cards	explain	The planner turns that into a chain of three stations: a VLA, then a VLA, then a scripted cell. Each VLA is fine-tuned from the closest skill in the library.
+train	explain	Now both stations train for real. The forge collects demos, fine-tunes, then tests each policy on scenes it never saw. The waiting is sped up four times, and the badge shows it.
+round2	honest	The {rname} station got {r1} of {rn} on its first round, under the bar, so the critic sent it back for another.
+trained	proud	The {a} station trained in {t0} seconds and the {b} one in {t1}. On {n} held-out scenes, they got {s0} and {s1}.
+replay	explain	Then {parts} parts go down the belt, in simulation.
+results	proud	{done} of {parts} ended up in the right tote, at about {tpm} parts a minute in simulated time.
 library	explain	Each station's skill is saved in the library as a tile with its measured success.
-close	close	Typing that line to a finished run took under five minutes.
+far	honest	Ask for something the arm can't reach, like lifting a block sixty centimeters, and the router says not feasible. The jaws top out at fifty-three.
+robot	explain	In the Robot tab you build the arm itself. Every part has a preview, and each one is a real open-source model.
+close	close	From typing that line to a finished run took under {mins} minutes.

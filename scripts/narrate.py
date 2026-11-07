@@ -1,6 +1,8 @@
 """Demo narration: one gpt-realtime-2.1 take per script line (voice cedar), acted, checked, trimmed, sped up.
 
-Reads demo/narration.tsv (name<TAB>mood<TAB>line). Each take's own transcript must match the line word for
+Reads demo/narration.tsv (name<TAB>mood<TAB>line). Numbers in a line are {placeholders} filled from the run
+measured for this cut (demo/v5-results.json and the newest recording's marks file), spelled out as words; the
+"round2" line is only voiced when a station really needed a second round. Each take's own transcript must match the line word for
 word (case and punctuation aside) or it is voiced again. Writes demo/narration/1x/<name>.wav (as spoken) and
 demo/narration/<name>.wav (sped to SPEED), 48 kHz mono. Adapted from meta-sight's narration script.
 The key comes from the macOS Keychain (OPENAI_API_KEY) and is never written anywhere.
@@ -45,6 +47,90 @@ MOODS = {
     "honest": "Plain and candid about a limit, no drama.",
     "close": "Warm and confident, wrapping up.",
 }
+
+
+ONES = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+]
+TENS = [
+    "_",
+    "_",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+]
+
+
+def words(n: int) -> str:
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        return TENS[n // 10] + (f"-{ONES[n % 10]}" if n % 10 else "")
+    h, r = divmod(n, 100)
+    return f"{ONES[h]} hundred" + (f" and {words(r)}" if r else "")
+
+
+def decimal(x: float) -> str:  # 7.2 -> "seven point two"
+    whole, frac = f"{x:.1f}".split(".")
+    return words(int(whole)) + (f" point {ONES[int(frac)]}" if frac != "0" else "")
+
+
+def fills() -> dict[str, str] | None:
+    f = ROOT / "demo/v5-results.json"
+    if not f.exists():
+        return None
+    r = json.loads(f.read_text())
+    st, ln = r["stations"], r["line"]
+    marks = json.loads(max((ROOT / "demo").glob("vla-forge-*.marks.json")).read_text())[
+        "at"
+    ]
+    mins = -(-int(marks["ran"] - marks["describe"]) // 60)
+    out = {
+        "a": st[0]["name"],
+        "b": st[1]["name"],
+        "t0": words(round(st[0]["train_seconds"])),
+        "t1": words(round(st[1]["train_seconds"])),
+        "s0": words(st[0]["rounds"][-1]["succeeded"]),
+        "s1": words(st[1]["rounds"][-1]["succeeded"]),
+        "n": words(st[0]["n_eval"]),
+        "parts": words(ln["parts"]),
+        "done": words(ln["completed"]),
+        "tpm": decimal(ln["parts_per_min"]),
+        "mins": words(mins),
+    }
+    if r["retry"]:
+        i = next(i for i, x in enumerate(st) if len(x["rounds"]) > 1)
+        first = st[i]["rounds"][0]
+        out |= {
+            "rname": st[i]["name"],
+            "r1": words(first["succeeded"]),
+            "rn": words(first["n"]),
+        }
+    return out
 
 
 def norm(s: str) -> str:
@@ -139,6 +225,13 @@ async def main(key: str) -> None:
     for d in (OUT_1X, OUT, CACHE):
         d.mkdir(parents=True, exist_ok=True)
     rows = [r.split("\t", 2) for r in LINES.read_text().splitlines() if r.strip()]
+    fill = fills()
+    if fill is not None:
+        rows = [
+            [n, m, t.format(**fill)]
+            for n, m, t in rows
+            if n != "round2" or "rname" in fill
+        ]
     gate = asyncio.Semaphore(PARALLEL)
     jobs = [voice(key, n, m, t, gate) for n, m, t in rows if not only or n in only]
     done = await asyncio.gather(*jobs)
