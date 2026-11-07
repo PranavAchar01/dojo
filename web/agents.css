@@ -11,7 +11,7 @@
 .ag-node text.sub { font: 500 10px var(--ui); fill: var(--ink3); }
 .ag-node.llm text.sub { fill: #0064e0; }
 .ag-node { cursor: default; }
-.ag-pulse { fill: #0866ff; filter: drop-shadow(0 0 4px rgba(8, 102, 255, .6)); }
+.ag-pulse { stroke: none; fill: #0866ff; filter: drop-shadow(0 0 4px rgba(8, 102, 255, .6)); }
 .ag-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .ag-foot { font-size: 12px; line-height: 1.45; color: var(--ink2); background: var(--card); border-radius: var(--r); box-shadow: var(--ring); padding: 10px 12px; }
 .ag-foot b { color: var(--ink); }
@@ -30,3 +30,6 @@
 
 .ag-node text, .ag-graph text { letter-spacing: 0; font-weight: 600; }
 .ag-node text.sub { font-weight: 500; }
+.ag-graph text { stroke: none; }
+.ag-node text { fill: var(--ink); } .ag-node text.sub { fill: var(--ink3); } .ag-node.llm text.sub { fill: #0064e0; }
+.ag-graph .ag-edge { fill: none; }

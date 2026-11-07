@@ -236,7 +236,9 @@ function dropBubble(delay = 0) {
 tick(() => {
   if (bub && layer && bub.base) {
     const r = bub.bot.host.getBoundingClientRect();
-    layer.root.style.translate = `${(r.left - bub.base.x).toFixed(1)}px ${(r.top - bub.base.y).toFixed(1)}px`;
+    const L0 = parseFloat(layer.root.style.left) || 0;
+    const tx = Math.max(8 - L0, Math.min(innerWidth - 368 - L0, r.left - bub.base.x));
+    layer.root.style.translate = `${tx.toFixed(1)}px ${(r.top - bub.base.y).toFixed(1)}px`;
   }
   return true;
 });
