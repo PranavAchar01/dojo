@@ -1,18 +1,23 @@
-"""The recursive optimizer: a language model improves a trained skill, one change per round, scored on the same scenes.
+"""The recursive optimizer: a language model improves a trained skill, one change per round, on a fair three-way split.
 
-R0 scores the skill as trained on 100 held-out simulated scenes. Every later round: the model reads the failure
-summary and proposes exactly one change to the policy's training (from a fixed menu, validated here), the change
-is applied, the policy is fine-tuned from the current weights and scored again on the same 100 scenes. The change
-is kept when the success count rises and reverted otherwise. Every round is written to runs/opt-<id>/run.json.
+Scenes come from three disjoint seed sets. TRAIN seeds generate every demonstration. SELECT (100 scenes) is scored each
+round and decides keep or revert. TEST (100 scenes) is never shown to the optimizer and is scored only at R0 and on the
+final kept policy, with 95% Wilson intervals and a paired comparison (McNemar exact, paired bootstrap) on the same scenes.
+A control arm repeats the same number of rounds with a random valid change each round (or no change at all), under the
+same keep/revert rule, so a gain can be attributed to the optimizer and not to extra training.
 
-The proposing model is Llama through the Meta Llama API (llama.py). Until a key works, the stub backend replays
-the changes recorded in a saved run.
+Every round the model (llama.py: Meta's Llama API if its key works, else OpenAI behind the same interface) reads the
+per-failure evidence and rendered frames and proposes exactly one change from a fixed menu, validated here; it may not
+repeat a change that was just reverted. The backend that really answered is recorded per round. Each SELECT scoring
+pass is rendered in Blender (blender_montage.py) from the recorded MuJoCo trajectories. Every round is written to
+runs/opt-<id>/run.json.
 """
 
 from __future__ import annotations
 
 import contextlib
 import copy
+import io
 import json
 import math
 import os
@@ -25,7 +30,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from . import llm, montage
+from . import blender_montage, llama, montage
 from .datagen import demo_job, pool
 from .encoders import device
 from .learn import SCOPES, Demos, train
@@ -37,13 +42,23 @@ from .sim.tasks import sample_layout
 N_SCENES = int(
     os.environ.get("VLA_FORGE_OPT_SCENES", "100")
 )  # fewer only for smoke tests
+N_TEST = int(os.environ.get("VLA_FORGE_OPT_TEST_SCENES", "100"))
 SEED0 = (
     EVAL_SEED0 + 200_000
-)  # held-out: never a training seed, never the 20 scenes a skill was published on
+)  # SELECT: held-out, never a training seed, never the 20 scenes a skill was published on
+TEST_SEED0 = (
+    EVAL_SEED0 + 300_000
+)  # TEST: a second held-out block the optimizer never sees
+START_SEED0 = 50_000  # TRAIN: the demonstrations every fine-tune starts from
+ROUND_SEED0 = (
+    60_000  # TRAIN: round r draws its extra demonstrations from ROUND_SEED0 + 1000 * r
+)
+MAX_ROUNDS = 8
 CHUNK = 25
 KEEP_FRAMES = 32
 START_DEMOS = 60  # fresh demonstrations every fine-tune starts from, before any change
 RUNS = ROOT / "runs"
+DEFAULT_RUN = "064106-9ad6"  # the run the Optimize panel opens on (a running one wins)
 
 DEFAULTS = {
     "lr": 1e-4,
@@ -69,22 +84,37 @@ KNOBS = {
 SCHEMA = {
     "type": "object",
     "properties": {
+        "diagnosis": {"type": "string"},
         "knob": {"type": "string", "enum": list(KNOBS)},
         "value": {"type": "string"},
         "reason": {"type": "string"},
     },
-    "required": ["knob", "value", "reason"],
+    "required": ["diagnosis", "knob", "value", "reason"],
     "additionalProperties": False,
 }
 SYSTEM = f"""You improve a trained robot policy by changing how it is fine-tuned. The policy is a small vision-language-action
-model for a simulated SO-101 arm. It was scored on a fixed set of held-out simulated scenes; you read the failures and
-propose exactly ONE change to the next fine-tuning round. The change is kept only if success on the same scenes rises.
+model for a simulated SO-101 arm. It was scored on a fixed set of simulated scenes (SELECT); you read the failures and
+propose exactly ONE change to the next fine-tuning round. The change is kept only if success on SELECT rises. A separate
+TEST set that you never see decides whether the whole process helped, so do not chase noise on SELECT.
 
-Allowed knobs and ranges (value is a number written as text, except scope):
+You get, per failed scene: the failure tag, where the target block started (x forward, y left, metres), the goal
+position when there is one, and contact statistics (closest gripper approach, highest the block was lifted, how far it
+moved, distance to the goal at the end), plus per-tag averages, failure rates by region, the settings now in force, the
+full history of earlier changes with their scores, and a picture: rows are failed scenes, columns are early, middle and
+late moments of the rollout, rendered in Blender from the recorded trajectory.
+
+The full menu of knobs, with ranges (value is a number written as text, except scope):
 {json.dumps({k: {"low": v[0], "high": v[1], "meaning": v[2]} for k, v in KNOBS.items()})}
 scope must be one of {list(SCOPES)}. Demonstration counts are whole numbers; batch is 64, 128, 256 or 512.
-Use the failure tags and the failure rate by region to choose. Do not repeat a change that was reverted unless you
-change its value clearly. reason: one plain sentence under 140 characters, no dashes, no claims beyond the numbers."""
+
+How to decide: first name the dominant failure pattern and what it says about the policy (is it where the block is,
+how the grasp closes, how the block meets the socket, too little training, overfitting to the new data, forgetting).
+Then pick the knob that addresses that cause, not the knob that is easiest. Demonstrations are one family of knob among
+eight; training length, learning rate, noise, replay, batch size, weight decay and scope act on different causes. If
+earlier rounds already tried a knob, say what you learned and move to a different cause when it stopped helping.
+Never repeat a change that was reverted (same knob and same value); a rejected list in the input shows what is barred.
+diagnosis: two or three plain sentences naming the pattern and the cause. reason: one plain sentence under 140
+characters, no dashes, no claims beyond the numbers."""
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> list[float]:
@@ -95,6 +125,73 @@ def wilson(k: int, n: int, z: float = 1.96) -> list[float]:
     c = (p + z * z / (2 * n)) / d
     h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
     return [round(max(0.0, c - h), 3), round(min(1.0, c + h), 3)]
+
+
+def split(
+    n_select: int | None = None, n_test: int | None = None
+) -> dict[str, list[int]]:
+    """The three scene sets as seed lists. Scene i of a set always has the same seed, so it is the same scene every time."""
+    n_select = N_SCENES if n_select is None else n_select
+    n_test = N_TEST if n_test is None else n_test
+    train = list(range(START_SEED0, START_SEED0 + START_DEMOS)) + [
+        ROUND_SEED0 + 1000 * r + i
+        for r in range(1, MAX_ROUNDS + 1)
+        for i in range(KNOBS["extra_demos_near_failures"][1])
+    ]
+    sets = {
+        "train": train,
+        "select": list(range(SEED0, SEED0 + n_select)),
+        "test": list(range(TEST_SEED0, TEST_SEED0 + n_test)),
+    }
+    check_disjoint(sets)
+    return sets
+
+
+def check_disjoint(sets: dict[str, list[int]]) -> None:
+    names = list(sets)
+    for i, a in enumerate(names):
+        if len(set(sets[a])) != len(sets[a]):
+            raise ValueError(f"{a} repeats a seed")
+        for b in names[i + 1 :]:
+            both = set(sets[a]) & set(sets[b])
+            if both:
+                raise ValueError(f"{a} and {b} share {len(both)} seeds")
+
+
+def mcnemar_exact(before: list[int], after: list[int]) -> dict:
+    """Paired comparison on the same scenes: b = fixed (0 -> 1), c = broken (1 -> 0); two-sided exact binomial p."""
+    b = sum(1 for x, y in zip(before, after, strict=True) if not x and y)
+    c = sum(1 for x, y in zip(before, after, strict=True) if x and not y)
+    n = b + c
+    if n == 0:
+        return {"fixed": b, "broken": c, "p": 1.0}
+    k = min(b, c)
+    tail = sum(math.comb(n, i) for i in range(k + 1)) / 2**n
+    return {"fixed": b, "broken": c, "p": round(min(1.0, 2 * tail), 4)}
+
+
+def paired_bootstrap(
+    before: list[int], after: list[int], reps: int = 10_000, seed: int = 0
+) -> list[float]:
+    """95% interval of the change in success rate, resampling scenes (pairs stay together)."""
+    d = np.asarray(after, float) - np.asarray(before, float)
+    rng = np.random.default_rng(seed)
+    means = d[rng.integers(0, len(d), (reps, len(d)))].mean(axis=1)
+    lo, hi = np.quantile(means, [0.025, 0.975])
+    return [round(float(lo), 3), round(float(hi), 3)]
+
+
+def compare(before: list[int], after: list[int]) -> dict:
+    n = len(before)
+    kb, ka = sum(before), sum(after)
+    return {
+        "n": n,
+        "before": {"k": kb, "rate": round(kb / n, 3), "ci": wilson(kb, n)},
+        "after": {"k": ka, "rate": round(ka / n, 3), "ci": wilson(ka, n)},
+        "delta": round((ka - kb) / n, 3),
+        "delta_ci": paired_bootstrap(before, after),
+        "mcnemar": mcnemar_exact(before, after),
+    }
 
 
 def clean_change(raw: dict) -> dict:
@@ -117,7 +214,11 @@ def clean_change(raw: dict) -> dict:
         else:
             v = float(min(max(x, lo), hi))
     reason = " ".join(str(raw.get("reason", "")).replace("—", ",").split())[:140]
-    return {"knob": knob, "value": v, "reason": reason}
+    out = {"knob": knob, "value": v, "reason": reason}
+    diag = " ".join(str(raw.get("diagnosis", "")).replace("—", ",").split())[:400]
+    if diag:
+        out["diagnosis"] = diag
+    return out
 
 
 def describe(ch: dict) -> str:
@@ -141,6 +242,15 @@ def describe(ch: dict) -> str:
     }[k]
 
 
+STAT_KEYS = (
+    "min_grip_dist",
+    "target_max_z",
+    "target_moved",
+    "final_goal_dist",
+    "distractor_lift",
+)
+
+
 def failure_report(scored: list[dict], cfg: dict) -> dict:
     fails = [s for s in scored if not s["success"]]
     tags: dict[str, int] = {}
@@ -157,11 +267,36 @@ def failure_report(scored: list[dict], cfg: dict) -> dict:
             "failure_rate": round(float((~ok[mask]).mean()), 2) if n else None,
         }
 
+    def mean_stats(rows: list[dict]) -> dict:
+        return {
+            k: round(float(np.mean([x["stats"].get(k, 0.0) for x in rows])), 3)
+            for k in STAT_KEYS
+        }
+
     q1, q2 = np.quantile(r, [1 / 3, 2 / 3])
     return {
         "scenes": len(scored),
         "succeeded": int(ok.sum()),
         "failure_tags": tags,
+        "per_tag_mean_stats": {
+            t: mean_stats([s for s in fails if s["failure"] == t]) for t in tags
+        },
+        "success_mean_stats": mean_stats([s for s in scored if s["success"]])
+        if ok.any()
+        else None,
+        "failures": [
+            {
+                "scene": s["index"],
+                "tag": s["failure"],
+                "target_xy": [round(v, 3) for v in s["target_xy"]],
+                "goal_xy": [round(v, 3) for v in s["goal_xy"]]
+                if s["goal_xy"]
+                else None,
+                "steps": s["steps"],
+                **{k: round(float(s["stats"].get(k, 0.0)), 3) for k in STAT_KEYS},
+            }
+            for s in fails[:40]
+        ],
         "by_distance_from_base": {
             "near": rate(r <= q1),
             "middle": rate((r > q1) & (r <= q2)),
@@ -181,25 +316,122 @@ def failure_report(scored: list[dict], cfg: dict) -> dict:
     }
 
 
-def propose(report: dict, history: list[dict], rnd: int) -> tuple[dict, str]:
-    """One change from the language model, validated. Returns (change, model that answered)."""
-    user = json.dumps({"round": rnd, "failure_report": report, "history": history})
-    try:
-        raw, model = llm._chat_json(SYSTEM, user, SCHEMA, "optimizer")
-        return clean_change(raw), model
-    except (RuntimeError, ValueError, TypeError) as e:
-        order = [
-            {"knob": "extra_demos_near_failures", "value": "30"},
-            {"knob": "lr", "value": "0.0001"},
-            {"knob": "train_seconds", "value": "60"},
-            {"knob": "replay_frac", "value": "0.3"},
-            {"knob": "state_noise", "value": "0.05"},
-            {"knob": "scope", "value": "action_layers"},
-        ]
-        pick = order[(rnd - 1) % len(order)]
-        return clean_change(
-            {**pick, "reason": f"fixed menu, no model answered: {e}"}
-        ), "rules"
+def evidence_png(sheets: Path, scored: list[dict], rows: int = 4) -> bytes | None:
+    """Rendered frames of the first few failures (early, middle, late moment), cropped from a round's Blender sheets."""
+    from PIL import Image
+
+    fails = [s["index"] for s in scored if not s["success"]][:rows]
+    cols = (2, 4, 7)
+    if not fails or not all((sheets / f"m{k}.jpg").exists() for k in cols):
+        return None
+    tw, th = montage.TILE_W, montage.TILE_H
+    sh = {k: Image.open(sheets / f"m{k}.jpg") for k in cols}
+    out = Image.new("RGB", (len(cols) * tw * 2, len(fails) * th * 2))
+    for ri, i in enumerate(fails):
+        x, y = (i % montage.COLS) * tw, (i // montage.COLS) * th
+        for ci, k in enumerate(cols):
+            tile = sh[k].crop((x, y, x + tw, y + th)).resize((tw * 2, th * 2))
+            out.paste(tile, (ci * tw * 2, ri * th * 2))
+    buf = io.BytesIO()
+    out.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _same(a: dict, b: dict) -> bool:
+    if a["knob"] != b["knob"]:
+        return False
+    if isinstance(a["value"], str) or isinstance(b["value"], str):
+        return a["value"] == b["value"]
+    return math.isclose(float(a["value"]), float(b["value"]), rel_tol=1e-6)
+
+
+def barred(history: list[dict]) -> list[dict]:
+    """Changes that were tried and reverted: the model may not propose these again."""
+    return [
+        {"knob": h["change"]["knob"], "value": h["change"]["value"]}
+        for h in history
+        if not h["kept"]
+    ]
+
+
+FALLBACK = [
+    {"knob": "extra_demos_near_failures", "value": "30"},
+    {"knob": "lr", "value": "0.0001"},
+    {"knob": "train_seconds", "value": "60"},
+    {"knob": "replay_frac", "value": "0.3"},
+    {"knob": "state_noise", "value": "0.05"},
+    {"knob": "scope", "value": "action_layers"},
+    {"knob": "weight_decay", "value": "0.001"},
+    {"knob": "batch", "value": "128"},
+]
+
+
+def fallback_change(rnd: int, history: list[dict], why: str) -> dict:
+    ban = barred(history)
+    for k in range(len(FALLBACK)):
+        pick = clean_change(
+            {**FALLBACK[(rnd - 1 + k) % len(FALLBACK)], "reason": f"fixed menu: {why}"}
+        )
+        if not any(_same(pick, b) for b in ban):
+            return pick
+    return pick
+
+
+def random_change(rng: np.random.Generator, history: list[dict]) -> dict:
+    """The control arm's change: a random valid knob and value, never a reverted repeat."""
+    ban = barred(history)
+    for _ in range(50):
+        knob = str(rng.choice(list(KNOBS)))
+        lo, hi, _ = KNOBS[knob]
+        if knob == "scope":
+            val = str(rng.choice(list(SCOPES)))
+        elif knob in ("lr", "weight_decay"):
+            val = str(float(np.exp(rng.uniform(np.log(lo), np.log(hi)))))
+        else:
+            val = str(float(rng.uniform(lo, hi)))
+        ch = clean_change(
+            {"knob": knob, "value": val, "reason": "control: random valid change"}
+        )
+        if not any(_same(ch, b) for b in ban):
+            return ch
+    return ch
+
+
+def propose(
+    report: dict,
+    history: list[dict],
+    rnd: int,
+    images: list[bytes] | None = None,
+) -> tuple[dict, str]:
+    """One change from the language model, validated. Returns (change, backend that answered; "rules" if none did).
+
+    A change identical to one that was reverted is sent back once with the barred list; a second repeat is dropped for
+    the fixed menu."""
+    ban = barred(history)
+    payload = {
+        "round": rnd,
+        "failure_report": report,
+        "history": history,
+        "rejected": ban,
+        "pictures": "rows are failed scenes, columns are early, middle and late moments"
+        if images
+        else "none this round",
+    }
+    why = ""
+    for attempt in range(2):
+        try:
+            raw, _model, backend = llama.chat_json_ex(
+                "optimizer", SYSTEM, json.dumps(payload), SCHEMA, images
+            )
+            ch = clean_change(raw)
+        except (RuntimeError, ValueError, TypeError) as e:
+            why = f"no model answered: {e}"
+            break
+        if not any(_same(ch, b) for b in ban):
+            return ch, backend
+        why = "the model repeated a reverted change"
+        payload["rejected_this_round"] = {"knob": ch["knob"], "value": ch["value"]}
+    return fallback_change(rnd, history, why), "rules"
 
 
 @dataclass
@@ -217,6 +449,10 @@ class Opt:
     error: str = ""
     n_scenes: int = N_SCENES
     seconds: float = 0.0
+    split: dict = field(default_factory=dict)
+    test: dict = field(default_factory=dict)
+    control: dict = field(default_factory=dict)
+    blender: dict = field(default_factory=dict)
 
     def to_json(self) -> dict:
         d = {k: v for k, v in self.__dict__.items()}
@@ -326,6 +562,34 @@ def eligible(skills: dict[str, Skill]) -> list[Skill]:
     )
 
 
+def score_outcomes(
+    model: VLA, spec, layouts: list[dict], robot: str, seed0: int
+) -> list[int]:
+    """Success flags only (no recording): how TEST is scored."""
+    out: list[int] = []
+    for c in range(0, len(layouts), CHUNK):
+        part = layouts[c : c + CHUNK]
+        rolls = evaluate(
+            model,
+            spec,
+            len(part),
+            seed0=seed0 + c,
+            layouts=part,
+            record=False,
+            robot=robot,
+        )
+        out += [int(r.success) for r in rolls]
+    return out
+
+
+def _copy_demos(data: Demos) -> Demos:
+    d = copy.copy(data)
+    d.vis, d.states, d.actions = list(data.vis), list(data.states), list(data.actions)
+    d.aux, d.lang_idx = list(data.aux), list(data.lang_idx)
+    d.instructions, d._packed = list(data.instructions), None
+    return d
+
+
 def run(
     skill: Skill,
     n_rounds: int,
@@ -334,7 +598,10 @@ def run(
     compute: contextlib.AbstractContextManager | None = None,
     emit: Callable[..., None] | None = None,
     train_seconds: float = DEFAULTS["train_seconds"],
+    control: str | None = "random",
 ) -> Opt:
+    """R0, then `n_rounds` of the optimizer arm (SELECT keeps or reverts), then the control arm from the same start,
+    then TEST for R0, the optimizer's final policy and the control's. control: "random", "none" or None."""
     comp = compute if compute is not None else contextlib.nullcontext()
     ev = emit or (lambda *a, **k: None)
     out = RUNS / f"opt-{opt.id}"
@@ -343,23 +610,50 @@ def run(
     spec = skill.task()
     dev = device()
     robot = skill.robot
-    model, _ = VLA.load(ROOT / skill.model, dev)
+    base, _ = VLA.load(ROOT / skill.model, dev)
     layouts = [
         sample_layout(spec, np.random.default_rng(SEED0 + i)).to_json()
         for i in range(N_SCENES)
     ]
+    test_layouts = [
+        sample_layout(spec, np.random.default_rng(TEST_SEED0 + i)).to_json()
+        for i in range(N_TEST)
+    ]
+    seeds = split()
+    sel_keys = {json.dumps(l, sort_keys=True) for l in layouts}
+    if any(json.dumps(l, sort_keys=True) in sel_keys for l in test_layouts):
+        raise ValueError("a TEST scene is also a SELECT scene")
+    opt.split = {
+        "train": {
+            "seeds": f"{START_SEED0}.. (start), {ROUND_SEED0}+1000*round.. (extra)",
+            "start_demos": START_DEMOS,
+            "used_for": "demonstration generation only",
+        },
+        "select": {
+            "seed0": SEED0,
+            "n": N_SCENES,
+            "used_for": "keep or revert, every round",
+        },
+        "test": {
+            "seed0": TEST_SEED0,
+            "n": N_TEST,
+            "used_for": "scored at R0 and on the final kept policy only",
+        },
+        "disjoint": True,
+        "sizes": {k: len(v) for k, v in seeds.items()},
+    }
     stage = montage.Stage(robot)
-    cfg = {**DEFAULTS, "train_seconds": float(train_seconds)}
-    history: list[dict] = []
-    all_scored: dict[int, list[dict]] = {}
-    opt.llm = {"asked": "Llama", "answered": None}
+    cfg0 = {**DEFAULTS, "train_seconds": float(train_seconds)}
+    opt.llm = {"asked": "Llama 4 Maverick", "backend": None, "backends_used": []}
+    bl = {"engine": None, "renders": 0, "rounds": 0, "seconds": 0.0, "workers": 0}
+    use_blender = blender_montage.blender_bin() is not None
 
     def phase(name: str, **kw) -> None:
         opt.phase = name
         _save(opt)
         ev(opt.id, "opt_phase", phase=name, **kw)
 
-    def evaluate_round(rnd: int, m: VLA) -> list[dict]:
+    def evaluate_round(rnd: int, m: VLA, sheets: bool) -> list[dict]:
         phase("scoring", round=rnd)
         with comp:
             sc = score(
@@ -369,65 +663,73 @@ def run(
                 robot,
                 lambda n: ev(opt.id, "opt_scoring", round=rnd, done=n),
             )
-        phase("rendering", round=rnd)
-        montage.write_sheets(stage, sc, out / f"r{rnd}")
-        all_scored[rnd] = sc
+        if sheets:
+            phase("rendering", round=rnd)
+            if use_blender:
+                st = blender_montage.render_sheets(stage, sc, out / f"r{rnd}")
+                bl["engine"] = st["engine"]
+                bl["renders"] += st["renders"]
+                bl["rounds"] += 1
+                bl["seconds"] = round(bl["seconds"] + st["seconds"], 1)
+                bl["workers"] = max(bl["workers"], st["workers"])
+                bl.setdefault("per_round", []).append(
+                    {
+                        "round": rnd,
+                        **{k: st[k] for k in ("renders", "workers", "seconds")},
+                    }
+                )
+            else:
+                montage.write_sheets(stage, sc, out / f"r{rnd}")
+                bl["engine"] = "mujoco"
+            opt.blender = bl
         return sc
 
-    try:
-        opt.status = "running"
-        t0 = time.time()
-        sc0 = evaluate_round(0, model)
-        k0 = sum(s["success"] for s in sc0)
-        best_k, best_scored = k0, sc0
-        opt.rounds.append(
-            {
-                "round": 0,
-                "change": None,
-                "status": "start",
-                "success": k0,
-                "n": N_SCENES,
-                "ci": wilson(k0, N_SCENES),
-                "failures": failure_report(sc0, cfg)["failure_tags"],
-                "outcomes": [int(s["success"]) for s in sc0],
-                "seconds": round(time.time() - t0, 1),
-            }
-        )
-        phase("collecting", round=0)
-        data = Demos()
-        with comp:
-            collect(spec, START_DEMOS, None, 50_000, tmp, robot, data)
+    def run_arm(kind: str, sc0: list[dict], data0: Demos, rows: list[dict]) -> tuple:
+        """One arm from R0: returns (final model, final cfg, best round, scored per round)."""
+        model = copy.deepcopy(base)
+        cfg, data = dict(cfg0), data0
+        best_k, best_scored, best_round = sum(s["success"] for s in sc0), sc0, 0
+        history: list[dict] = []
+        scored: dict[int, list[dict]] = {0: sc0}
+        rng = np.random.default_rng(7)
         for rnd in range(1, n_rounds + 1):
             t1 = time.time()
-            phase("proposing", round=rnd)
-            report = failure_report(best_scored, cfg)
-            change, answered = propose(report, history, rnd)
-            opt.llm["answered"] = answered
-            opt.llm["real_llama"] = answered.lower().startswith("llama")
+            phase("proposing" if kind == "optimizer" else "control", round=rnd)
+            if kind == "optimizer":
+                report = failure_report(best_scored, cfg)
+                png = evidence_png(out / f"r{best_round}", best_scored)
+                change, backend = propose(report, history, rnd, [png] if png else None)
+                opt.llm["backend"] = backend
+                if backend not in opt.llm["backends_used"]:
+                    opt.llm["backends_used"].append(backend)
+                opt.llm["real_llama"] = backend.startswith("meta:")
+            elif kind == "random":
+                change, backend = random_change(rng, history), "random"
+            else:
+                change, backend = None, "none"
             cand_cfg, cand_data = dict(cfg), data
-            text = describe(change)
+            text = describe(change) if change else "no change, train again"
             row = {
                 "round": rnd,
-                "change": {**change, "text": text, "model": answered},
+                "change": {**change, "text": text, "model": "Llama 4 Maverick"}
+                if change
+                else {
+                    "knob": None,
+                    "value": None,
+                    "text": text,
+                    "reason": "control: no change",
+                },
+                "backend": backend,
                 "status": "training",
             }
-            opt.rounds.append(row)
-            _save(opt)
-            ev(opt.id, "opt_change", round=rnd, change=row["change"])
-            knob, val = change["knob"], change["value"]
-            if knob.startswith("extra_demos"):
+            rows.append(row)
+            if kind == "optimizer":
+                _save(opt)
+                ev(opt.id, "opt_change", round=rnd, change=row["change"])
+            if change and change["knob"].startswith("extra_demos"):
+                knob, val = change["knob"], change["value"]
                 phase("collecting", round=rnd)
-                cand_data = copy.copy(data)
-                cand_data.vis, cand_data.states, cand_data.actions = (
-                    list(data.vis),
-                    list(data.states),
-                    list(data.actions),
-                )
-                cand_data.aux, cand_data.lang_idx = list(data.aux), list(data.lang_idx)
-                cand_data.instructions, cand_data._packed = (
-                    list(data.instructions),
-                    None,
-                )
+                cand_data = _copy_demos(data)
                 near = None
                 if knob == "extra_demos_near_failures":
                     near = [
@@ -443,13 +745,13 @@ def run(
                         spec,
                         int(val),
                         near,
-                        60_000 + 1_000 * rnd,
+                        ROUND_SEED0 + 1_000 * rnd,
                         tmp,
                         robot,
                         cand_data,
                     )
-            else:
-                cand_cfg[knob] = val
+            elif change:
+                cand_cfg[change["knob"]] = change["value"]
             phase("training", round=rnd)
             cand = copy.deepcopy(model)
             with comp:
@@ -460,14 +762,18 @@ def run(
                     lr=float(cand_cfg["lr"]),
                     batch=int(cand_cfg["batch"]),
                     state_noise=float(cand_cfg["state_noise"]),
-                    on_log=lambda e, r=rnd: ev(opt.id, "opt_loss", round=r, **e),
+                    on_log=(
+                        (lambda e, r=rnd: ev(opt.id, "opt_loss", round=r, **e))
+                        if kind == "optimizer"
+                        else None
+                    ),
                     log_every=0.5,
                     replay=replay,
                     replay_frac=float(cand_cfg["replay_frac"]),
                     weight_decay=float(cand_cfg["weight_decay"]),
                     scope=str(cand_cfg["scope"]),
                 )
-            sc = evaluate_round(rnd, cand)
+            sc = evaluate_round(rnd, cand, sheets=kind == "optimizer")
             k = sum(s["success"] for s in sc)
             kept = k > best_k
             row.update(
@@ -490,24 +796,97 @@ def run(
             history.append(
                 {
                     "round": rnd,
-                    "change": change,
+                    "change": change
+                    or {"knob": "none", "value": "none", "reason": "no change"},
                     "success_before": best_k,
                     "success_after": k,
                     "kept": kept,
                 }
             )
+            scored[rnd] = sc
             if kept:
-                model, cfg, data, best_k, best_scored = cand, cand_cfg, cand_data, k, sc
-                opt.best_round = rnd
+                model, cfg, data, best_k, best_scored, best_round = (
+                    cand,
+                    cand_cfg,
+                    cand_data,
+                    k,
+                    sc,
+                    rnd,
+                )
             del cand
-            _save(opt)
-            ev(opt.id, "opt_round", round=rnd, row=row)
+            if kind == "optimizer":
+                opt.best_round = rnd if kept else opt.best_round
+                _save(opt)
+                ev(opt.id, "opt_round", round=rnd, row=row)
+        return model, cfg, best_round, best_k, scored
+
+    try:
+        opt.status = "running"
+        t0 = time.time()
+        sc0 = evaluate_round(0, base, sheets=True)
+        k0 = sum(s["success"] for s in sc0)
+        opt.rounds.append(
+            {
+                "round": 0,
+                "change": None,
+                "status": "start",
+                "success": k0,
+                "n": N_SCENES,
+                "ci": wilson(k0, N_SCENES),
+                "failures": failure_report(sc0, cfg0)["failure_tags"],
+                "outcomes": [int(s["success"]) for s in sc0],
+                "seconds": round(time.time() - t0, 1),
+            }
+        )
+        phase("testing", round=0)
+        with comp:
+            test0 = score_outcomes(base, spec, test_layouts, robot, TEST_SEED0)
+        opt.test = {"n": N_TEST, "r0": test0}
+        phase("collecting", round=0)
+        data0 = Demos()
+        with comp:
+            collect(spec, START_DEMOS, None, START_SEED0, tmp, robot, data0)
+        model, cfg, best_round, best_k, scored = run_arm(
+            "optimizer", sc0, _copy_demos(data0), opt.rounds
+        )
+        opt.best_round = best_round
         phase("replay")
-        _hero(opt, stage, all_scored, out)
+        _hero(opt, stage, scored, out, use_blender, bl)
         model.save(
             out / "final.pt",
             {"optimizer": opt.id, "from": skill.id, "settings": cfg, "success": best_k},
         )
+        phase("testing", round=n_rounds)
+        with comp:
+            test1 = score_outcomes(model, spec, test_layouts, robot, TEST_SEED0)
+        opt.test = {
+            "n": N_TEST,
+            "r0": test0,
+            "final": test1,
+            "final_round": best_round,
+            "compare": compare(test0, test1),
+        }
+        _save(opt)
+        if control:
+            crow: list[dict] = []
+            opt.control = {"kind": control, "rounds": crow}
+            cmodel, _ccfg, cbest, ck, _ = run_arm(
+                control, sc0, _copy_demos(data0), crow
+            )
+            phase("testing", round=n_rounds)
+            with comp:
+                ctest = score_outcomes(cmodel, spec, test_layouts, robot, TEST_SEED0)
+            opt.control = {
+                "kind": control,
+                "rounds": crow,
+                "best_round": cbest,
+                "select_final": ck,
+                "test_final": ctest,
+                "vs_r0": compare(test0, ctest),
+                "optimizer_vs_control": compare(ctest, test1),
+                "renders": "none: the control arm is scored without Blender",
+            }
+            del cmodel
         opt.status = "done"
         opt.seconds = round(time.time() - t0, 1)
         opt.phase = ""
@@ -522,7 +901,12 @@ def run(
 
 
 def _hero(
-    opt: Opt, stage: montage.Stage, scored: dict[int, list[dict]], out: Path
+    opt: Opt,
+    stage: montage.Stage,
+    scored: dict[int, list[dict]],
+    out: Path,
+    blender: bool = False,
+    bl: dict | None = None,
 ) -> None:
     """One scene, the first try against the last kept policy: prefer a scene that failed then and passes now."""
     a, b = scored[0], scored[opt.best_round]
@@ -531,8 +915,15 @@ def _hero(
     )
     if pick is None:
         pick = next((i for i in range(N_SCENES) if not a[i]["success"]), 0)
-    montage.write_hero(stage, a[pick], out / "hero_r0.jpg")
-    montage.write_hero(stage, b[pick], out / "hero_final.jpg")
+    for sc, name in ((a[pick], "hero_r0.jpg"), (b[pick], "hero_final.jpg")):
+        if blender:
+            st = blender_montage.render_hero(stage, sc, out / name)
+            if bl is not None:
+                bl["renders"] += st["renders"]
+                bl["seconds"] = round(bl["seconds"] + st["seconds"], 1)
+                bl["hero_renders"] = bl.get("hero_renders", 0) + st["renders"]
+        else:
+            montage.write_hero(stage, sc, out / name)
     opt.hero = {
         "scene": pick,
         "round_a": 0,
@@ -544,6 +935,7 @@ def _hero(
         "b_success": b[pick]["success"],
         "a_failure": a[pick]["failure"],
         "b_failure": b[pick]["failure"],
+        "engine": "blender-eevee" if blender else "mujoco",
     }
 
 
@@ -562,20 +954,21 @@ def new_opt(skill: Skill, n_rounds: int) -> Opt:
 
 def list_runs() -> list[dict]:
     out = []
-    for p in sorted(RUNS.glob("opt-*/run.json"), reverse=True):
+    for p in RUNS.glob("opt-*/run.json"):
         d = json.loads(p.read_text())
         out.append(
             {
                 k: d.get(k)
                 for k in ("id", "skill", "status", "n_rounds", "started", "best_round")
             }
+            | {"default": d.get("id") == DEFAULT_RUN}
             | {
                 "rounds_done": sum(
                     1 for r in d["rounds"] if r.get("success") is not None
                 )
             }
         )
-    return out
+    return sorted(out, key=lambda r: (not r["default"], -(r["started"] or 0)))
 
 
 def load_run(oid: str) -> dict | None:
