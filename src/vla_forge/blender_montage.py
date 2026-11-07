@@ -37,6 +37,8 @@ GB_PER_WORKER = 1.5
 
 
 def blender_bin() -> str | None:
+    if os.environ.get("VLA_FORGE_NO_BLENDER") == "1":  # the GPU is busy or absent: draw the grid with MuJoCo
+        return None
     return shutil.which("blender") or (str(APP) if APP.exists() else None)
 
 

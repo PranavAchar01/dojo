@@ -2,7 +2,9 @@
    ES module: export mount(root, ctx) puts a compact panel in #optimizer-root and opens the montage as an overlay.
    ctx.stage(name, state, metric) (optional) drives the rail step. Self-contained: needs only web/optimizer.css (injected if missing)
    and these endpoints: GET /api/optimizer/skills, POST /api/optimizer/start, GET /api/optimizer/runs,
-   GET /api/optimizer/runs/{id}, GET /api/optimizer/runs/{id}/img/{path}.
+   GET /api/optimizer/runs/{id}, GET /api/optimizer/runs/{id}/img/{path}, POST /api/optimizer/runs/{id}/{stop,test,resume}
+   and, for the tile zoom, GET /api/optimizer/runs/{id}/scene and /frame (MuJoCo frames rendered by the server).
+   Events: forge:tilezoom {run, scene, round, success} when a tile is opened, forge:tilezoomclose when it is closed.
    Everything shown comes from the run record; nothing here is simulated by the page. */
 export function mount(root, ctx = {}) {
   if (!root || root.dataset.optMounted) return;
@@ -24,6 +26,7 @@ export function mount(root, ctx = {}) {
   const pct = (v) => `${Math.round(v * 100)}%`;
   const get = (u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(u + " " + r.status))));
 
+  let live = false;
   const S = { run: null, sel: 0, runs: [], skills: [], poll: null, imgs: new Map(), tick: 0, follow: true };
 
   root.classList.add("opt");
@@ -38,10 +41,15 @@ export function mount(root, ctx = {}) {
   const roundsSel = el("select", "opt-select opt-narrow");
   roundsSel.setAttribute("aria-label", "Rounds");
   for (const n of [3, 4, 5, 6]) roundsSel.add(new Option(`${n} rounds`, n, false, n === 5));
+  roundsSel.add(new Option("until stopped", 0));
   const go = el("button", "opt-btn", "Run optimizer");
   const pastSel = el("select", "opt-select");
   pastSel.setAttribute("aria-label", "Earlier runs");
-  controls.append(skillSel, roundsSel, go, pastSel);
+  const stopBtn = el("button", "opt-btn opt-ghost", "Stop after this round");
+  const testBtn = el("button", "opt-btn opt-ghost", "Check TEST now");
+  const resumeBtn = el("button", "opt-btn opt-ghost", "Resume");
+  for (const b of [stopBtn, testBtn, resumeBtn]) b.hidden = true;
+  controls.append(skillSel, roundsSel, go, pastSel, stopBtn, testBtn, resumeBtn);
   head.append(title, controls);
 
   const badge = el("div", "opt-badge");
@@ -60,7 +68,7 @@ export function mount(root, ctx = {}) {
   wrap.append(canvas, veil);
   const legend = el("div", "opt-legend");
   legend.append(el("span", "opt-key ok", "succeeded"), el("span", "opt-key bad", "failed"),
-    el("span", "opt-note", "Each tile is one selection scene, drawn in Blender from the recorded run"));
+    el("span", "opt-note", "Each tile is one selection scene, drawn in Blender from the recorded run. Click a tile to open it."));
   gridCard.append(gridTop, wrap, legend);
 
   const stats = el("div", "opt-stats");
@@ -71,7 +79,8 @@ export function mount(root, ctx = {}) {
   const fails = el("div", "opt-fails");
   const phase = el("div", "opt-phase");
   const heldCard = el("div", "opt-held");
-  stats.append(ticker, changeBox, metric, spark, fails, phase, heldCard);
+  const popCard = el("div", "opt-pop");
+  stats.append(ticker, changeBox, metric, spark, fails, phase, popCard, heldCard);
   main.append(gridCard, stats);
 
   const replay = el("div", "opt-replay");
@@ -89,7 +98,7 @@ export function mount(root, ctx = {}) {
   root.append(panel);
   document.querySelectorAll("body > .opt-overlay").forEach((n) => n.remove());
   document.body.append(overlay);
-  const setOpen = (v) => { overlay.hidden = !v; root.dataset.optOpen = v ? "1" : ""; };
+  const setOpen = (v) => { if (!v && typeof closeZoom === "function") closeZoom(); overlay.hidden = !v; root.dataset.optOpen = v ? "1" : ""; };
   openBtn.onclick = () => setOpen(true);
   closeBtn.onclick = () => setOpen(false);
   document.addEventListener("keydown", (e) => e.key === "Escape" && setOpen(false));
@@ -104,11 +113,11 @@ export function mount(root, ctx = {}) {
     const first = done[0], best = r.rounds[r.best_round];
     if (first && best) {
       summary.textContent = `R0 ${first.success}/${first.n}, best R${r.best_round} ${best.success}/${best.n}, in simulation. ` +
-        (r.status === "running" ? `Now: ${phaseText(r)}.` : r.status === "error" ? `Stopped: ${r.error}` : "Finished.");
+        (r.status === "running" ? `Now: ${phaseText(r)}.` : r.status === "error" ? `Stopped: ${r.error}` : r.status === "stopped" ? "Stopped, can be resumed." : "Finished.");
     } else summary.textContent = r.status === "running" ? `Now: ${phaseText(r)}.` : "";
     if (ctx.stage) {
       const m = first && best ? `${first.success} to ${best.success}/${first.n}` : "";
-      ctx.stage("optimizer", r.status === "running" ? "live" : r.status === "done" ? "done" : "fail", m);
+      ctx.stage("optimizer", r.status === "running" ? "live" : r.status === "done" || r.status === "stopped" ? "done" : "fail", m);
     }
   }
 
@@ -148,6 +157,10 @@ export function mount(root, ctx = {}) {
     go.disabled = false;
   };
   pastSel.onchange = () => pastSel.value && open(pastSel.value);
+  const post = (path) => fetch(`${API}/runs/${S.run.id}/${path}`, { method: "POST" }).then((r) => r.json());
+  stopBtn.onclick = async () => { stopBtn.disabled = true; await post("stop").catch(() => {}); stopBtn.disabled = false; };
+  testBtn.onclick = async () => { testBtn.disabled = true; await post("test").catch(() => {}); testBtn.disabled = false; };
+  resumeBtn.onclick = async () => { await post("resume").catch(() => {}); open(S.run.id); };
 
   async function open(id) {
     S.imgs.clear();
@@ -165,7 +178,10 @@ export function mount(root, ctx = {}) {
     if (first && [...skillSel.options].some((o) => o.value === r.skill.id)) skillSel.value = r.skill.id;
     const done = r.rounds.filter((x) => x.success !== undefined && x.success !== null);
     if (S.follow || first) S.sel = Math.max(0, done.length - 1);
-    if (r.status === "done" || r.status === "error") { clearInterval(S.poll); S.poll = null; loadLists(); }
+    live = r.status === "running" || r.status === "starting";
+    stopBtn.hidden = testBtn.hidden = !(live && r.mode === "perpetual");
+    resumeBtn.hidden = !(!live && r.mode === "perpetual" && r.status !== "done" && r.engine && r.engine.next_round);
+    if (!live) { clearInterval(S.poll); S.poll = null; loadLists(); }
     report(r);
     render();
   }
@@ -237,7 +253,7 @@ export function mount(root, ctx = {}) {
     gridLabel.textContent = `${r.skill.instruction}, ${r.n_scenes} selection scenes`;
 
     ticker.textContent = "";
-    for (let i = 0; i <= r.n_rounds; i++) {
+    for (let i = 0; i <= Math.max(r.n_rounds, r.rounds.length - 1); i++) {
       const row = r.rounds[i];
       const b = el("button", "opt-chip", `R${i}`);
       b.setAttribute("aria-label", `Round ${i}`);
@@ -280,10 +296,11 @@ export function mount(root, ctx = {}) {
       if (!tags.length) fails.append(el("div", "opt-tag", "none"));
       for (const [k, v] of tags) fails.append(el("div", "opt-tag", `${v} ${k}`));
     }
-    phase.textContent = r.status === "running" ? `Now: ${phaseText(r)}${r.phase === "training" || r.phase === "scoring" ? `, round ${r.rounds.length - 1}` : ""}` :
+    phase.textContent = r.status === "stopped" ? `Stopped after ${r.rounds.length - 1} rounds in ${Math.round(r.seconds)} s. Best: round ${r.best_round}. Can be resumed.` : r.status === "running" ? `Now: ${phaseText(r)}${r.phase === "training" || r.phase === "scoring" ? `, round ${r.rounds.length - 1}` : ""}` :
       r.status === "done" ? `Finished in ${Math.round(r.seconds)} s. Best: round ${r.best_round}.` :
       r.status === "error" ? `Stopped: ${r.error}` : "";
 
+    renderPop(r);
     renderHeld(r);
     renderTable(r);
     renderReplay(r);
@@ -303,13 +320,33 @@ export function mount(root, ctx = {}) {
     if (c) heldCard.append(el("div", "opt-held-row", `Random changes, same rounds: ${c.before.k} to ${c.after.k}`));
     const p = te.mcnemar.p;
     heldCard.append(el("div", "opt-held-line", `${sg(te.delta)} on held-out, ${p < 0.05 ? "significant" : "not yet significant"} (p = ${p.toFixed(2)})`));
+    const pk = r.test.peeks || [];
+    if (pk.length) {
+      heldCard.append(el("div", "opt-held-row", `TEST looked at ${pk.length} time${pk.length === 1 ? "" : "s"}; the number shown is the latest, not the highest. ` +
+        pk.map((q) => `R${q.round}: ${q.optimizer}${q.control != null ? ` vs ${q.control}` : ""}`).join(", ")));
+    }
+  }
+
+  function renderPop(r) {
+    popCard.textContent = "";
+    const e = r.engine;
+    if (!e || !e.population) return;
+    popCard.append(el("div", "opt-held-h", "Population"),
+      el("div", "opt-held-sub", `${e.population.length} policies kept across ${e.islands} islands. Framework: OpenEvolve population database. Proposals: Llama 4 Maverick.`));
+    for (const p of e.population.slice().sort((a, b) => b.success - a.success).slice(0, 5)) {
+      const l = el("button", "opt-pop-row" + (p.round === r.best_round ? " best" : ""));
+      const bits = [...Object.entries(p.recipe.changed_settings || {}).map(([k, v]) => `${k} ${typeof v === "number" ? +v.toPrecision(2) : v}`), ...(p.recipe.extra_demos || [])];
+      l.textContent = `R${p.round}  ${Math.round(p.success)}/${r.n_scenes}  ${bits.length ? bits.join(", ") : "as trained"}`;
+      l.onclick = () => { if (r.rounds[p.round]) { S.sel = p.round; S.follow = false; render(); } };
+      popCard.append(l);
+    }
   }
 
   function drawSpark(r) {
     spark.textContent = "";
     const pts = r.rounds.filter((x) => x.success != null);
     if (pts.length < 1) return;
-    const W = 300, H = 70, P = 8, N = Math.max(r.n_rounds, 1);
+    const W = 300, H = 70, P = 8, N = Math.max(r.n_rounds, r.rounds.length - 1, 1);
     const xs = (i) => P + (i / N) * (W - 2 * P);
     const lo = Math.min(...pts.map((p) => p.ci[0])), hi = Math.max(...pts.map((p) => p.ci[1]));
     const ys = (v) => H - P - ((v - lo) / Math.max(hi - lo, 0.01)) * (H - 2 * P);
@@ -404,6 +441,164 @@ export function mount(root, ctx = {}) {
       if (im && im.complete && im.naturalWidth) c.getContext("2d").drawImage(im, f * h.w, 0, h.w, h.h, 0, 0, h.w, h.h);
     }
   }
+
+
+  /* ---------- tile zoom: the recorded MuJoCo rollout of one scene, replayed live ---------- */
+  const Z = { open: false, scene: 0, round: 0, info: null, az: 148, el: -34, dist: 0.46, i: 0, hold: 0, playing: true,
+    cache: new Map(), pending: new Set(), drag: null, token: 0 };
+  const zoom = el("div", "opt-zoom");
+  zoom.hidden = true;
+  const zCard = el("div", "opt-zoom-card");
+  zCard.setAttribute("role", "dialog");
+  zCard.setAttribute("aria-label", "Scene replay");
+  const zHead = el("div", "opt-zoom-head");
+  const zTitle = el("h3", "", "");
+  const zClose = el("button", "opt-btn opt-ghost", "Close");
+  zHead.append(zTitle, zClose);
+  const zToggle = el("div", "opt-zoom-toggle");
+  const zBody = el("div", "opt-zoom-body");
+  const zView = el("div", "opt-zoom-view");
+  const zCanvas = el("canvas", "opt-zoom-canvas");
+  zCanvas.width = 480; zCanvas.height = 360;
+  zCanvas.tabIndex = 0;
+  zCanvas.setAttribute("aria-label", "MuJoCo replay, drag to orbit, scroll to zoom");
+  const zBadge = el("span", "opt-zoom-badge", "");
+  const zMsg = el("div", "opt-zoom-msg", "");
+  zView.append(zCanvas, zBadge, zMsg);
+  const zBar = el("div", "opt-zoom-bar");
+  const zPlay = el("button", "opt-btn opt-ghost", "Pause");
+  const zScrub = el("input"); zScrub.type = "range"; zScrub.min = 0; zScrub.max = 1; zScrub.value = 0; zScrub.setAttribute("aria-label", "Frame");
+  const zOrbitReset = el("button", "opt-btn opt-ghost", "Reset view");
+  zBar.append(zPlay, zScrub, zOrbitReset);
+  const zLeft = el("div", "opt-zoom-left"); zLeft.append(zView, zBar, el("div", "opt-note", "Live MuJoCo replay of the recorded rollout, drawn by the server at 30 frames a second. Drag to orbit, scroll to zoom. In simulation."));
+  const zInfo = el("div", "opt-zoom-info");
+  zBody.append(zLeft, zInfo);
+  zCard.append(zHead, zToggle, zBody);
+  zoom.append(zCard);
+  overlay.append(zoom);
+
+  const zurl = (i) => `${API}/runs/${S.run.id}/frame?round=${Z.round}&scene=${Z.scene}&i=${i}&w=480&h=360&az=${Z.az.toFixed(1)}&el=${Z.el.toFixed(1)}&d=${Z.dist.toFixed(3)}`;
+  const zkey = (i) => `${Z.round}|${Z.scene}|${Z.az.toFixed(0)}|${Z.el.toFixed(0)}|${Z.dist.toFixed(2)}|${i}`;
+  function zWant(i) {
+    const k = zkey(i);
+    if (Z.cache.has(k) || Z.pending.has(k) || Z.pending.size >= 6) return;
+    Z.pending.add(k);
+    const tok = Z.token;
+    fetch(zurl(i)).then((r) => (r.ok ? r.blob() : Promise.reject(r.status))).then(createImageBitmap)
+      .then((bm) => { if (tok === Z.token) { Z.cache.set(k, bm); if (Z.cache.size > 500) Z.cache.delete(Z.cache.keys().next().value); } })
+      .catch(() => {}).finally(() => Z.pending.delete(k));
+  }
+  function zTick() {
+    if (!Z.open || !Z.info || !Z.info.available) return;
+    const n = Z.info.frames;
+    for (let d = 0; d < 6; d++) zWant((Z.i + d) % n);
+    const bm = Z.cache.get(zkey(Z.i));
+    if (!bm) return;
+    zCanvas.getContext("2d").drawImage(bm, 0, 0, zCanvas.width, zCanvas.height);
+    zScrub.value = Z.i;
+    if (Z.playing) {
+      if (Z.i === n - 1 && Z.hold < 20) Z.hold++; // rest on the last frame for a moment, then loop
+      else { Z.hold = 0; Z.i = (Z.i + 1) % n; }
+    }
+  }
+  setInterval(zTick, 1000 / 30);
+
+  function zSetPlaying(v) { Z.playing = v; zPlay.textContent = v ? "Pause" : "Play"; }
+  zPlay.onclick = () => zSetPlaying(!Z.playing);
+  zScrub.oninput = () => { zSetPlaying(false); Z.i = +zScrub.value; };
+  zOrbitReset.onclick = () => { Z.az = 148; Z.el = -34; Z.dist = 0.46; Z.cache.clear(); Z.token++; };
+  zCanvas.addEventListener("pointerdown", (e) => { Z.drag = { x: e.clientX, y: e.clientY }; zCanvas.setPointerCapture(e.pointerId); });
+  zCanvas.addEventListener("pointermove", (e) => {
+    if (!Z.drag) return;
+    Z.az -= (e.clientX - Z.drag.x) * 0.4;
+    Z.el = Math.min(-5, Math.max(-85, Z.el - (e.clientY - Z.drag.y) * 0.3));
+    Z.drag = { x: e.clientX, y: e.clientY };
+  });
+  zCanvas.addEventListener("pointerup", () => { Z.drag = null; });
+  zCanvas.addEventListener("wheel", (e) => { e.preventDefault(); Z.dist = Math.min(1.2, Math.max(0.2, Z.dist * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+
+  async function openZoom(scene, round) {
+    const r = S.run;
+    if (!r) return;
+    Z.open = true; Z.scene = scene; Z.round = round; Z.info = null; Z.i = 0; Z.hold = 0; Z.token++;
+    Z.cache.clear(); Z.pending.clear();
+    zSetPlaying(true);
+    zoom.hidden = false;
+    zTitle.textContent = `Scene ${scene + 1} of ${r.n_scenes}, round ${round}`;
+    zMsg.textContent = "Loading the rollout...";
+    zMsg.classList.add("on");
+    window.dispatchEvent(new CustomEvent("forge:tilezoom", { detail: { run: r.id, scene, round, success: !!(r.rounds[round] && r.rounds[round].outcomes[scene]) } }));
+    let info;
+    try { info = await get(`${API}/runs/${r.id}/scene?round=${round}&scene=${scene}`); } catch { zMsg.textContent = "That scene could not be loaded."; return; }
+    if (!Z.open || Z.scene !== scene || Z.round !== round) return;
+    Z.info = info;
+    zScrub.max = Math.max(info.frames - 1, 0);
+    zMsg.classList.toggle("on", !info.available);
+    if (!info.available) zMsg.textContent = info.source;
+    renderZoomInfo(info);
+  }
+  function closeZoom() {
+    if (!Z.open) return;
+    Z.open = false; Z.token++;
+    zoom.hidden = true;
+    window.dispatchEvent(new CustomEvent("forge:tilezoomclose", { detail: { run: S.run && S.run.id } }));
+  }
+  zClose.onclick = closeZoom;
+  zoom.addEventListener("click", (e) => { if (e.target === zoom) closeZoom(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && Z.open) { e.stopImmediatePropagation(); closeZoom(); }
+  }, true);
+
+  function renderZoomInfo(i) {
+    const r = S.run;
+    zToggle.textContent = "";
+    const opts = [[0, `Before (R0)`]];
+    if (S.sel !== 0 && S.sel !== i.best_round) opts.push([S.sel, `This round (R${S.sel})`]);
+    opts.push([i.best_round, i.best_round === 0 ? "After (no kept change yet)" : `After (best, R${i.best_round})`]);
+    for (const [rd, label] of opts) {
+      const b = el("button", "opt-seg" + (rd === Z.round ? " on" : ""), label);
+      b.disabled = rd === 0 && label.startsWith("After");
+      b.onclick = () => { if (rd !== Z.round) openZoom(Z.scene, rd); };
+      zToggle.append(b);
+    }
+    zBadge.textContent = i.success ? "succeeded" : "failed";
+    zBadge.className = "opt-zoom-badge " + (i.success ? "ok" : "bad");
+    zInfo.textContent = "";
+    const line = (k, v, cls) => { const d = el("div", "opt-zoom-line" + (cls ? " " + cls : "")); d.append(el("b", "", k), document.createTextNode(v)); zInfo.append(d); };
+    line("Scene ", `${i.scene + 1} of ${i.n_scenes}, round ${i.round}${i.round === 0 ? " (the skill as trained)" : ""}`);
+    line("Outcome ", i.success ? "succeeded" : `failed${i.failure ? ": " + i.failure : ""}`, i.success ? "ok" : "bad");
+    if (i.steps) line("Length ", `${i.steps} control steps, ${(i.frames / i.fps).toFixed(1)} s`);
+    const c = i.change;
+    if (i.round > 0) {
+      line("Change this round ", c.text);
+      if (c.reason) zInfo.append(el("div", "opt-reason", c.reason));
+      zInfo.append(el("div", "opt-verdict " + (c.status || ""), `${c.status === "kept" ? "Kept" : "Reverted"}: ${c.round_success}/${i.n_scenes} on the selection scenes (parent ${c.vs})`));
+    }
+    const pair = el("div", "opt-zoom-pair");
+    const a = i.before, b = i.after;
+    pair.textContent = `Same scene: R0 ${a.success ? "succeeded" : "failed"}${b.round !== 0 ? `, best R${b.round} ${b.success ? "succeeded" : "failed"}` : ""}.`;
+    zInfo.append(pair);
+    const agent = el("div", "opt-zoom-agent");
+    agent.append(el("div", "opt-zoom-agent-h", "Llama 4 Maverick"));
+    if (i.note) {
+      agent.append(el("div", "opt-zoom-agent-t", `"${i.note.text}"`),
+        el("div", "opt-note", i.note.kind === "scene" ? `Its note on this scene, written in round ${i.note.round} when it chose that change.` : `Its diagnosis of the failure pattern in round ${i.note.round}, not a note on this scene alone.`));
+    } else agent.append(el("div", "opt-note", "It has not written about this scene in this run."));
+    zInfo.append(agent, el("div", "opt-note", `Source: ${i.source}.`));
+  }
+
+  canvas.style.cursor = "pointer";
+  canvas.addEventListener("click", (e) => {
+    const r = S.run;
+    if (!r) return;
+    const b = canvas.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - b.left) / b.width) * COLS), y = Math.floor(((e.clientY - b.top) / b.height) * COLS);
+    const scene = y * COLS + x;
+    const row = r.rounds[S.sel];
+    const round = row && row.success != null ? S.sel : Math.max(0, S.sel - 1);
+    if (scene >= 0 && scene < r.n_scenes) openZoom(scene, round);
+  });
+  window.addEventListener("forge:newchat", closeZoom);
 
   loadLists().then(async () => {
     const live = S.runs.find((r) => r.status === "running") || S.runs.find((r) => r.default) || S.runs[0];

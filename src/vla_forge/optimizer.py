@@ -33,7 +33,7 @@ import numpy as np
 from . import blender_montage, llama, montage
 from .datagen import demo_job, pool
 from .encoders import device
-from .learn import SCOPES, Demos, train
+from .learn import SCOPES, Demos
 from .policy import VLA
 from .registry import ROOT, Skill
 from .rollout import EVAL_SEED0, _goal_xy, evaluate
@@ -88,8 +88,20 @@ SCHEMA = {
         "knob": {"type": "string", "enum": list(KNOBS)},
         "value": {"type": "string"},
         "reason": {"type": "string"},
+        "scene_notes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "scene": {"type": "integer"},
+                    "note": {"type": "string"},
+                },
+                "required": ["scene", "note"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["diagnosis", "knob", "value", "reason"],
+    "required": ["diagnosis", "knob", "value", "reason", "scene_notes"],
     "additionalProperties": False,
 }
 SYSTEM = f"""You improve a trained robot policy by changing how it is fine-tuned. The policy is a small vision-language-action
@@ -114,7 +126,10 @@ eight; training length, learning rate, noise, replay, batch size, weight decay a
 earlier rounds already tried a knob, say what you learned and move to a different cause when it stopped helping.
 Never repeat a change that was reverted (same knob and same value); a rejected list in the input shows what is barred.
 diagnosis: two or three plain sentences naming the pattern and the cause. reason: one plain sentence under 140
-characters, no dashes, no claims beyond the numbers."""
+characters, no dashes, no claims beyond the numbers.
+scene_notes: the picture shows the scenes listed in evidence_scenes, in that order from the top row. For each one write
+what you see in a single plain sentence under 140 characters (where the block ended up, what the gripper did), using the
+scene number from the list. Only describe what the picture and the numbers show."""
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> list[float]:
@@ -128,14 +143,16 @@ def wilson(k: int, n: int, z: float = 1.96) -> list[float]:
 
 
 def split(
-    n_select: int | None = None, n_test: int | None = None
+    n_select: int | None = None,
+    n_test: int | None = None,
+    max_rounds: int = MAX_ROUNDS,
 ) -> dict[str, list[int]]:
     """The three scene sets as seed lists. Scene i of a set always has the same seed, so it is the same scene every time."""
     n_select = N_SCENES if n_select is None else n_select
     n_test = N_TEST if n_test is None else n_test
     train = list(range(START_SEED0, START_SEED0 + START_DEMOS)) + [
         ROUND_SEED0 + 1000 * r + i
-        for r in range(1, MAX_ROUNDS + 1)
+        for r in range(1, max_rounds + 1)
         for i in range(KNOBS["extra_demos_near_failures"][1])
     ]
     sets = {
@@ -218,6 +235,19 @@ def clean_change(raw: dict) -> dict:
     diag = " ".join(str(raw.get("diagnosis", "")).replace("—", ",").split())[:400]
     if diag:
         out["diagnosis"] = diag
+    notes = []
+    for n in raw.get("scene_notes") or []:
+        try:
+            sc, txt = (
+                int(n["scene"]),
+                " ".join(str(n["note"]).replace("—", ",").split())[:160],
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+        if txt and sc >= 0 and len(notes) < 6:
+            notes.append({"scene": sc, "note": txt})
+    if notes:
+        out["scene_notes"] = notes
     return out
 
 
@@ -316,11 +346,20 @@ def failure_report(scored: list[dict], cfg: dict) -> dict:
     }
 
 
-def evidence_png(sheets: Path, scored: list[dict], rows: int = 4) -> bytes | None:
-    """Rendered frames of the first few failures (early, middle, late moment), cropped from a round's Blender sheets."""
+def pick_evidence(scored: list[dict], rnd: int, rows: int = 4) -> list[int]:
+    """Which failed scenes the model is shown this round: evenly spread over the failures, shifted each round so that
+    different scenes get looked at (and described) over a run."""
+    fails = [s["index"] for s in scored if not s["success"]]
+    if len(fails) <= rows:
+        return fails
+    step = len(fails) / rows
+    return sorted({fails[int(step * k + rnd) % len(fails)] for k in range(rows)})
+
+
+def evidence_png(sheets: Path, fails: list[int]) -> bytes | None:
+    """Rendered frames of the chosen failures (early, middle, late moment), cropped from a round's Blender sheets."""
     from PIL import Image
 
-    fails = [s["index"] for s in scored if not s["success"]][:rows]
     cols = (2, 4, 7)
     if not fails or not all((sheets / f"m{k}.jpg").exists() for k in cols):
         return None
@@ -402,6 +441,7 @@ def propose(
     history: list[dict],
     rnd: int,
     images: list[bytes] | None = None,
+    extra: dict | None = None,
 ) -> tuple[dict, str]:
     """One change from the language model, validated. Returns (change, backend that answered; "rules" if none did).
 
@@ -416,6 +456,7 @@ def propose(
         "pictures": "rows are failed scenes, columns are early, middle and late moments"
         if images
         else "none this round",
+        **(extra or {}),
     }
     why = ""
     for attempt in range(2):
@@ -440,6 +481,7 @@ class Opt:
     skill: dict
     n_rounds: int
     started: float = field(default_factory=time.time)
+    session_start: float = field(default_factory=time.time, repr=False)
     status: str = "starting"
     phase: str = ""
     llm: dict = field(default_factory=dict)
@@ -453,12 +495,19 @@ class Opt:
     test: dict = field(default_factory=dict)
     control: dict = field(default_factory=dict)
     blender: dict = field(default_factory=dict)
+    mode: str = "bounded"  # "perpetual" runs until stopped
+    engine: dict = field(
+        default_factory=dict
+    )  # the framework and its population, see optimizer_evo
+    prior_seconds: float = 0.0  # time spent in earlier sessions of a resumed run
 
     def to_json(self) -> dict:
-        d = {k: v for k, v in self.__dict__.items()}
+        d = {k: v for k, v in self.__dict__.items() if k != "session_start"}
+        live = self.status in ("starting", "running")
         d["seconds"] = round(
-            (time.time() if self.status != "done" else self.started + self.seconds)
-            - self.started,
+            (time.time() - self.session_start + self.prior_seconds)
+            if live
+            else self.seconds,
             1,
         )
         return d
@@ -494,6 +543,7 @@ def score(
     robot: str,
     progress: Callable[[int], None],
     first: int = 0,
+    traj: dict[int, np.ndarray] | None = None,
 ) -> list[dict]:
     """The same scenes every time: scene i always has seed SEED0 + i (so the same lighting and the same layout)."""
     out: list[dict] = []
@@ -510,6 +560,8 @@ def score(
         )
         for r in rolls:
             r.index += c
+            if traj is not None:
+                traj[r.index] = np.asarray(r.frames, np.float32)
             out.append(_compact(r))
         progress(len(out))
     return out
@@ -599,305 +651,18 @@ def run(
     emit: Callable[..., None] | None = None,
     train_seconds: float = DEFAULTS["train_seconds"],
     control: str | None = "random",
+    **kw,
 ) -> Opt:
-    """R0, then `n_rounds` of the optimizer arm (SELECT keeps or reverts), then the control arm from the same start,
-    then TEST for R0, the optimizer's final policy and the control's. control: "random", "none" or None."""
-    comp = compute if compute is not None else contextlib.nullcontext()
-    ev = emit or (lambda *a, **k: None)
-    out = RUNS / f"opt-{opt.id}"
-    tmp = out / "tmp"
-    tmp.mkdir(parents=True, exist_ok=True)
-    spec = skill.task()
-    dev = device()
-    robot = skill.robot
-    base, _ = VLA.load(ROOT / skill.model, dev)
-    layouts = [
-        sample_layout(spec, np.random.default_rng(SEED0 + i)).to_json()
-        for i in range(N_SCENES)
-    ]
-    test_layouts = [
-        sample_layout(spec, np.random.default_rng(TEST_SEED0 + i)).to_json()
-        for i in range(N_TEST)
-    ]
-    seeds = split()
-    sel_keys = {json.dumps(l, sort_keys=True) for l in layouts}
-    if any(json.dumps(l, sort_keys=True) in sel_keys for l in test_layouts):
-        raise ValueError("a TEST scene is also a SELECT scene")
-    opt.split = {
-        "train": {
-            "seeds": f"{START_SEED0}.. (start), {ROUND_SEED0}+1000*round.. (extra)",
-            "start_demos": START_DEMOS,
-            "used_for": "demonstration generation only",
-        },
-        "select": {
-            "seed0": SEED0,
-            "n": N_SCENES,
-            "used_for": "keep or revert, every round",
-        },
-        "test": {
-            "seed0": TEST_SEED0,
-            "n": N_TEST,
-            "used_for": "scored at R0 and on the final kept policy only",
-        },
-        "disjoint": True,
-        "sizes": {k: len(v) for k, v in seeds.items()},
-    }
-    stage = montage.Stage(robot)
-    cfg0 = {**DEFAULTS, "train_seconds": float(train_seconds)}
-    opt.llm = {"asked": "Llama 4 Maverick", "backend": None, "backends_used": []}
-    bl = {"engine": None, "renders": 0, "rounds": 0, "seconds": 0.0, "workers": 0}
-    use_blender = blender_montage.blender_bin() is not None
+    """Run the optimizer on `skill` for `n_rounds` rounds (0 or less: until stopped), or continue a saved run.
 
-    def phase(name: str, **kw) -> None:
-        opt.phase = name
-        _save(opt)
-        ev(opt.id, "opt_phase", phase=name, **kw)
+    The loop itself lives in optimizer_evo.py (population database from OpenEvolve, the model as the proposal operator);
+    the call signature is the one the web API and the Fetch agent have always used. Extra keywords: test_every,
+    round_budget_s, resume (see optimizer_evo.run)."""
+    from . import optimizer_evo
 
-    def evaluate_round(rnd: int, m: VLA, sheets: bool) -> list[dict]:
-        phase("scoring", round=rnd)
-        with comp:
-            sc = score(
-                m,
-                spec,
-                layouts,
-                robot,
-                lambda n: ev(opt.id, "opt_scoring", round=rnd, done=n),
-            )
-        if sheets:
-            phase("rendering", round=rnd)
-            if use_blender:
-                st = blender_montage.render_sheets(stage, sc, out / f"r{rnd}")
-                bl["engine"] = st["engine"]
-                bl["renders"] += st["renders"]
-                bl["rounds"] += 1
-                bl["seconds"] = round(bl["seconds"] + st["seconds"], 1)
-                bl["workers"] = max(bl["workers"], st["workers"])
-                bl.setdefault("per_round", []).append(
-                    {
-                        "round": rnd,
-                        **{k: st[k] for k in ("renders", "workers", "seconds")},
-                    }
-                )
-            else:
-                montage.write_sheets(stage, sc, out / f"r{rnd}")
-                bl["engine"] = "mujoco"
-            opt.blender = bl
-        return sc
-
-    def run_arm(kind: str, sc0: list[dict], data0: Demos, rows: list[dict]) -> tuple:
-        """One arm from R0: returns (final model, final cfg, best round, scored per round)."""
-        model = copy.deepcopy(base)
-        cfg, data = dict(cfg0), data0
-        best_k, best_scored, best_round = sum(s["success"] for s in sc0), sc0, 0
-        history: list[dict] = []
-        scored: dict[int, list[dict]] = {0: sc0}
-        rng = np.random.default_rng(7)
-        for rnd in range(1, n_rounds + 1):
-            t1 = time.time()
-            phase("proposing" if kind == "optimizer" else "control", round=rnd)
-            if kind == "optimizer":
-                report = failure_report(best_scored, cfg)
-                png = evidence_png(out / f"r{best_round}", best_scored)
-                change, backend = propose(report, history, rnd, [png] if png else None)
-                opt.llm["backend"] = backend
-                if backend not in opt.llm["backends_used"]:
-                    opt.llm["backends_used"].append(backend)
-                opt.llm["real_llama"] = backend.startswith("meta:")
-            elif kind == "random":
-                change, backend = random_change(rng, history), "random"
-            else:
-                change, backend = None, "none"
-            cand_cfg, cand_data = dict(cfg), data
-            text = describe(change) if change else "no change, train again"
-            row = {
-                "round": rnd,
-                "change": {**change, "text": text, "model": "Llama 4 Maverick"}
-                if change
-                else {
-                    "knob": None,
-                    "value": None,
-                    "text": text,
-                    "reason": "control: no change",
-                },
-                "backend": backend,
-                "status": "training",
-            }
-            rows.append(row)
-            if kind == "optimizer":
-                _save(opt)
-                ev(opt.id, "opt_change", round=rnd, change=row["change"])
-            if change and change["knob"].startswith("extra_demos"):
-                knob, val = change["knob"], change["value"]
-                phase("collecting", round=rnd)
-                cand_data = _copy_demos(data)
-                near = None
-                if knob == "extra_demos_near_failures":
-                    near = [
-                        {
-                            "target": s["target_xy"],
-                            **({"goal": s["goal_xy"]} if s["goal_xy"] else {}),
-                        }
-                        for s in best_scored
-                        if not s["success"]
-                    ] or None
-                with comp:
-                    collect(
-                        spec,
-                        int(val),
-                        near,
-                        ROUND_SEED0 + 1_000 * rnd,
-                        tmp,
-                        robot,
-                        cand_data,
-                    )
-            elif change:
-                cand_cfg[change["knob"]] = change["value"]
-            phase("training", round=rnd)
-            cand = copy.deepcopy(model)
-            with comp:
-                st = train(
-                    cand,
-                    cand_data,
-                    float(cand_cfg["train_seconds"]),
-                    lr=float(cand_cfg["lr"]),
-                    batch=int(cand_cfg["batch"]),
-                    state_noise=float(cand_cfg["state_noise"]),
-                    on_log=(
-                        (lambda e, r=rnd: ev(opt.id, "opt_loss", round=r, **e))
-                        if kind == "optimizer"
-                        else None
-                    ),
-                    log_every=0.5,
-                    replay=replay,
-                    replay_frac=float(cand_cfg["replay_frac"]),
-                    weight_decay=float(cand_cfg["weight_decay"]),
-                    scope=str(cand_cfg["scope"]),
-                )
-            sc = evaluate_round(rnd, cand, sheets=kind == "optimizer")
-            k = sum(s["success"] for s in sc)
-            kept = k > best_k
-            row.update(
-                {
-                    "status": "kept" if kept else "reverted",
-                    "success": k,
-                    "n": N_SCENES,
-                    "ci": wilson(k, N_SCENES),
-                    "failures": failure_report(sc, cfg)["failure_tags"],
-                    "outcomes": [int(s["success"]) for s in sc],
-                    "train": {
-                        "steps": st["steps"],
-                        "seconds": st["seconds"],
-                        "frames": st["frames"],
-                    },
-                    "seconds": round(time.time() - t1, 1),
-                    "vs": best_k,
-                }
-            )
-            history.append(
-                {
-                    "round": rnd,
-                    "change": change
-                    or {"knob": "none", "value": "none", "reason": "no change"},
-                    "success_before": best_k,
-                    "success_after": k,
-                    "kept": kept,
-                }
-            )
-            scored[rnd] = sc
-            if kept:
-                model, cfg, data, best_k, best_scored, best_round = (
-                    cand,
-                    cand_cfg,
-                    cand_data,
-                    k,
-                    sc,
-                    rnd,
-                )
-            del cand
-            if kind == "optimizer":
-                opt.best_round = rnd if kept else opt.best_round
-                _save(opt)
-                ev(opt.id, "opt_round", round=rnd, row=row)
-        return model, cfg, best_round, best_k, scored
-
-    try:
-        opt.status = "running"
-        t0 = time.time()
-        sc0 = evaluate_round(0, base, sheets=True)
-        k0 = sum(s["success"] for s in sc0)
-        opt.rounds.append(
-            {
-                "round": 0,
-                "change": None,
-                "status": "start",
-                "success": k0,
-                "n": N_SCENES,
-                "ci": wilson(k0, N_SCENES),
-                "failures": failure_report(sc0, cfg0)["failure_tags"],
-                "outcomes": [int(s["success"]) for s in sc0],
-                "seconds": round(time.time() - t0, 1),
-            }
-        )
-        phase("testing", round=0)
-        with comp:
-            test0 = score_outcomes(base, spec, test_layouts, robot, TEST_SEED0)
-        opt.test = {"n": N_TEST, "r0": test0}
-        phase("collecting", round=0)
-        data0 = Demos()
-        with comp:
-            collect(spec, START_DEMOS, None, START_SEED0, tmp, robot, data0)
-        model, cfg, best_round, best_k, scored = run_arm(
-            "optimizer", sc0, _copy_demos(data0), opt.rounds
-        )
-        opt.best_round = best_round
-        phase("replay")
-        _hero(opt, stage, scored, out, use_blender, bl)
-        model.save(
-            out / "final.pt",
-            {"optimizer": opt.id, "from": skill.id, "settings": cfg, "success": best_k},
-        )
-        phase("testing", round=n_rounds)
-        with comp:
-            test1 = score_outcomes(model, spec, test_layouts, robot, TEST_SEED0)
-        opt.test = {
-            "n": N_TEST,
-            "r0": test0,
-            "final": test1,
-            "final_round": best_round,
-            "compare": compare(test0, test1),
-        }
-        _save(opt)
-        if control:
-            crow: list[dict] = []
-            opt.control = {"kind": control, "rounds": crow}
-            cmodel, _ccfg, cbest, ck, _ = run_arm(
-                control, sc0, _copy_demos(data0), crow
-            )
-            phase("testing", round=n_rounds)
-            with comp:
-                ctest = score_outcomes(cmodel, spec, test_layouts, robot, TEST_SEED0)
-            opt.control = {
-                "kind": control,
-                "rounds": crow,
-                "best_round": cbest,
-                "select_final": ck,
-                "test_final": ctest,
-                "vs_r0": compare(test0, ctest),
-                "optimizer_vs_control": compare(ctest, test1),
-                "renders": "none: the control arm is scored without Blender",
-            }
-            del cmodel
-        opt.status = "done"
-        opt.seconds = round(time.time() - t0, 1)
-        opt.phase = ""
-    except Exception as e:  # recorded on the run, then raised for the caller's log
-        opt.status, opt.error = "error", f"{type(e).__name__}: {e}"
-        raise
-    finally:
-        stage.close()
-        _save(opt)
-        ev(opt.id, "opt_done", status=opt.status)
-    return opt
+    return optimizer_evo.run(
+        skill, n_rounds, opt, replay, compute, emit, train_seconds, control, **kw
+    )
 
 
 def _hero(
@@ -939,8 +704,20 @@ def _hero(
     }
 
 
+def load_opt(oid: str) -> Opt:
+    """A saved run as an Opt again, to continue it."""
+    d = load_run(oid)
+    if d is None:
+        raise ValueError(f"no run {oid}")
+    names = Opt.__dataclass_fields__
+    o = Opt(**{k: v for k, v in d.items() if k in names and k != "session_start"})
+    o.prior_seconds = float(d.get("seconds", 0.0))
+    return o
+
+
 def new_opt(skill: Skill, n_rounds: int) -> Opt:
     return Opt(
+        mode="perpetual" if n_rounds <= 0 else "bounded",
         id=time.strftime("%H%M%S") + "-" + uuid4().hex[:4],
         skill={
             "id": skill.id,

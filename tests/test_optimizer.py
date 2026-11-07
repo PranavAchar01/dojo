@@ -244,3 +244,65 @@ def test_a_frozen_scope_trains_without_dropout_in_the_frozen_layers():
     quiet_frozen_layers(m)
     assert not m.head.xattn.training and m.head.enc.training
     assert isinstance(m, torch.nn.Module)
+
+
+def test_evidence_scenes_spread_and_rotate():
+    sc = _scored(60)
+    a = optimizer.pick_evidence(sc, 1)
+    b = optimizer.pick_evidence(sc, 2)
+    assert len(a) == 4 and all(not sc[i]["success"] for i in a)
+    assert a != b
+    assert optimizer.pick_evidence(_scored(5), 1) == [0, 3]
+
+
+def test_scene_notes_are_cleaned():
+    c = optimizer.clean_change(
+        {
+            "knob": "lr",
+            "value": "1e-4",
+            "reason": "r",
+            "scene_notes": [
+                {"scene": 3, "note": "block — on rim"},
+                {"scene": "x"},
+                {"note": "n"},
+            ],
+        }
+    )
+    assert c["scene_notes"] == [{"scene": 3, "note": "block , on rim"}]
+
+
+def test_split_stays_disjoint_for_a_long_perpetual_run():
+    sets = optimizer.split(100, 100, max_rounds=400)
+    assert len(sets["train"]) + 200 == len(
+        set(sets["train"] + sets["select"] + sets["test"])
+    )
+
+
+def test_population_database_roundtrip(tmp_path):
+    from openevolve.database import Program
+
+    from vla_forge import optimizer_evo as E
+
+    rec = {"cfg": dict(optimizer.DEFAULTS), "plan": []}
+    db = E.new_db(tmp_path)
+    for i, k in enumerate((50, 55)):
+        db.add(
+            Program(
+                id=f"p{i}",
+                code=__import__("json").dumps(rec),
+                language="json",
+                metrics=E.metrics_of(k, 100, rec),
+                metadata={"round": i, "light": []},
+            ),
+            iteration=i,
+            target_island=0,
+        )
+    parent, _ = db.sample(num_inspirations=1)
+    assert parent.id in ("p0", "p1")
+    db.save(str(tmp_path), iteration=1)
+    db2 = E.new_db(tmp_path)
+    db2.load(str(tmp_path))
+    assert sorted(db2.programs) == ["p0", "p1"]
+    assert (
+        max(db2.programs.values(), key=lambda p: p.metrics["combined_score"]).id == "p1"
+    )

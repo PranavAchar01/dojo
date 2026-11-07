@@ -66,6 +66,8 @@ class Stage:
         w: int,
         h: int,
         distance: float = 0.46,
+        azimuth: float = 148.0,
+        elevation: float = -34.0,
     ) -> list[np.ndarray]:
         lay = Layout.from_json(layout_json)
         m, d, rs = self._model(lay)
@@ -80,8 +82,8 @@ class Stage:
         cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         cam.lookat[:] = [0.15, 0.0, 0.07]
         cam.distance = distance
-        cam.azimuth = 148.0
-        cam.elevation = -34.0
+        cam.azimuth = azimuth
+        cam.elevation = elevation
         out = []
         for i in idx:
             f = np.asarray(frames[i], float).reshape(-1, 7)
