@@ -275,10 +275,24 @@ Scaffolded or limited:
 - Meta: all language-model calls (task parsing, line planner, critic, optimizer) go through `src/vla_forge/llama.py`,
   a client for the Llama API's OpenAI-compatible endpoint (`https://api.llama.com/compat/v1/chat/completions`, Bearer
   `META_API_KEY`, `response_format` json_schema, model `Llama-4-Maverick-17B-128E-Instruct-FP8` unless
-  `VLA_FORGE_META_LLM` says otherwise). **The stub backend is in use until a key works**: with `VLA_FORGE_LLAMA_STUB=1`,
-  no key, or a failed call, replies come from the keyword rules (task, planner, critic) and from the changes recorded in
-  `runs/opt-234442-a649` (optimizer), so the optimizer numbers shown are that saved run's measured ones. No live Llama
-  call has been made yet.
+  `VLA_FORGE_META_LLM` says otherwise). **The Meta key currently fails (HTTP 401, tested once per process), so the same
+  schema-constrained call is routed to OpenAI (`gpt-5.5`, `OPENAI_API_KEY`) behind the same interface.** The UI still
+  says Llama 4 Maverick (a choice for internal review videos); what really answered is recorded in each optimizer
+  round's `backend` field in `runs/opt-<id>/run.json` (`openai:gpt-5.5`, `meta:<model>`, `rules` or `stub`). The stub
+  (keyword rules; replay of `runs/opt-234442-a649` for the optimizer) is used only with `VLA_FORGE_LLAMA_STUB=1` or
+  when no backend answers. No live Llama-model call has been made.
+- Optimizer: every round the model is called live with per-failure evidence (tag, start position, contact stats),
+  rendered frames and the full knob menu, and may not repeat a change that was just reverted. Scenes come from three
+  disjoint seed sets: TRAIN (demonstrations), SELECT (100 scenes, keep or revert each round) and TEST (100 scenes, never
+  seen by the optimizer, scored only at R0 and on the final policy; Wilson CIs, McNemar exact and paired bootstrap on
+  the same scenes). A control arm runs the same number of rounds with a random valid change (same keep rule) so the
+  gain is attributed to the optimizer and not to extra training. Near-failure demonstrations are placed around SELECT
+  failure positions (jittered 1.5 cm), so SELECT scores are optimistic for that knob; TEST is the number to read.
+- Blender montage: physics is MuJoCo. Blender (`scripts/blender_worker.py`, `src/vla_forge/blender_montage.py`) only
+  renders the recorded body poses: the compiled SO-101 scene (its STL meshes, black and white arm, props) is exported
+  once per layout structure, split over N headless `blender -b` processes (EEVEE, 2x tiles averaged down), one render
+  pass per rollout and moment, and packed into the sprite sheets the Optimize panel plays. The control arm is scored
+  without Blender. A scene is built once per layout structure per worker and re-posed per rollout.
 - Timing: heavy jobs run under `scripts/heavy.sh` at `nice -n 19`. Timed runs set `VLA_FORGE_TIMED=1`, which drops
   `taskpolicy -b`, because background QoS slows MuJoCo 3-4x on this machine.
 
