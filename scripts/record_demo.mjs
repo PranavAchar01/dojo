@@ -5,15 +5,18 @@
 //
 //   PPTR_DIR=~/helloworld/hyperframes-trial/node_modules node scripts/record_demo.mjs
 //
-// The tour (v8): the landing page at / scrolled once, then into the editor at /app, which opens on a blank canvas.
-// A new kitting skill for the SO-101 is forged live from a typed task (success check, demos, fine-tune, 20
-// held-out scenes, sped up); "add another SO-101" grows the scene in place; a two-arm task fills the Arms list and
-// runs; then the Optimize step opens the montage of a saved real optimizer run, round by round, and its
-// before/after replay.
+// The tour (v9): the landing page at /, where the roaming robot greets and flies to each section as it scrolls in,
+// then into the editor at /app, which opens on a blank canvas. A new pushing skill for the SO-101 is forged live
+// from a typed task: the Agents view shows the Fetch.ai uAgents messages pulse while the task is parsed and planned,
+// back on the canvas the robot flies to the stage being worked on and points at it, and once training starts the
+// Thinking panel (T) opens and the dock is asked "What are you doing?". The waits (demos, training, 20 held-out
+// scenes) are sped up. Then "add another SO-101" grows the scene in place, a two-arm task fills the Arms list and
+// runs, and the Optimize step opens the montage of a saved real optimizer run, round by round, with its held-out
+// test card.
 // The page cannot record across a navigation, so the landing page is its own capture
 // (<webm>.marks.json holds its length under "landing_len"); the editor capture's marks file names it under
 // "landing". Every segment start is written to the editor's marks under "at" for the narration cues, and the
-// numbers shown are written to demo/v8-results.json.
+// numbers shown are written to demo/v9-results.json.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -21,7 +24,7 @@ const require = createRequire(`${process.env.PPTR_DIR || "./node_modules"}/`);
 const puppeteer = require("puppeteer-core");
 
 const BASE = process.env.BASE || "http://127.0.0.1:8100";
-const TASK = process.env.TASK || "put the blue block in the front-left slot of the tray";
+const TASK = process.env.TASK || "push the blue block onto the white square";
 const TWO = "two arms: one seats the housing in the pallet, the other inserts it into the socket";
 const OPT_RUN = process.env.OPT_RUN || "064106-9ad6"; // a saved real optimizer run in runs/opt-<id>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -54,7 +57,7 @@ await page.waitForFunction(() => document.querySelector(".part-fig img") && [...
 
 // 0. the landing page: its own capture, a few seconds, scrolled once, then the click into the editor
 await page.goto(`${BASE}/`, { waitUntil: "load" });
-await sleep(1500);
+await sleep(200);
 await page.evaluate(() => {
   const chunks = [];
   window.landingT0 = null;
@@ -78,17 +81,23 @@ await page.evaluate(() => {
   for (const a of document.querySelectorAll('a[href="/app"]')) a.setAttribute("href", "/app?capture=1");
 });
 await page.evaluate(() => window.startLanding());
-await sleep(2500);
-await page.evaluate(() => window.scrollTo({ top: 620, behavior: "smooth" }));
-await sleep(3200);
+// the robot says hello, then flies to each section heading as it scrolls in
+await sleep(3600);
+await page.evaluate(() => document.querySelector("#how").scrollIntoView({ block: "start", behavior: "smooth" }));
+await sleep(4600);
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-landing.png` });
+await page.evaluate(() => document.querySelector("#agents").scrollIntoView({ block: "start", behavior: "smooth" }));
+await sleep(4600);
 const landingLen = await page.evaluate(() => (performance.now() - window.landingT0) / 1000);
 const landing = await page.evaluate(() => window.stopLanding());
 await Promise.all([page.waitForNavigation({ waitUntil: "load" }), page.click("#nav a.cta")]);
 writeFileSync(landing.path.replace(/\.webm$/, ".marks.json"), JSON.stringify({ landing_len: landingLen }, null, 1));
 console.log("landing", landing.path, landingLen.toFixed(1));
 
-// 1. the editor, on the Sim tab
+// 1. the editor, on the Sim tab (the Agents view is built once first, so its pulses draw from the first message)
 await ready();
+await page.evaluate(() => window.setView("agents"));
+await page.waitForSelector("#ag-graph svg", { timeout: 30000 });
 await page.evaluate(() => { window.setView("sim"); window.scrollTo(0, 0); });
 await sleep(1500);
 await page.evaluate(() => window.startCapture());
@@ -114,10 +123,21 @@ const rail = (names, cls) =>
 const waiting = () => rail(["Demos", "Train", "Eval"], "live");
 const finished = async () =>
   (await rail(["Publish"], "done")) || (await page.evaluate(() => [...document.querySelectorAll(".rail li")].some((l) => l.classList.contains("fail") && !l.classList.contains("off"))));
-// run `until` while speeding up whatever `isWait` calls a wait (the page shows the 4x badge)
-async function sped(until, isWait) {
+// run `until` while speeding up whatever `isWait` calls a wait (the page shows the 4x badge). `hook` = { ready, run }:
+// the first time ready() is true the speed-up stops, run() plays at 1x, then the loop carries on.
+async function sped(until, isWait, hook = null) {
   let fast = null;
   while (!(await until())) {
+    if (hook && (await hook.ready())) {
+      if (fast !== null) {
+        await page.evaluate(() => window.setSpeed(false));
+        marks.speed.push([fast, await now()]);
+        fast = null;
+      }
+      await hook.run();
+      hook = null;
+      continue;
+    }
     const w = await isWait();
     if (w && fast === null) {
       await page.evaluate(() => window.setSpeed(true));
@@ -137,37 +157,77 @@ async function sped(until, isWait) {
 const J = (u) => page.evaluate((x) => fetch(x).then((r) => r.json()), u);
 
 await mark("intro");
-await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-blank.png` });
-await sleep(3500);
+await sleep(3000);
 
-// 2. type a task: the agents write the success check, collect demos, fine-tune and test on 20 held-out scenes
+// 2. type a task; the Agents view shows the uAgents messages while it is parsed, routed and planned
 await mark("describe");
 await page.waitForSelector("#go:not([disabled])", { timeout: 120000 });
 await page.click("#prompt", { clickCount: 3 });
 await page.type("#prompt", TASK, { delay: 40 });
-await sleep(500);
+await sleep(600);
 const t0 = Date.now();
 const p = { prompt: TASK, start: await now() };
 marks.prompts.push(p);
 const cards = await page.evaluate(() => document.querySelectorAll(".route-card").length);
 const runs0 = (await J("/api/state")).runs.length;
+const rows0 = await page.evaluate(() => document.querySelectorAll("#ag-log tbody tr").length);
+// the Agents view hides the chat panel, so the task is sent from the Sim view and the view switches right after
 await page.click("#go");
+await mark("agents");
+await view("agents");
+await sleep(12000);
+const agentMsgs = (await page.evaluate(() => document.querySelectorAll("#ag-log tbody tr").length)) - rows0;
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-agents.png` });
+console.log("agent messages while on the Agents view:", agentMsgs);
 await page.waitForFunction((n) => document.querySelectorAll(".route-card").length > n, { timeout: 120000, polling: 100 }, cards);
-await sped(finished, waiting);
+
+// 3. back on the canvas: the robot flies to the stage being worked on and points at it (1x for a few seconds)
+await view("sim");
+await page.evaluate(() => window.scrollTo(0, 0));
+await mark("roam");
+await sleep(2500);
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-roam.png` });
+await sleep(2000);
+const stageLive = (k) => page.evaluate((x) => document.querySelector(`#rail li[data-stage="${x}"]`)?.classList.contains("live"), k);
+// once training starts: Thinking on (T), then ask the dock what it is doing, all at 1x
+let botAnswer = "";
+const thinking = {
+  ready: () => stageLive("trainer"),
+  run: async () => {
+    await mark("thinking");
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press("t");
+    await sleep(4500);
+    await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-thinking.png` });
+    await mark("ask");
+    await page.evaluate(() => window.forgeDock.prefill(""));
+    await sleep(700);
+    await page.type(".ag-input", "What are you doing?", { delay: 45 });
+    await sleep(300);
+    await page.keyboard.press("Enter");
+    await sleep(7500);
+    botAnswer = await page.evaluate(() => [...document.querySelectorAll(".ag-answer, [class*='answer']")].map((x) => x.innerText).filter(Boolean).at(-1) || "");
+    await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-ask.png` });
+    console.log("bot answer:", botAnswer.replace(/\s+/g, " ").slice(0, 300));
+    await page.evaluate(() => { document.querySelector(".th-panel .th-x")?.click(); window.forgeDock.expand(false); });
+    await mark("thinking_end");
+  },
+};
+await sped(finished, waiting, thinking);
 p.published = await now();
 p.seconds = (Date.now() - t0) / 1000;
 console.log(`"${TASK}" settled after ${p.seconds.toFixed(1)} s`);
 await mark("trained");
-await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-trained.png` });
+await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-rec-trained.png` });
 const st = await J("/api/state");
 const run = await J(`/api/runs/${st.runs[st.runs.length - 1].id ?? st.runs[st.runs.length - 1]}`);
 const sk = st.skills.reduce((a, b) => (b.created > a.created ? b : a));
-const sim = { instruction: TASK, skill_id: sk.id, parent: sk.parent, train_seconds: sk.seconds, held_out_success: sk.success_rate, n_eval: sk.n_eval,
+const sim = { agent_msgs_on_view: agentMsgs, bot_answer: botAnswer, settled_seconds: p.seconds, instruction: TASK, skill_id: sk.id, parent: sk.parent, train_seconds: sk.seconds, held_out_success: sk.success_rate, n_eval: sk.n_eval,
   rounds: run.rounds.map((r) => ({ succeeded: r.eval?.succeeded, n: r.eval?.n })), new_runs: st.runs.length - runs0 };
 console.log("sim:", JSON.stringify(sim));
-await sleep(7000);
+await sleep(5500);
 
-// 3. another arm: "add another SO-101" grows the scene in place, then a two-arm task fills the Arms list
+// 4. another arm: "add another SO-101" grows the scene in place, then a two-arm task fills the Arms list
 await view("sim");
 await page.evaluate(() => window.scrollTo(0, 0));
 await mark("addarm");
@@ -176,22 +236,21 @@ await page.type("#prompt", "add another SO-101", { delay: 40 });
 await sleep(400);
 await page.click("#go");
 await page.waitForFunction(() => document.querySelectorAll("#arms .arm").length >= 2, { timeout: 60000, polling: 100 });
-await sleep(6500);
+await sleep(5500);
 await mark("twoarm");
-await page.screenshot({ path: `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-rec-two-arms.png` });
 await page.click("#prompt");
 await page.type("#prompt", TWO, { delay: 22 });
 const before = new Set(((x) => (Array.isArray(x) ? x : x.lines))(await J("/api/lines")).map((l) => l.id));
 await sleep(400);
 await page.click("#go");
 await page.waitForFunction(() => document.querySelectorAll("#arms .arm").length === 2 && !document.querySelector("#arms-go").disabled, { timeout: 90000, polling: 100 });
-await sleep(4500);
+await sleep(3500);
 await mark("armsrun");
 await page.click("#arms-go");
 await sleep(6000);
 await sped(() => page.evaluate(() => /of \d+ tries/.test(document.querySelector("#arms-result")?.innerText || "")), async () => true);
 await mark("armsresult");
-await sleep(9000);
+await sleep(7000);
 const lines = await J("/api/lines");
 const lid = (Array.isArray(lines) ? lines : lines.lines).map((l) => l.id).find((id) => !before.has(id));
 const ln = await J(`/api/line/${lid}`);
@@ -202,33 +261,32 @@ const arms = ln.stations.map((x, i) => {
 const armsText = await page.evaluate(() => document.querySelector("#arms-result").innerText.replace(/\s+/g, " "));
 console.log("arms:", armsText);
 
-// 4. the Optimize step: the saved real run, round by round
+// 5. the Optimize step: the saved real run, round by round
 await page.evaluate(() => window.scrollTo(0, 0));
 await mark("optimize");
 await page.evaluate(() => [...document.querySelectorAll(".rail li")].find((l) => l.textContent.startsWith("Optimize")).click());
-await sleep(2500);
+await sleep(2000);
 await page.evaluate((id) => {
   const s = [...document.querySelectorAll("#optimizer-root select")].find((x) => [...x.options].some((o) => o.value === id));
   s.value = id;
   s.dispatchEvent(new Event("change", { bubbles: true }));
 }, OPT_RUN);
-await sleep(2500);
+await sleep(2000);
 await mark("montage");
 await page.evaluate(() => [...document.querySelectorAll("#optimizer-root .opt-btn")].find((x) => /montage/i.test(x.textContent)).click());
 await sleep(3000);
 const chipCount = await page.evaluate(() => document.querySelectorAll(".opt-overlay .opt-chip").length);
 await mark("ticker");
-const SHOT = `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v8-`;
+const SHOT = `${process.env.HOME}/Pictures/Screenshots/2026-11-07-vla-forge-v9-`;
 for (let i = 0; i < chipCount; i++) {
   await page.evaluate((k) => document.querySelectorAll(".opt-overlay .opt-chip")[k].click(), i);
-  await sleep(i === 0 ? 4000 : 3200);
-  if (i === 2 || i === 5) await page.screenshot({ path: `${SHOT}rec-round${i}.png` });
+  await sleep(i === 0 ? 3500 : 2700);
 }
 await mark("held");
 await page.evaluate(() => document.querySelector(".opt-overlay .opt-held").scrollIntoView({ block: "center", behavior: "smooth" }));
 await sleep(1500);
 await page.screenshot({ path: `${SHOT}rec-held-out.png` });
-await sleep(15500);
+await sleep(14500);
 const orun = await J(`/api/optimizer/runs/${OPT_RUN}`);
 const optimizer = {
   run: OPT_RUN, skill: orun.skill.instruction, n_scenes: orun.n_scenes, best_round: orun.best_round,
@@ -237,10 +295,10 @@ const optimizer = {
 };
 const results = { recorded: new Date().toISOString(), sim_skill: sim, arms: { line_id: lid, prompt: TWO, arms, text: armsText, tries: ln.result?.n_parts, completed: ln.result?.completed, seed: ln.result?.seed }, optimizer, retry: sim.rounds.length > 1 };
 mkdirSync("demo", { recursive: true });
-writeFileSync("demo/v8-results.json", JSON.stringify(results, null, 1));
+writeFileSync("demo/v9-results.json", JSON.stringify(results, null, 1));
 console.log("results:", JSON.stringify(results).slice(0, 600));
 
-// 5. close on the montage's before and after
+// 6. close on the montage's before and after
 await mark("close");
 await sleep(4000);
 marks.end = await now();

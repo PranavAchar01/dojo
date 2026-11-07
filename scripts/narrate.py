@@ -1,7 +1,7 @@
 """Demo narration: one gpt-realtime-2.1 take per script line (voice cedar), acted, checked, trimmed, sped up.
 
 Reads demo/narration.tsv (name<TAB>mood<TAB>line). Numbers in a line are {placeholders} filled from the run
-measured for this cut (demo/v8-results.json), spelled out as words; the
+measured for this cut (demo/v9-results.json), spelled out as words; the
 "round2" line is only voiced when a station really needed a second round. Each take's own transcript must match the line word for
 word (case and punctuation aside) or it is voiced again. Writes demo/narration/1x/<name>.wav (as spoken) and
 demo/narration/<name>.wav (sped to SPEED), 48 kHz mono. Adapted from meta-sight's narration script.
@@ -24,7 +24,7 @@ from pathlib import Path
 import websockets
 
 ROOT = Path(__file__).resolve().parents[1]
-LINES = ROOT / "demo/narration.tsv"
+LINES = ROOT / os.environ.get("NARRATION", "demo/narration.tsv")  # NARRATION=demo/narration-ui.tsv for the UI cut
 NARR = ROOT / "demo/narration"
 OUT_1X, OUT = NARR / "1x", NARR
 CACHE = NARR / "cache"
@@ -101,7 +101,7 @@ def decimal(x: float) -> str:  # 7.2 -> "seven point two"
 
 
 def fills() -> dict[str, str] | None:
-    f = ROOT / "demo/v8-results.json"
+    f = ROOT / "demo/v9-results.json"
     if not f.exists():
         return None
     r = json.loads(f.read_text())
@@ -220,7 +220,7 @@ async def main(key: str) -> None:
     for d in (OUT_1X, OUT, CACHE):
         d.mkdir(parents=True, exist_ok=True)
     rows = [r.split("\t", 2) for r in LINES.read_text().splitlines() if r.strip()]
-    fill = fills()
+    fill = fills() if "{" in LINES.read_text() else None
     if fill is not None:
         rows = [
             [n, m, t.format(**fill)]
