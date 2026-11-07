@@ -23,3 +23,4 @@ the arm that came closest. A run the user has not pinned a robot for moves to `c
 - `ranked`: list, best first, of `{robot, label, cost_nm, score (0..1 share of objects passed), passes: [names], fails: [{object, reasons: [..]}]}`.
 - `pinned`: `null`, or `{robot, ok, message}` when the user pinned a robot. If `ok` is false the message names
   what it cannot do and the arm that could.
+- A `task` event carries it as `spec.routing`; the prompt bar's robot chip shows `chosen` (labels from `ranked`).
