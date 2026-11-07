@@ -116,12 +116,12 @@ class Layout:
             tuple((n, v[0]) for n, v in sorted(self.pads.items())),
             tuple((n, v[0]) for n, v in sorted(self.bins.items())),
             self.belt,
-            self.dressing,
             *(
                 [tuple((n, v[0], v[1]) for n, v in sorted(self.props.items()))]
                 if self.props
                 else []
             ),
+            *(["dressing:" + self.dressing] if self.dressing else []),
         )
 
     def fixtures(self) -> dict[str, tuple[str, float, float]]:
