@@ -199,7 +199,7 @@ a.brand:hover { color: var(--accent); }
 .boot-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 .boot-t { font-size: 13px; color: var(--ink2); }
 /* caption sits where Etch puts its credits line */
-.caption { position: absolute; left: 14px; bottom: 14px; z-index: 9; display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ink3); max-width: 30%; }
+.caption { position: absolute; left: 14px; bottom: 14px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(255, 255, 255, .86); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); z-index: 9; display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ink3); max-width: 30%; }
 #vp-caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tier { flex: none; height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 11px var(--ui); animation: tt-pop .26s var(--bounce) both; }
 .badge { position: absolute; top: 14px; right: 14px; z-index: 11; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 14px; background: var(--card); box-shadow: var(--shadow); animation: pop-in .38s var(--bounce) both; }
@@ -249,7 +249,7 @@ a.brand:hover { color: var(--accent); }
 .pb-progress div { height: 100%; width: 0; border-radius: 2px; background: var(--accent); }
 
 /* rounds strip: Etch's tool row with chips */
-.tabs { height: 46px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-top: 1px solid var(--line); background: var(--bg); }
+.tabs { margin-right: var(--tabs-clear, 0px); height: 46px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-top: 1px solid var(--line); background: var(--bg); }
 .page { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 12px; border-radius: 10px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(16, 24, 32, .05); font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .page svg { width: 14px; height: 14px; color: var(--ink3); }
 .page:hover { background: #f4f6f8; }
@@ -480,12 +480,10 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
   border-radius: 16px; box-shadow: 0 8px 28px rgba(22, 28, 45, .12), 0 1px 2px rgba(22, 28, 45, .1); font-family: var(--ag-sans); color: var(--ag-ink);
   transition: bottom .42s var(--bounce), opacity .25s, transform .25s; animation: pill-rise .45s var(--soft) both; }
 .wf { max-height: calc(100% - 28px); overflow-y: auto; overscroll-behavior: contain; }
-.wf.lift { bottom: 70px; max-height: calc(100% - 84px); }
 .wf.gone { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
 .wf[hidden] { display: none; }
 .wf .ag-tl-live:empty { display: none; }
 .wf .ag-tl.open .ag-tl-list { max-height: min(260px, 40vh); }
-@media (max-width: 760px) { .wf, .wf.lift { bottom: 176px; } }
 @media (prefers-color-scheme: dark) { .ag-eyes .ag-face { stroke: rgba(255, 255, 255, .85); stroke-width: 1px; } .ag-eyes .ag-eyes-dots circle { fill: #fff; } }
 
 /* welcome: with nothing picked, the regular loading mascot sits centred in the free space above the prompt bar */
@@ -531,7 +529,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 /* ---------- the docked prompt: one bar at the bottom of the stage, the conversation above it ---------- */
 .dock { position: relative; flex: none; z-index: 30; align-self: center; width: min(700px, calc(100% - 32px)); padding: 10px 0 calc(14px + var(--dock-lift, 0px)); display: flex; flex-direction: column; gap: 8px; transition: padding .25s var(--soft); }
 .app.immersive .dock { display: none; }
-.dock-thread { position: absolute; left: 0; right: 0; bottom: calc(100% - 4px); display: flex; flex-direction: column; min-height: 0; border-radius: 18px; background: #fff; box-shadow: var(--ring-up), 0 12px 32px rgba(28, 43, 51, .08); overflow: hidden; animation: rise .3s var(--soft) both; }
+.dock-thread { position: relative; flex: none; display: flex; flex-direction: column; min-height: 0; min-width: 0; border-radius: 18px; background: #fff; box-shadow: var(--ring-up), 0 12px 32px rgba(28, 43, 51, .08); overflow: hidden; animation: rise .3s var(--soft) both; }
 .dock-thread[hidden] { display: none; }
 .dock-th { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-bottom: 1px solid var(--line); }
 .dock-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: 600 13px var(--ui); color: var(--ink); text-align: left; }
@@ -541,7 +539,14 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .dock-thread.collapsed .dock-toggle svg { transform: rotate(180deg); }
 .dock-thread.collapsed .thread { display: none; }
 .dock-thread.collapsed .dock-th { border-bottom: 0; }
-.dock-thread .thread { max-height: min(34vh, 320px); flex: none; }
+.dock-thread .thread { max-height: min(24vh, 240px); flex: none; overflow-x: hidden; }
+/* the run's step summary lives in the conversation card, under its header, never over the scene */
+.dock-thread .wf { position: static; left: auto; bottom: auto; width: auto; max-width: none; transform: none; padding: 4px 14px; border-radius: 0; box-shadow: none; background: transparent; border-bottom: 1px solid var(--line); max-height: 150px; animation: none; }
+.dock-thread .wf.gone { transform: none; }
+.dock-thread .wf .ag-tl.open .ag-tl-list { max-height: 110px; }
+/* the playback pill is part of the dock column too */
+#dock #playbar { position: static; left: auto; bottom: auto; transform: none; align-self: center; flex: none; max-width: 100%; }
+#app:has(#view-sim.blank) #dock #playbar, #app:has(#view-sim.noplay) #dock #playbar, #app:has(#view-sim.hidden) #dock #playbar, #app:has(.view.auto:not(.hidden)) #dock #playbar { display: none; }
 .composer.dock-bar { position: relative; display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0; padding: 7px 8px 7px 7px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #e4e9ee, 0 10px 30px rgba(28, 43, 51, .12); transition: box-shadow .2s; }
 .composer.dock-bar:focus-within { box-shadow: 0 0 0 1px var(--accent-200), 0 0 0 5px var(--accent-glow), 0 10px 30px rgba(28, 43, 51, .12); }
 .dock-plus { flex: none; width: 38px; height: 38px; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--accent-bg); color: var(--accent-700); transition: background-color .15s, transform .45s var(--liquid); }

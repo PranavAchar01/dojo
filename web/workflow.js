@@ -18,13 +18,14 @@ const ROWS = [
 ];
 
 const rail = document.querySelector("#rail");
-const canvas = document.querySelector("#view-sim"); // the card lives in the Sim view, so it always sits above the prompt bar under it
-if (rail && canvas) {
+const dockThread = document.querySelector("#dock-thread"); // the card lives inside the conversation card, in the one dock
+if (rail && dockThread) {
   const card = el("div", "wf");
   card.dataset.keepclear = "";
   card.setAttribute("aria-label", "What the run is doing");
   card.hidden = true;
-  canvas.append(card);
+  dockThread.querySelector(".dock-th").after(card);
+  const dockSync = () => dispatchEvent(new Event("dock:sync"));
   let tl = null, last = "", hideT = 0, t0 = 0, savedSecs = null;
   // a saved model's rail fills in an instant, so its time is the train time kept on the skill record
   addEventListener("dojo:skill", (e) => { savedSecs = +e.detail.seconds > 0 ? +e.detail.seconds : null; });
@@ -59,6 +60,7 @@ if (rail && canvas) {
     clearTimeout(hideT);
     card.hidden = false;
     card.classList.remove("gone");
+    dockSync();
     for (const r of rows) tl.row(r);
     // a row that dropped back to idle is no longer part of this run's story; leave it folded
     const published = rows.find((r) => r.id === "publish")?.status === "done";
@@ -67,21 +69,10 @@ if (rail && canvas) {
   }
   function scheduleHide(ms) {
     clearTimeout(hideT);
-    hideT = setTimeout(() => { if (card.matches(":hover") || (tl && !tl.finished)) return; card.classList.add("gone"); setTimeout(() => { if (card.classList.contains("gone")) card.hidden = true; }, 260); }, ms);
+    hideT = setTimeout(() => { if (card.matches(":hover") || (tl && !tl.finished)) return; card.classList.add("gone"); setTimeout(() => { if (card.classList.contains("gone")) card.hidden = true; dockSync(); }, 260); }, ms);
   }
   card.addEventListener("pointerleave", () => { if (tl && tl.finished) scheduleHide(4000); });
-  // sit above the playbar when it shows
-  const bar = document.querySelector("#playbar"), sim = document.querySelector("#view-sim");
-  const phone = matchMedia("(max-width: 760px)");
-  const place = () => {
-    card.classList.toggle("lift", !!(bar && !bar.classList.contains("hidden") && sim && !sim.classList.contains("hidden") && !sim.classList.contains("blank")));
-    // phones: the stage rail runs along the bottom of the canvas, so the card sits just above it
-    const q = rail.getBoundingClientRect();
-    card.style.bottom = phone.matches && q.height ? `${Math.round(canvas.getBoundingClientRect().bottom - q.top + 10)}px` : "";
-  };
-  addEventListener("resize", place);
-  const mo = new MutationObserver(() => { sync(); place(); });
+  const mo = new MutationObserver(() => sync());
   mo.observe(rail, { subtree: true, attributes: true, attributeFilter: ["class"], childList: true, characterData: true });
-  for (const n of [bar, sim]) if (n) mo.observe(n, { attributes: true, attributeFilter: ["class"] });
-  sync(); place();
+  sync();
 }
