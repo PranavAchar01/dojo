@@ -105,9 +105,9 @@ a.brand:hover { color: var(--accent); }
 .ag-eyes { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 85%; }
 .ag-eyes .ag-hb { fill: #0866ff; }
 .ag-eyes .ag-hb-tail { fill: none; stroke: #0866ff; stroke-width: 3.4; stroke-linecap: round; }
-.ag-eyes .ag-face { fill: #fff; stroke: #0b0b0c; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
-.ag-eyes .ag-eye { fill: #0b0b0c; }
-.ag-eyes .ag-eyes-glint { color: #0b0b0c; }
+.ag-eyes .ag-face { fill: #0b0b0c; stroke: #0b0b0c; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.ag-eyes .ag-eye { fill: #fff; stroke: #1c2a3a; stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.ag-eyes .ag-eyes-glint { color: #fff; }
 .ag-eyes .ag-eyes-dots circle { fill: #0b0b0c; }
 .ag-eyes.breathe { animation: ag-breathe 4.4s ease-in-out infinite; }
 @keyframes ag-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
@@ -504,4 +504,4 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 .wf .ag-tl-live:empty { display: none; }
 .wf .ag-tl.open .ag-tl-list { max-height: min(260px, 40vh); }
 @media (max-width: 760px) { .wf, .wf.lift { bottom: 176px; } }
-@media (prefers-color-scheme: dark) { .ag-eyes .ag-face { fill: #0b0b0c; stroke: rgba(255, 255, 255, .85); stroke-width: 1px; } .ag-eyes .ag-eye { fill: #fff; } .ag-eyes .ag-eyes-dots circle { fill: #fff; } .ag-eyes .ag-eyes-glint { color: #fff; } }
+@media (prefers-color-scheme: dark) { .ag-eyes .ag-face { stroke: rgba(255, 255, 255, .85); stroke-width: 1px; } .ag-eyes .ag-eyes-dots circle { fill: #fff; } }
