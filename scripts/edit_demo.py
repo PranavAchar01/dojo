@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +23,10 @@ FAST = 4.0
 CUES = [
     ("hook", "zero", 0.5),
     ("describe", "describe", 0.3),
+    ("agents", "agents", 0.6),
+    ("roam", "roam", 0.3),
     ("train", "speed0", 0.4),
+    ("thinking", "thinking", 0.3),
     ("round2", "mid", 0.0),
     ("trained", "trained", 0.3),
     ("addarm", "addarm", 0.3),
@@ -35,6 +39,17 @@ CUES = [
     ("close", "close", 0.5),
 ]
 
+# the short UI cut (record_ui_v9.mjs, marks "cut": "ui"): no results, no numbers
+UI_CUES = [
+    ("hook", "zero", 0.8),
+    ("describe", "describe", 0.2),
+    ("agents", "agents", 0.5),
+    ("roam", "roam", 0.3),
+    ("thinking", "thinking", 0.3),
+    ("wait", "wait", 0.3),
+    ("close", "close", 0.0),
+]
+
 
 # idle holds trimmed at the end of a segment, in recording seconds: (anchor in marks, offset after it, length).
 # "speed_last_end" is where the last logged wait ends. Narration cues all sit before these.
@@ -45,7 +60,7 @@ DROPS = [
 
 
 def has_retry() -> bool:
-    return json.loads((ROOT / "demo/v8-results.json").read_text())["retry"]
+    return json.loads((ROOT / "demo/v9-results.json").read_text())["retry"]
 
 
 def main() -> None:
@@ -53,10 +68,11 @@ def main() -> None:
     marks = json.loads(src.with_suffix(".marks.json").read_text())
     spans = marks["speed"]
     at = marks["at"]
+    ui = marks.get("cut") == "ui"
     last_end = max(b for _a, b in spans)
     drops = [
         ((last_end if k == "speed_last_end" else at[k]) + o, 0.0, ln)
-        for k, o, ln in DROPS
+        for k, o, ln in ([] if ui else DROPS)
     ]
     segs = sorted(
         [(a, b, FAST) for a, b in spans] + [(a, a + ln, 0.0) for a, _z, ln in drops],
@@ -74,14 +90,13 @@ def main() -> None:
 
     anchors = {
         "zero": 0.0,
-        "mid": (spans[0][0] + max(b for _a, b in spans if b <= at["trained"] + 0.5))
-        / 2,
+        **({} if ui else {"mid": (spans[0][0] + max(b for _a, b in spans if b <= at["trained"] + 0.5)) / 2}),
         **({"ladder": marks["ladder"]} if "ladder" in marks else {}),
         **marks.get("at", {}),
         **{f"speed{i}": a for i, (a, _b) in enumerate(spans)},
         **{f"speed{i}_end": b for i, (_a, b) in enumerate(spans)},
         **{f"start{i}": p["start"] for i, p in enumerate(marks["prompts"])},
-        **{f"published{i}": p["published"] for i, p in enumerate(marks["prompts"])},
+        **{f"published{i}": p["published"] for i, p in enumerate(marks["prompts"]) if "published" in p},
     }
     # tab capture can open on a frame of a different size before the page settles: size every cut like the
     # frame one second in
@@ -127,17 +142,21 @@ def main() -> None:
     inputs, agraph, amix = [], [], []
     cues = [
         c
-        for c in CUES
+        for c in (UI_CUES if ui else CUES)
         if (ROOT / "demo/narration" / f"{c[0]}.wav").exists()
-        and (c[0] != "round2" or has_retry())
+        and (ui or c[0] != "round2" or has_retry())
     ]
+    free = 0.0  # a line never starts before the one before it has finished
     for k, (name, anchor, off) in enumerate(cues):
-        at = to_out(anchors[anchor]) + off + (0.0 if name == "hook" else lead)
+        wav = ROOT / "demo/narration" / f"{name}.wav"
+        at = max(to_out(anchors[anchor]) + off + (0.0 if name == "hook" else lead), free)
+        with wave.open(str(wav)) as w:
+            free = at + w.getnframes() / w.getframerate() + 0.3
         inputs += ["-i", str(ROOT / "demo/narration" / f"{name}.wav")]
         ms = int(at * 1000)
         agraph.append(f"[{k}:a]aresample=48000,adelay={ms}|{ms}[a{k}]")
         amix.append(f"[a{k}]")
-        print(f"{name:9s} {at:6.1f}s")
+        print(f"{name:9s} {at:6.1f}s to {free - 0.3:6.1f}s")
     agraph.append(f"{''.join(amix)}amix=inputs={len(amix)}:normalize=0,apad[a]")
     total = lead + to_out(marks["end"])
     mix = out.with_suffix(".narration.wav")

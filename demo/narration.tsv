@@ -1,6 +1,9 @@
 hook	hook	This is VLA Forge. You describe a task in plain words, and it trains a robot policy for it. Building a skill from one sentence needs a frontier model, and here that model is Llama. All of this runs in simulation.
-describe	explain	The canvas starts blank. I type one task for an SO-101: put the blue block in the front-left slot of the tray.
-train	explain	The agents write the success check, collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
+describe	explain	The canvas starts blank. I type one task for an SO-101: push the blue block onto the white square.
+agents	explain	Every step is a message between Fetch.ai uAgents. Fetch.ai is the multi-agent orchestration, and Llama powers the reasoning agents: task, critic and optimizer.
+roam	explain	Back on the canvas, the robot flies to the stage being worked on and points at it with its gripper.
+train	explain	The agents collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
+thinking	explain	Press T and the Thinking panel shows each agent's reasoning as it happens. I ask what it is doing, and it answers from the live run.
 round2	honest	The first round got {r1} of {rn}, under the bar, so the critic sent it back for another.
 trained	proud	The new skill trained in {t} seconds and got {s} of {n} held-out scenes, in simulation.
 addarm	explain	Now I type add another SO-101, and a second arm appears in place.
