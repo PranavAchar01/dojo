@@ -255,7 +255,11 @@ def idle_preview(robot: str | None = None):
     """A resting scene for the empty page: the active arm at home behind a few blocks."""
     rng = np.random.default_rng(3)
     return preview(
-        sample_layout(TaskSpec("pick_place", "red", "white", 2), rng),
+        sample_layout(
+            TaskSpec("pick_place", "red", "white", 2),
+            rng,
+            robot=_robot_id(robot or FORGE.robot),
+        ),
         _robot_id(robot or FORGE.robot),
     )
 

@@ -375,7 +375,7 @@ def _evaluate(
     init = [{"spec": spec.to_json(), "envs": [], "robot": robot} for _ in range(w)]
     for i in range(n):
         rng = np.random.default_rng(seed0 + i)
-        lay = layouts[i] if layouts else sample_layout(spec, rng).to_json()
+        lay = layouts[i] if layouts else sample_layout(spec, rng, robot=robot).to_json()
         rolls.append(Rollout(i, seed0 + i, lay))
         init[i % w]["envs"].append((i, lay, seed0 + i + 7, look_strength))
     obs = pool._scatter("init", init)
