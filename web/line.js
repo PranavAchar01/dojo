@@ -318,7 +318,7 @@ async function buildLine3D() {
     const partMat = cube.material;
     const st = line.stations[k];
     // the station's stencil on the floor beside its belt, orange for a trained VLA, graphite for a scripted cell
-    floorLabel(lab, `${String(k + 1).padStart(2, "0")}  ${st.name}`.toUpperCase(), 0.5, root.position.y - 0.3, Math.PI / 2, 0.042, st.controller === "vla" ? "rgba(224,86,26,0.95)" : "rgba(44,47,53,0.95)");
+    floorLabel(lab, `STATION ${String(k + 1).padStart(2, "0")}  ${st.controller === "vla" ? "VLA" : "SCRIPTED"}`, 0.5, root.position.y - 0.2, Math.PI / 2, 0.042, st.controller === "vla" ? "rgba(224,86,26,0.95)" : "rgba(44,47,53,0.95)");
     if (k > 0) hazardStrip(lab, -0.3, root.position.y - pitch / 2, 0.74, root.position.y - pitch / 2, 0.012);
     const binBody = sc.bins?.[0]?.body;
     cells.push({ root, bodies, belt, cube, partMat, partBody: part.body, home: sc.home, binBody, done: [] });
