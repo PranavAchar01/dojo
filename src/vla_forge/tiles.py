@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from .registry import ROOT, TILES_DIR, Skill
+from .sim.display import restyle
 from .sim.robots import calibrate, fix_qpos0
 from .sim.scene import JOINTS, Layout, build_spec
 from .viz import export_scene
@@ -37,6 +38,7 @@ def render_thumb(
     lay = Layout.from_json(layout_json)
     m = build_spec(lay, robot=robot).compile()
     fix_qpos0(m)
+    restyle(m)
     d = mujoco.MjData(m)
     rb = calibrate(robot)
     joints = (

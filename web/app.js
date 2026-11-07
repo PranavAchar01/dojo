@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
 import { initBuilder, showBuilder } from "./builder.js";
+import { HAZE, setupRenderer, makeEnvironment, makeStage, addStudioLights, buildLab, basePlate, floorLabel, robotMaterial as studioMaterial, partsMesh } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -60,20 +60,15 @@ function resetStages(composite) {
 }
 
 // ---------------------------------------------------------------- 3D
+// A clean robotics cell: sealed concrete floor, taped cell corners, the arm bolted to a floor plate. No furniture.
 const canvas = $("#three");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.NeutralToneMapping; // keeps the block colours true, like a product render
-renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap; // PCF honours shadow.radius, so the key light casts a soft edge
+setupRenderer(renderer);
 const scene3 = new THREE.Scene();
-const STUDIO = new THREE.Color(0xeeeef0); // the page's zinc-50 card, so the set melts into the UI
-scene3.background = STUDIO;
-scene3.fog = new THREE.Fog(STUDIO, 3.2, 7.5);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene3.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene3.background = HAZE;
+scene3.fog = new THREE.Fog(HAZE, 2.6, 7.0);
+scene3.environment = makeEnvironment(renderer);
 scene3.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 30);
@@ -87,157 +82,16 @@ controls.maxDistance = 2.6;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.update();
 
-// three-point studio lighting: a warm soft key that casts the shadows, a cool fill from the sky, a rim from behind
-const key = new THREE.DirectionalLight(0xfff3e4, 2.4);
-key.position.set(0.95, -0.7, 1.7);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = -1.1; key.shadow.camera.right = 1.1;
-key.shadow.camera.top = 1.1; key.shadow.camera.bottom = -1.1;
-key.shadow.camera.near = 0.5; key.shadow.camera.far = 4.5;
-key.shadow.radius = 4;
-key.shadow.blurSamples = 16;
-key.shadow.bias = -0.0003;
-key.shadow.normalBias = 0.0015;
-key.target.position.set(0.2, 0, -0.2);
-scene3.add(key, key.target);
-scene3.add(new THREE.HemisphereLight(0xf7f8ff, 0xd9d6d0, 0.55));
-const rim = new THREE.DirectionalLight(0xe4ecff, 0.9);
-rim.position.set(-1.1, 1.0, 1.0);
-scene3.add(rim);
+addStudioLights(scene3, { target: [0.2, 0, 0], extent: 1.1 });
+const lab = buildLab(scene3, renderer, { cell: [-0.34, -0.58, 0.74, 0.58] });
+floorLabel(lab, "CELL 01  ·  SO-101", 0.5, -0.545, Math.PI / 2, 0.034);
+let plate = basePlate(0.23);
+scene3.add(plate);
+const postStage = makeStage(renderer, scene3, camera);
 
-// seamless cyclorama: a floor that curves up into a wall all the way round, so every orbit angle sees a studio
-{
-  const pts = [];
-  const floorZ = -0.75, flat = 2.4, cove = 1.4;
-  pts.push(new THREE.Vector2(0.001, floorZ));
-  pts.push(new THREE.Vector2(flat, floorZ));
-  for (let i = 1; i <= 24; i++) {
-    const a = (i / 24) * Math.PI * 0.5;
-    pts.push(new THREE.Vector2(flat + cove * Math.sin(a), floorZ + cove * (1 - Math.cos(a))));
-  }
-  pts.push(new THREE.Vector2(flat + cove, 6));
-  const g = new THREE.LatheGeometry(pts, 96);
-  g.rotateX(Math.PI / 2);
-  const cyc = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xe6e6e9, roughness: 1, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.3 }));
-  cyc.position.set(0.2, 0, 0);
-  cyc.receiveShadow = true;
-  scene3.add(cyc);
-}
-
-// soft radial texture for contact shadows (ambient occlusion where things touch a surface)
-function blobTexture() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d");
-  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  r.addColorStop(0, "rgba(0,0,0,0.55)");
-  r.addColorStop(0.45, "rgba(0,0,0,0.28)");
-  r.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = r;
-  g.fillRect(0, 0, 128, 128);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const BLOB = blobTexture();
-function contactShadow(size, opacity) {
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(size, size),
-    new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWrite: false, opacity, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }),
-  );
-  m.renderOrder = 1;
-  return m;
-}
-
-// lab bench: pale ash top (the CC0 Poly Haven wood, washed out to sit with the zinc UI) on a brushed aluminium frame
-const texLoader = new THREE.TextureLoader();
-function washedWood(mat) { // canvas size is fixed before the texture is made: GPU texture storage cannot be resized
-  texLoader.load("/static/assets/wood_diff.jpg", (tex) => {
-    const img = tex.image;
-    const c = document.createElement("canvas");
-    c.width = img.width; c.height = img.height;
-    const g = c.getContext("2d", { willReadFrequently: true });
-    g.drawImage(img, 0, 0);
-    // remap the dark walnut grain onto a pale ash range by hand (canvas filters are not honoured everywhere)
-    const d = g.getImageData(0, 0, c.width, c.height);
-    const px = d.data;
-    let lo = 255, hi = 0;
-    for (let i = 0; i < px.length; i += 16) { const l = 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; lo = Math.min(lo, l); hi = Math.max(hi, l); }
-    for (let i = 0; i < px.length; i += 4) {
-      const l = ((0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) - lo) / Math.max(1, hi - lo);
-      const v = 0.80 + 0.17 * l; // grain survives as a 17% swing
-      px[i] = 255 * v; px[i + 1] = 255 * v * 0.955; px[i + 2] = 255 * v * 0.89;
-    }
-    g.putImageData(d, 0, 0);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(1.0, 1.4);
-    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    mat.map = t;
-    mat.needsUpdate = true;
-    tex.dispose();
-  });
-}
-const TOP = { w: 0.9, d: 1.2, t: 0.036 };
-const tableTop = new THREE.Mesh(
-  new RoundedBoxGeometry(TOP.w, TOP.d, TOP.t, 6, 0.008),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, envMapIntensity: 0.35 }),
-);
-washedWood(tableTop.material);
-tableTop.position.set(0.2, 0, -TOP.t / 2);
-tableTop.receiveShadow = true;
-tableTop.castShadow = true;
-scene3.add(tableTop);
-const alu = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, roughness: 0.32, metalness: 0.9, envMapIntensity: 0.9 });
-const frameZ = -TOP.t, legH = 0.75 + frameZ;
-for (const [x, y] of [[-0.21, -0.56], [-0.21, 0.56], [0.61, -0.56], [0.61, 0.56]]) {
-  const leg = new THREE.Mesh(new RoundedBoxGeometry(0.036, 0.036, legH, 3, 0.004), alu);
-  leg.position.set(x, y, frameZ - legH / 2);
-  leg.castShadow = leg.receiveShadow = true;
-  scene3.add(leg);
-  const foot = contactShadow(0.16, 0.5);
-  foot.position.set(x, y, -0.7495);
-  scene3.add(foot);
-}
-for (const [x, y, sx, sy] of [[0.2, -0.56, 0.82, 0.03], [0.2, 0.56, 0.82, 0.03], [-0.21, 0, 0.03, 1.12], [0.61, 0, 0.03, 1.12]]) {
-  const rail = new THREE.Mesh(new RoundedBoxGeometry(sx, sy, 0.05, 3, 0.004), alu);
-  rail.position.set(x, y, frameZ - 0.03);
-  rail.castShadow = true;
-  scene3.add(rail);
-}
-const lowShelf = new THREE.Mesh(new RoundedBoxGeometry(0.82, 1.12, 0.02, 3, 0.004), new THREE.MeshStandardMaterial({ color: 0x2c2d31, roughness: 0.7, metalness: 0.2 }));
-lowShelf.position.set(0.2, 0, -0.6);
-lowShelf.castShadow = lowShelf.receiveShadow = true;
-scene3.add(lowShelf);
-const benchShadow = contactShadow(1.9, 0.35);
-benchShadow.scale.set(1, 1.3, 1);
-benchShadow.position.set(0.2, 0, -0.7493);
-scene3.add(benchShadow);
-
-const MAT = {
-  // matte 3D-printed PLA shells, satin anodised-looking servo cases
-  printed: new THREE.MeshPhysicalMaterial({ color: 0xf2c53a, roughness: 0.62, sheen: 0.25, sheenRoughness: 0.7, sheenColor: 0xfff2c8, envMapIntensity: 0.6 }),
-  motor: new THREE.MeshPhysicalMaterial({ color: 0x26272b, roughness: 0.36, metalness: 0.65, clearcoat: 0.3, clearcoatRoughness: 0.35, envMapIntensity: 1.0 }),
-  other: new THREE.MeshStandardMaterial({ color: 0xa4a6aa, roughness: 0.35, metalness: 0.8 }),
-};
 const geomCache = new Map();
 const meshStore = {}; // robot id -> promise of its mesh buffers (fetched once per robot)
 const meshesFor = (rid) => (meshStore[rid] ||= fetch(`/api/meshes?robot=${encodeURIComponent(rid)}`).then((r) => r.json()));
-const robotMats = new Map();
-function robotMaterial(rid, rgba) {
-  const lum = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2];
-  if (rid === "so101") return lum > 0.5 ? MAT.printed : lum < 0.2 ? MAT.motor : MAT.other;
-  // other embodiments keep the colours their source models ship with
-  const k = rgba.map((x) => x.toFixed(2)).join(",");
-  if (!robotMats.has(k)) {
-    const dim = lum > 0.8 ? 0.72 / lum : 1; // near-white parts wash out under the key light
-    const c = srgb(rgba.slice(0, 3).map((x) => x * dim));
-    robotMats.set(k, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.4 }));
-  }
-  return robotMats.get(k);
-}
 function meshGeometry(id, data) {
   if (geomCache.has(id)) return geomCache.get(id);
   const v = new Float32Array(Uint8Array.from(atob(data.v), (c) => c.charCodeAt(0)).buffer);
@@ -284,106 +138,138 @@ function beltTexture() {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
-const BELT_RAIL = new THREE.MeshStandardMaterial({ color: 0x9ea3ab, roughness: 0.35, metalness: 0.7 });
-function addLineParts(sc, root, bodies, maxHalfLen = Infinity) {
+// Conveyor and totes of a factory-line cell (sim/line.py). The belt is drawn fixed in place on a proper frame (side
+// rails, end rollers, legs to the floor) and its tread scrolls with the slide joint; totes are robosuite's bin boxes.
+const BELT_FRAME = new THREE.MeshStandardMaterial({ color: 0xb9bdc4, roughness: 0.38, metalness: 0.9, envMapIntensity: 0.9 });
+const BELT_DARK = new THREE.MeshStandardMaterial({ color: 0x23252a, roughness: 0.6, metalness: 0.5, envMapIntensity: 0.7 });
+function addLineParts(sc, root, bodies, { shadows = true, belt: wantBelt = true, halfLen = Infinity } = {}) {
   for (const b of sc.bins || []) {
-    const mat = new THREE.MeshStandardMaterial({ color: srgb(b.rgb), roughness: 0.6, envMapIntensity: 0.5 });
+    const mat = new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.45, envMapIntensity: 0.6 });
     for (const g of b.boxes) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(g.size[0] * 2, g.size[1] * 2, g.size[2] * 2), mat);
+      const m = new THREE.Mesh(new RoundedBoxGeometry(g.size[0] * 2, g.size[1] * 2, g.size[2] * 2, 3, 0.0012), mat);
       m.position.set(...g.pos);
-      m.castShadow = m.receiveShadow = true;
+      m.castShadow = m.receiveShadow = shadows;
       bodies[b.body].add(m);
     }
   }
-  if (!sc.belt) return null;
+  if (!sc.belt || !wantBelt) return null;
   const [w, l0, t] = sc.belt.half;
-  const l = Math.min(l0, maxHalfLen);
+  const l = Math.min(l0, halfLen);
   const tex = beltTexture();
   tex.repeat.set(1, (l * 2) / 0.06);
-  const belt = new THREE.Mesh(new THREE.BoxGeometry(w * 2, l * 2, t * 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
   const x = sc.frame ? sc.frame[sc.belt.body * 7] : 0.245;
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(w * 2, l * 2, t * 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
   belt.position.set(x, 0, sc.belt.top - t);
-  belt.receiveShadow = true;
+  belt.receiveShadow = shadows;
   root.add(belt);
-  for (const s of [-1, 1]) { // side rails
-    const r = new THREE.Mesh(new THREE.BoxGeometry(0.008, l * 2, 0.014), BELT_RAIL);
-    r.position.set(x + s * (w + 0.004), 0, 0.004);
-    r.castShadow = r.receiveShadow = true;
+  const topZ = sc.belt.top;
+  for (const s of [-1, 1]) { // side rails and the frame beneath
+    const r = new THREE.Mesh(new RoundedBoxGeometry(0.012, l * 2, 0.03, 3, 0.002), BELT_FRAME);
+    r.position.set(x + s * (w + 0.006), 0, topZ - 0.013);
+    r.castShadow = r.receiveShadow = shadows;
     root.add(r);
+    for (let y = -l + 0.1; y <= l - 0.05; y += 0.4) { // legs
+      const leg = new THREE.Mesh(new RoundedBoxGeometry(0.02, 0.02, topZ + 0.001, 2, 0.002), BELT_FRAME);
+      leg.position.set(x + s * (w + 0.006), y, (topZ - 0.028) / 2 - 0.001);
+      leg.scale.z = 0.01 / 0.01;
+      leg.geometry = new RoundedBoxGeometry(0.02, 0.02, Math.max(0.005, topZ - 0.028 + 0.012), 2, 0.002);
+      leg.position.z = (topZ - 0.028 + 0.012) / 2 - 0.006;
+      leg.castShadow = shadows;
+      root.add(leg);
+    }
+  }
+  for (const e of [-1, 1]) { // end rollers
+    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, w * 2 + 0.01, 24), BELT_DARK);
+    roll.rotation.z = Math.PI / 2;
+    roll.position.set(x, e * (l - 0.004), topZ - 0.009);
+    root.add(roll);
   }
   return { tex, body: sc.belt.body, y0: sc.frame ? sc.frame[sc.belt.body * 7 + 1] : 0 };
 }
-async function buildWorld(sc) {
-  const rid = sc.robot_id || "so101";
-  const meshes = await meshesFor(rid);
-  if (world) scene3.remove(world.root);
-  if (!world || world.rid !== rid) camFor(rid); // frame a new arm once; keep the viewer's orbit otherwise
-  const root = new THREE.Group();
-  const blobs = [];
+// every drawable of a compiled scene, parented under `root`: the robot's real meshes in the studio materials, blocks,
+// bowls, taped squares, totes, fixtures. Returns one Group per MuJoCo body (poses are applied to these).
+function populate(sc, root, rid, meshes, { shadows = true, belt: wantBelt = true, beltHalfLen = Infinity } = {}) {
   const bodies = sc.bodies.map(() => {
     const o = new THREE.Group();
     root.add(o);
     return o;
   });
+  const shade = (m) => { m.castShadow = shadows; m.receiveShadow = shadows; return m; };
   for (const g of sc.robot) {
     const geo = meshGeometry(`${rid}|${g.mesh}`, meshes[String(g.mesh)]);
-    const m = new THREE.Mesh(geo, robotMaterial(rid, g.rgba));
+    const m = shade(new THREE.Mesh(geo, studioMaterial(g.rgba, g.name)));
     m.position.fromArray(g.pos);
     m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
-    m.castShadow = true;
-    m.receiveShadow = true;
     bodies[g.body].add(m);
   }
   for (const b of sc.blocks) {
+    if (b.parts) {
+      const g = partsMesh(b.parts, b.rgb, b.kind || "part");
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = shadows; } });
+      bodies[b.body].add(g);
+      continue;
+    }
     const s = b.half * 2;
-    const m = new THREE.Mesh(
+    const m = shade(new THREE.Mesh(
       new RoundedBoxGeometry(s, s, s, 4, 0.0025),
       new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.5, clearcoat: 0.22, clearcoatRoughness: 0.45, envMapIntensity: 0.7 }),
-    );
-    m.castShadow = m.receiveShadow = true;
+    ));
     bodies[b.body].add(m);
-    blobs.push({ body: b.body, mesh: contactShadow(s * 2.4, 0.55), lift: 0.06 });
   }
   for (const b of sc.bowls) {
-    const m = new THREE.Mesh(
+    const m = shade(new THREE.Mesh(
       bowlGeometry(b.r, b.h),
       new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.3, clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 0.9, side: THREE.DoubleSide }),
-    );
-    m.castShadow = m.receiveShadow = true;
+    ));
     bodies[b.body].add(m);
-    blobs.push({ body: b.body, mesh: contactShadow(b.r * 2.9, 0.5), lift: 1 });
   }
   for (const p of sc.pads) {
     const mat = new THREE.MeshStandardMaterial({ color: srgb(p.rgb), roughness: 0.85, envMapIntensity: 0.4 });
     const t = p.half, w = 0.006;
     for (const [x, y, sx, sy] of [[t, 0, w, t + w], [-t, 0, w, t + w], [0, t, t + w, w], [0, -t, t + w, w]]) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(sx * 2, sy * 2, 0.0012), mat);
-      m.position.set(x, y, 0.0006);
-      m.receiveShadow = true;
+      m.position.set(x, y, 0.0009);
+      m.receiveShadow = shadows;
       bodies[p.body].add(m);
     }
   }
-  const belt = addLineParts(sc, root, bodies, TOP.d / 2 - 0.02);
-  const base = contactShadow(0.2, 0.6); // under the arm's base plate
-  base.position.set(0, 0, 0.0004);
-  root.add(base);
-  for (const b of blobs) root.add(b.mesh);
+  for (const p of sc.props || []) {
+    const g = partsMesh(p.parts, p.rgb, p.kind);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = shadows; } });
+    bodies[p.body].add(g);
+  }
+  const belt = addLineParts(sc, root, bodies, { shadows, belt: wantBelt, halfLen: beltHalfLen });
+  return { bodies, belt };
+}
+async function buildWorld(sc) {
+  const rid = sc.robot_id || "so101";
+  const meshes = await meshesFor(rid);
+  if (world) { scene3.remove(world.root); scene3.remove(world.mirror); }
+  if (!world || world.rid !== rid) {
+    camFor(rid); // frame a new arm once; keep the viewer's orbit otherwise
+    scene3.remove(plate);
+    plate = basePlate(0.23 * camScale);
+    scene3.add(plate);
+  }
+  const root = new THREE.Group();
+  const lone = populate(sc, root, rid, meshes, { belt: false });
   scene3.add(root);
-  world = { root, bodies, blobs, n: sc.bodies.length, rid, belt };
+  // the sealed floor shows a faint mirror of the cell: the same objects below z = 0, no shadows of their own
+  const mirror = new THREE.Group();
+  mirror.scale.z = -1;
+  const twin = populate(sc, mirror, rid, meshes, { shadows: false, belt: false });
+  scene3.add(mirror);
+  world = { root, mirror, bodies: lone.bodies, twin: twin.bodies, n: sc.bodies.length, rid, belt: null };
 }
 function applyFrame(frame) {
   if (!world || !frame) return;
   const n = world.n;
   for (let i = 0; i < n; i++) {
     const k = i * 7; // per body: x y z, then quaternion w x y z (MuJoCo order)
-    world.bodies[i].position.set(frame[k], frame[k + 1], frame[k + 2]);
-    world.bodies[i].quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
-  }
-  if (world.belt) world.belt.tex.offset.y = -(frame[world.belt.body * 7 + 1] - world.belt.y0) / 0.06;
-  for (const b of world.blobs) { // contact shadows stay on the table and fade as the object lifts
-    const p = world.bodies[b.body].position;
-    b.mesh.position.set(p.x, p.y, 0.0004);
-    b.mesh.material.opacity = (b.base ??= b.mesh.material.opacity) * Math.max(0, 1 - Math.max(0, p.z - 0.02) / b.lift);
+    for (const set of [world.bodies, world.twin]) {
+      set[i].position.set(frame[k], frame[k + 1], frame[k + 2]);
+      set[i].quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
+    }
   }
 }
 
@@ -399,6 +285,7 @@ function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
   if (!r.width || !r.height) return; // the sim view is hidden on the other tabs
   renderer.setSize(r.width, r.height, false);
+  postStage.setSize(r.width, r.height);
   camera.aspect = r.width / r.height;
   camera.updateProjectionMatrix();
 }
@@ -411,7 +298,7 @@ const CAMS = {
 };
 // Orbit starts in front of the arm (+x, the side the gripper works toward), a little to the right, and only sways
 // about 25 degrees either way, so the camera never swings round behind it.
-const SWAY = { az: (-12 * Math.PI) / 180, amp: (25 * Math.PI) / 180, period: 28, r: 0.88, h: 0.30, resume: 4000 };
+const SWAY = { az: (-42 * Math.PI) / 180, amp: (12 * Math.PI) / 180, period: 30, r: 1.2, h: 0.4, resume: 4000 };
 let userUntil = 0; // sway pauses while the user drags and for a few seconds after
 function swayPose(now) {
   const k = camScale;
@@ -476,7 +363,7 @@ function tick() {
       controls.target.z += (p[3] - controls.target.z) * 0.06;
     }
     controls.update();
-    renderer.render(scene3, camera);
+    postStage.render();
   }
   requestAnimationFrame(tick);
 }
@@ -1140,7 +1027,7 @@ window.forge = {
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
   THREE, scene3, camera, controls, renderer,
-  meshesFor, meshGeometry, robotMaterial, srgb, contactShadow, addLineParts, RoundedBoxGeometry,
+  meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage, applyFrame, buildWorld, populate, armScale: (rid) => ARM_SCALE[String(rid || "so101").split(".")[0]] || 1,
 };
 
 idleScene();

@@ -1,0 +1,221 @@
+{
+ "date": "2026-11-07",
+ "budget_s": 172,
+ "held_out_scenes": 20,
+ "skills": {
+  "budget": "standard 3 minute pipeline (DEADLINE 172 s), no longer budget used",
+  "skills": [
+   {
+    "skill_id": "185611-f8b0",
+    "skill": "kit",
+    "instruction": "put the red block in the front-left slot of the tray",
+    "tier": 2,
+    "rounds": [
+     "11/20",
+     "13/20"
+    ],
+    "held_out_success": "13/20",
+    "seconds": 177.5,
+    "budget_seconds": 172,
+    "init": "closest skill 'put the red block in the red bin' is a different motion: starting from the base policy",
+    "expert_success_dart_noise": "47-48/50 (94-96%)"
+   },
+   {
+    "skill_id": "185909-ce72",
+    "skill": "insert",
+    "instruction": "insert the red block into the socket",
+    "tier": 3,
+    "rounds": [
+     "7/20",
+     "13/20"
+    ],
+    "held_out_success": "13/20",
+    "seconds": 176.2,
+    "budget_seconds": 172,
+    "init": "closest skill 'put the red block in the front-left slot of the tray' is a different motion: starting from the base policy",
+    "expert_success_dart_noise": "46/50 (92%)"
+   },
+   {
+    "skill_id": "190206-1c08",
+    "skill": "rotate",
+    "instruction": "pick up the red block, rotate it and set it in the diamond socket",
+    "tier": 3,
+    "rounds": [
+     "13/20",
+     "13/20"
+    ],
+    "held_out_success": "13/20",
+    "seconds": 184.0,
+    "budget_seconds": 172,
+    "init": "closest skill 'insert the red block into the socket' is a different motion: starting from the base policy",
+    "expert_success_dart_noise": "47/50 (94%)"
+   },
+   {
+    "skill_id": "190511-3a8e",
+    "skill": "kit",
+    "instruction": "put the red block in the back-right slot of the tray",
+    "tier": 2,
+    "rounds": [
+     "14/20",
+     "17/20"
+    ],
+    "held_out_success": "17/20",
+    "seconds": 165.8,
+    "budget_seconds": 172,
+    "init": "fine-tuning from 'put the red block in the front-left slot of the tray' (similarity 1.14)",
+    "expert_success_dart_noise": "47-48/50 (94-96%)"
+   },
+   {
+    "skill_id": "190758-40c7",
+    "skill": "kit",
+    "instruction": "put the blue block in the front-right slot of the tray",
+    "tier": 2,
+    "rounds": [
+     "11/20",
+     "14/20"
+    ],
+    "held_out_success": "14/20",
+    "seconds": 172.8,
+    "budget_seconds": 172,
+    "init": "fine-tuning from 'put the red block in the front-left slot of the tray' (similarity 1.08)",
+    "expert_success_dart_noise": "47-48/50 (94-96%)"
+   },
+   {
+    "skill_id": "191052-f611",
+    "skill": "insert",
+    "instruction": "insert the green block into the socket",
+    "tier": 3,
+    "rounds": [
+     "10/20",
+     "12/20"
+    ],
+    "held_out_success": "12/20",
+    "seconds": 175.1,
+    "budget_seconds": 172,
+    "init": "fine-tuning from 'insert the red block into the socket' (similarity 1.08)",
+    "expert_success_dart_noise": "46/50 (92%)"
+   },
+   {
+    "skill_id": "191348-6791",
+    "skill": "rotate",
+    "instruction": "pick up the blue block, rotate it and set it in the diamond socket",
+    "tier": 3,
+    "rounds": [
+     "10/20",
+     "14/20"
+    ],
+    "held_out_success": "14/20",
+    "seconds": 180.7,
+    "budget_seconds": 172,
+    "init": "fine-tuning from 'pick up the red block, rotate it and set it in the diamond socket' (similarity 1.09)",
+    "expert_success_dart_noise": "47/50 (94%)"
+   }
+  ]
+ },
+ "line": {
+  "line_id": "194528-ab1b",
+  "prompt": "Assemble housings: an SO-101 seats each housing in a pallet slot, a second SO-101 inserts it into a socket, then a scripted ViperX moves the finished assembly into the crate.",
+  "name": "Housing Assembly",
+  "assembly": true,
+  "planner": {
+   "model": "gpt-6.1-sol",
+   "seconds": 5.5,
+   "note": ""
+  },
+  "stations": [
+   {
+    "index": 0,
+    "name": "Pallet Seating",
+    "task": "kit",
+    "slot": "front-left",
+    "robot": "so101",
+    "controller": "vla",
+    "instruction": "put the red block in the front-left slot of the tray"
+   },
+   {
+    "index": 1,
+    "name": "Socket Insertion",
+    "task": "insert",
+    "slot": "",
+    "robot": "so101",
+    "controller": "vla",
+    "instruction": "insert the red block into the socket"
+   },
+   {
+    "index": 2,
+    "name": "Finished Assembly Crating",
+    "task": "pick_place",
+    "slot": "",
+    "robot": "vx300s.native.native",
+    "controller": "scripted",
+    "instruction": "put the block in the gray bin"
+   }
+  ],
+  "training": [
+   {
+    "station": 0,
+    "run": "194536-85a5",
+    "seconds": 94.5,
+    "success_rate": 0.8,
+    "n_eval": 20,
+    "from": "put-the-red-block-in-the-front-left-slot-of-the-tray-f8b0"
+   },
+   {
+    "station": 1,
+    "run": "194711-aa6a",
+    "seconds": 107.5,
+    "success_rate": 0.8,
+    "n_eval": 20,
+    "from": "insert-the-red-block-into-the-socket-ce72"
+   }
+  ],
+  "parts_run": 30,
+  "end_to_end_completed": 22,
+  "end_to_end_yield": 0.733,
+  "makespan_s": 444.6,
+  "throughput_parts_per_min": 2.97,
+  "release_every_s": 3.0,
+  "per_station_line_run": [
+   {
+    "station": 0,
+    "parts_in": 30,
+    "succeeded": 26,
+    "mean_work_s": 9.75
+   },
+   {
+    "station": 1,
+    "parts_in": 26,
+    "succeeded": 22,
+    "mean_work_s": 11.54
+   },
+   {
+    "station": 2,
+    "parts_in": 22,
+    "succeeded": 22,
+    "mean_work_s": 10.26
+   }
+  ],
+  "loss_reasons": [
+   "dropped it on the way",
+   "jammed on the socket rim",
+   "landed on a divider"
+  ],
+  "notes": [
+   "held-out n/20 in training are cell layouts with the fixtures jittered; the line run is 30 further parts with their own seeds",
+   "scripted expert success inside the cells (DART noise 0.05, 40 episodes): kit 31/40, insert 34/40",
+   "stations are separate MuJoCo cells; the workpiece is re-staged on each cell's belt, fixtures do not travel"
+  ]
+ },
+ "visual": {
+  "screenshots": "~/Pictures/Screenshots/2026-11-07-vla-forge-real-*.png, real-final-desktop-line.png",
+  "renderer": "three.js r170, RoomEnvironment PMREM, GTAO, SMAA, 4x MSAA, neutral tone mapping, PCF soft shadows",
+  "robots": "white shells, black servos/joints, graphite steel; real sourced meshes, materials only",
+  "floor": "procedural sealed concrete, taped markings, no tables"
+ },
+ "gaps": [
+  "props are procedural boxes, not sourced meshes",
+  "stations are separate MuJoCo cells; the workpiece is re-staged per belt",
+  "kit/insert/rotate 12-17/20 at the 3 min budget; cell experts 78-85% on the line",
+  "phone screenshots of the final build timed out under software WebGL"
+ ]
+}

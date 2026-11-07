@@ -252,6 +252,7 @@ window.addEventListener("forge:event", async (ev) => {
 
 function disposeLine3D() {
   if (!three) return;
+  three.stage.dispose();
   three.renderer.dispose();
   three.renderer.domElement.remove();
   three.ro.disconnect();
@@ -261,20 +262,20 @@ function disposeLine3D() {
 async function buildLine3D() {
   disposeLine3D();
   if (!line?.stations.length) return;
-  const { THREE, meshesFor, meshGeometry, robotMaterial, srgb, addLineParts, contactShadow, RoundedBoxGeometry } = F();
+  const { THREE, meshesFor, populate, RoundedBoxGeometry, srgb } = F();
+  const { HAZE, setupRenderer, makeEnvironment, makeStage, addStudioLights, buildLab, basePlate, floorLabel, hazardStrip } = await import("./studio.js");
   const data = await api(`/api/line/${line.id}/scene`);
   const box = $(".ln-3d");
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  setupRenderer(renderer);
   box.appendChild(renderer.domElement);
+  const rect = box.getBoundingClientRect();
+  renderer.setSize(Math.max(2, rect.width), Math.max(2, rect.height), false);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf4f4f5);
-  scene.environment = F().scene3.environment;
-  scene.fog = new THREE.Fog(0xf4f4f5, 3.2, 7);
+  scene.background = HAZE;
+  scene.environment = makeEnvironment(renderer); // an environment belongs to the context that built it
+  scene.fog = new THREE.Fog(HAZE, 4.5, 11);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 30);
   camera.up.set(0, 0, 1);
   const N = data.cells.length, pitch = data.pitch;
@@ -289,35 +290,13 @@ async function buildLine3D() {
   controls.maxPolarAngle = Math.PI * 0.48;
   controls.update();
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xd4d4d8, 0.9));
-  const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-  sun.position.set(1.4, cy - 0.8, 2.2);
-  sun.target.position.set(0.1, cy, 0);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 0.5, far: 6 });
-  sun.shadow.bias = -0.0004;
-  scene.add(sun, sun.target);
+  addStudioLights(scene, { target: [0.12, cy, 0], extent: span * 0.75 + 0.5, reach: 1.1 + 0.25 * N });
+  // the lab floor with the whole line taped out as one aisle: a hazard edge down each side and a stencil per cell
+  const lab = buildLab(scene, renderer, { cell: [-0.3, y0 - pitch / 2, 0.74, y0 + span - pitch / 2], joints: false });
+  hazardStrip(lab, 0.84, y0 - pitch / 2, 0.84, y0 + span - pitch / 2, 0.035);
+  hazardStrip(lab, -0.36, y0 - pitch / 2, -0.36, y0 + span - pitch / 2, 0.035);
 
-  // floor and one long bench under every cell
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0xe9e9ec, roughness: 1 }));
-  floor.position.z = -0.78;
-  floor.receiveShadow = true;
-  scene.add(floor);
-  const benchMat = new THREE.MeshStandardMaterial({ color: 0xd9d4cb, roughness: 0.8 });
-  const bench = new THREE.Mesh(new RoundedBoxGeometry(0.72, span + 0.3, 0.036, 4, 0.006), benchMat);
-  bench.position.set(0.16, cy, -0.018);
-  bench.receiveShadow = true;
-  scene.add(bench);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x9ea3ab, roughness: 0.35, metalness: 0.7 });
-  for (let k = 0; k <= N; k++) for (const x of [-0.17, 0.49]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.75), legMat);
-    leg.position.set(x, Math.min(span + 0.1, Math.max(-0.1, k * pitch)), -0.41);
-    leg.castShadow = true;
-    scene.add(leg);
-  }
-
-  // one belt down the whole line (each zone's tread scrolls with its own cell's belt joint)
+  // each cell: arm on its floor plate, belt segment, totes, parts; the cells' belts meet end to end
   const cells = [];
   const meshes = {};
   for (let k = 0; k < N; k++) {
@@ -327,56 +306,29 @@ async function buildLine3D() {
     const root = new THREE.Group();
     root.position.y = y0 + k * pitch; // cell k's entry meets cell k-1's exit
     scene.add(root);
-    const bodies = sc.bodies.map(() => { const o = new THREE.Group(); root.add(o); return o; });
-    for (const g of sc.robot) {
-      const m = new THREE.Mesh(meshGeometry(`${rid}|${g.mesh}`, meshes[rid][String(g.mesh)]), robotMaterial(rid, g.rgba));
-      m.position.set(...g.pos);
-      m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
-      m.castShadow = m.receiveShadow = true;
-      bodies[g.body].add(m);
-    }
     const scCut = { ...sc, belt: sc.belt && { ...sc.belt, half: [sc.belt.half[0], pitch / 2, sc.belt.half[2]] } };
-    const belt = addLineParts(scCut, root, bodies);
+    const { bodies, belt } = F().populate(scCut, root, rid, meshes[rid], { belt: true });
     // the cell's belt segment is centred on the cell's own y range
     root.children.filter((c) => c.geometry?.parameters?.height === pitch).forEach((c) => (c.position.y = (-0.32 + 0.34) / 2));
-    const part = sc.blocks[0];
-    const partMat = new THREE.MeshPhysicalMaterial({ color: srgb(part.rgb), roughness: 0.5, clearcoat: 0.22 });
-    const cube = new THREE.Mesh(new RoundedBoxGeometry(part.half * 2, part.half * 2, part.half * 2, 4, 0.0025), partMat);
-    cube.castShadow = cube.receiveShadow = true;
-    bodies[part.body].add(cube);
-    const shadow = contactShadow(0.2, 0.55);
-    shadow.position.set(0, 0, 0.0004);
-    root.add(shadow);
-    // station sign: a floating number plate behind the arm
-    const plate = sign(THREE, `${String(k + 1).padStart(2, "0")}  ${line.stations[k].controller === "vla" ? "VLA" : "SCRIPTED"}`, line.stations[k].controller === "vla");
-    plate.position.set(0.43, -0.12, 0.03); // station placard on the bench's front edge
+    const plate = basePlate(0.23 * (F().armScale ? F().armScale(rid) : 1));
     root.add(plate);
+    const part = sc.blocks[0];
+    let cube = null;
+    bodies[part.body].traverse((o) => { if (!cube && o.isMesh) cube = o; });
+    const partMat = cube.material;
+    const st = line.stations[k];
+    // the station's stencil on the floor beside its belt, orange for a trained VLA, graphite for a scripted cell
+    floorLabel(lab, `STATION ${String(k + 1).padStart(2, "0")}  ${st.controller === "vla" ? "VLA" : "SCRIPTED"}`, 0.5, root.position.y - 0.2, Math.PI / 2, 0.042, st.controller === "vla" ? "rgba(224,86,26,0.95)" : "rgba(44,47,53,0.95)");
+    if (k > 0) hazardStrip(lab, -0.3, root.position.y - pitch / 2, 0.74, root.position.y - pitch / 2, 0.012);
     const binBody = sc.bins?.[0]?.body;
     cells.push({ root, bodies, belt, cube, partMat, partBody: part.body, home: sc.home, binBody, done: [] });
     applyCell(cells[k], sc.home, false);
   }
+  const stage = makeStage(renderer, scene, camera);
   const ro = new ResizeObserver(() => size());
   ro.observe(box);
-  three = { THREE, renderer, scene, camera, controls, cells, ro, data, srgb, eye };
+  three = { THREE, renderer, scene, camera, controls, cells, ro, data, srgb, eye, stage };
   size();
-}
-
-function sign(THREE, text, accent) {
-  const c = document.createElement("canvas");
-  c.width = 512; c.height = 96;
-  const g = c.getContext("2d");
-  g.fillStyle = accent ? "#ff5a1f" : "#27272a";
-  g.fillRect(0, 0, 512, 96);
-  g.fillStyle = accent ? "#120a06" : "#fafafa";
-  g.font = "600 52px Geist, system-ui, sans-serif";
-  g.textBaseline = "middle";
-  g.fillText(text, 28, 50);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.0488), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
-  // face the viewer in front of the line (+x), text running along the belt (+y), upright (+z)
-  m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)));
-  return m;
 }
 
 function size() {
@@ -384,6 +336,7 @@ function size() {
   const r = three.renderer.domElement.parentElement.getBoundingClientRect();
   if (!r.width || !r.height) return;
   three.renderer.setSize(r.width, r.height, false);
+  three.stage.setSize(r.width, r.height);
   three.camera.aspect = r.width / r.height;
   three.camera.updateProjectionMatrix();
   // portrait screens: look down the line from its entry end, so the stations recede into depth instead of
@@ -451,7 +404,7 @@ function tick(now) {
     $(".ln-clock").textContent = `${Math.min(clock.t, line.result.makespan_s).toFixed(1)} s`;
     if (clock.t > clock.end + 4) startClock(); // loop the run
   }
-  three.renderer.render(three.scene, three.camera);
+  three.stage.render();
 }
 requestAnimationFrame(tick);
 
