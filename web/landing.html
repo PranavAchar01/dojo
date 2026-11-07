@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dojo</title>
-<meta name="description" content="Turning a sentence into a trained robot skill takes a frontier model to plan, critique and optimize, and here that model is Llama. Describe a task in a sentence. Dojo trains and measures a vision-language-action policy for it on an SO-101, and for each arm when the task needs several, in simulation.">
+<meta name="description" content="Turning a sentence into a trained robot skill takes a frontier model to plan, critique and optimize, and here that model is Meta's Muse Spark. Describe a task in a sentence. Dojo trains and measures a vision-language-action policy for it on an SO-101, and for each arm when the task needs several, in simulation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -39,7 +39,7 @@
         <div class="hero-copy">
           <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
           <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
-          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here that is Meta Llama, running in parallel with SubQ. Say what the arm should do, and Dojo trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
+          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here that is Meta's Muse Spark, running in parallel with SubQ. Say what the arm should do, and Dojo trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
           <div class="hero-cta rv" style="--d:220ms">
             <a class="cta big" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
             <a class="cta ghost big" href="#watch">See several arms</a>
@@ -80,7 +80,7 @@
       <h2 class="rv">One sentence goes in. <em>Eight agents</em> hand it down the pipe.</h2>
       <p class="sub rv">Every stage streams its logs, demos, loss and evaluation to the page as it happens.</p>
       <ol class="pipe" id="pipe">
-        <li><span class="n">01</span><h3>Prompt</h3><p>A planner turns the sentence into a task and a success check the simulator can evaluate. It runs on Llama 4 Maverick, and the app names the model that answered.</p></li>
+        <li><span class="n">01</span><h3>Prompt</h3><p>A planner turns the sentence into a task and a success check the simulator can evaluate. It runs on Muse Spark, and the app names the model that answered.</p></li>
         <li><span class="n">02</span><h3>Route</h3><p>The router picks the nearest skill in the library, or the base policy, and checks the robot can do the task.</p></li>
         <li><span class="n">03</span><h3>Scene</h3><p>MuJoCo builds the table and 20 held-out layouts the policy never sees in training.</p></li>
         <li><span class="n">04</span><h3>Demos</h3><p>A scripted expert collects demonstrations with randomised colours, positions and noise.</p></li>
@@ -96,15 +96,15 @@
   <!-- ------------------------------------------------------------ llama + subq -->
   <section class="band tint" id="agents">
     <div class="wrap">
-      <p class="kicker rv">Llama and SubQ</p>
+      <p class="kicker rv">Muse Spark + SubQ</p>
       <h2 class="rv">Two models, side by side. <em>Plain code</em> for the rest.</h2>
-      <p class="sub rv">Meta Llama 4 Maverick parses the task, plans the arms and reads the failures. SubQ, a long-context model, reads the whole run history, every past round and the skill library. In each optimizer round both propose a change at the same time, both are scored in simulation, and the round records whose change won. The app shows which backend really answered.</p>
+      <p class="sub rv">Meta's Muse Spark parses the task, plans the arms, reads the failures and proposes each change. SubQ is a long-context decision model: it reads the whole run history, every past round and the skill library, and picks among the options. Every change is scored in simulation, and each round records which pick won. The app shows which backend really answered.</p>
       <ul class="agt rv">
-        <li class="llm"><b>task</b><span>Parses the sentence into a task and a success check.</span><i>Llama 4 Maverick</i></li>
-        <li class="llm"><b>critic</b><span>Reads the failed rollouts and picks what to train next.</span><i>Llama 4 Maverick</i></li>
-        <li class="llm"><b>optimizer</b><span>Each round, Llama and SubQ each propose a change; both are scored and the better one is kept.</span><i>Llama + SubQ</i></li>
+        <li class="llm"><b>task</b><span>Parses the sentence into a task and a success check.</span><i>Muse Spark</i></li>
+        <li class="llm"><b>critic</b><span>Reads the failed rollouts and picks what to train next.</span><i>Muse Spark</i></li>
+        <li class="llm"><b>optimizer</b><span>Each round, Muse Spark proposes changes and SubQ picks among them with the whole history in view; the result is scored in simulation.</span><i>Muse Spark + SubQ</i></li>
         <li><b>router</b><span>Picks the nearest skill and checks the robot can do the task.</span><i>code</i></li>
-        <li class="llm"><b>planner</b><span>Splits a task across arms.</span><i>Llama 4 Maverick</i></li>
+        <li class="llm"><b>planner</b><span>Splits a task across arms.</span><i>Muse Spark</i></li>
         <li><b>scene, data, trainer, eval</b><span>Build the scene, collect demos, fine-tune, and score on held-out layouts.</span><i>code</i></li>
         <li><b>registry</b><span>Saves the skill so the next task can start from it.</span><i>code</i></li>
       </ul>
@@ -214,7 +214,7 @@
         <div class="mrow">
           <div class="mrole">Planner and critic</div>
           <div class="mlist">
-            <div class="m live"><b>Llama by Meta</b><span>Built with Llama: Llama 4 Maverick parses the task, writes the success check, plans the arms, reads the failures and proposes each optimizer change.</span><i class="status live">Live</i></div>
+            <div class="m live"><b>Muse Spark by Meta</b><span>Muse Spark parses the task, writes the success check, plans the arms, reads the failures and proposes each optimizer change. SubQ reads the run history and picks among the options.</span><i class="status live">Live</i></div>
           </div>
         </div>
         <div class="mrow">
@@ -243,7 +243,7 @@
 <footer class="lp-foot">
   <div class="wrap">
     <span>Dojo. Everything robotic on this page is in simulation.</span>
-    <span class="fl"><span>Built with Llama</span><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a></span>
+    <span class="fl"><span>Muse Spark + SubQ</span><a href="/app">Open the app</a><a href="https://github.com/google-deepmind/mujoco" target="_blank" rel="noopener">MuJoCo</a></span>
   </div>
 </footer>
 
