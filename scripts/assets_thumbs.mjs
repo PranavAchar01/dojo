@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stampPng } from "./stamp.mjs";
 
 const require = createRequire(`${process.env.PW_DIR || "./node_modules"}/`);
 const { chromium } = require("playwright");
@@ -43,7 +44,9 @@ try {
   for (const j of jobs) {
     try {
       const info = await page.evaluate((u) => window.shoot(u), j.url);
-      await page.locator("canvas").screenshot({ path: j.out || join(j.dir, "thumb.png") });
+      const out = j.out || join(j.dir, "thumb.png");
+      await page.locator("canvas").screenshot({ path: out });
+      stampPng(out);
       process.stdout.write(`${j.id} ${info.size.map((v) => v.toFixed(2)).join("x")}\n`);
     } catch (e) {
       process.stdout.write(`skip ${j.id}: ${String(e).slice(0, 100)}\n`);

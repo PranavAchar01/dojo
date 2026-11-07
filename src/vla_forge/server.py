@@ -66,7 +66,6 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(agents_api.router)
 app.include_router(optimizer_api.router)
 app.include_router(assets_api.router)
-app.include_router(assets_api.factory_router)
 app.include_router(hero_api.router)
 
 
