@@ -42,6 +42,9 @@ def _conj(q: np.ndarray) -> np.ndarray:
     return np.array([q[0], -q[1], -q[2], -q[3]])
 
 
+MODELS_KEPT = 2
+
+
 class Stage:
     """Compiled scenes by structure; a pose frame goes in, an RGB image comes out."""
 
@@ -52,6 +55,10 @@ class Stage:
     def _model(self, lay: Layout):
         key = lay.key()
         if key not in self.models:
+            while len(self.models) >= MODELS_KEPT:  # each model owns a GL context, so never keep one per scene
+                _m, _d, rs = self.models.pop(next(iter(self.models)))
+                for r in rs.values():
+                    r.close()
             m = build_spec(lay, robot=self.robot).compile()
             fix_qpos0(m)
             restyle(m)
