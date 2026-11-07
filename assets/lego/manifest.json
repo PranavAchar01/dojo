@@ -1,0 +1,79 @@
+{
+  "library": "LDraw Parts Library, official complete.zip",
+  "library_url": "https://library.ldraw.org/library/updates/complete.zip",
+  "library_licence": "CC BY 4.0 (parts); the zip's CAlicense.txt text is Creative Commons Attribution 2.0",
+  "attribution": "LDraw is a trademark of the Estate of James Jessiman. Parts are from the LDraw Parts Library.",
+  "conversion": "src/vla_forge/duck_ldraw.py: sub-file recursion with BFC winding, LDU 0.4 mm, Y-down to Z-up, origin at the footprint bottom centre. Studs and underside tubes are kept in the visual mesh; physics uses boxes.",
+  "parts": {
+    "3001": {
+      "title": "Brick 2 x 4",
+      "source_url": "https://library.ldraw.org/library/official/parts/3001.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        4,
+        2
+      ],
+      "mesh": "meshes/3001.npz",
+      "vertices": 472,
+      "triangles": 700
+    },
+    "3002": {
+      "title": "Brick 2 x 3",
+      "source_url": "https://library.ldraw.org/library/official/parts/3002.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        3,
+        2
+      ],
+      "mesh": "meshes/3002.npz",
+      "vertices": 342,
+      "triangles": 508
+    },
+    "3003": {
+      "title": "Brick 2 x 2",
+      "source_url": "https://library.ldraw.org/library/official/parts/3003.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        2,
+        2
+      ],
+      "mesh": "meshes/3003.npz",
+      "vertices": 212,
+      "triangles": 316
+    },
+    "3004": {
+      "title": "Brick 1 x 2",
+      "source_url": "https://library.ldraw.org/library/official/parts/3004.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        2,
+        1
+      ],
+      "mesh": "meshes/3004.npz",
+      "vertices": 115,
+      "triangles": 172
+    },
+    "3039": {
+      "title": "Slope 45 2 x 2",
+      "source_url": "https://library.ldraw.org/library/official/parts/3039.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        2,
+        2
+      ],
+      "mesh": "meshes/3039.npz",
+      "vertices": 197,
+      "triangles": 352
+    }
+  }
+}
