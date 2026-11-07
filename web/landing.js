@@ -1,4 +1,4 @@
-// Landing page behaviour: reveal on scroll, nav border, and a hero video that pauses off screen or when motion is reduced.
+// Landing page behaviour: reveal on scroll, nav border, and the hero rollout loop, which pauses off screen or when motion is reduced.
 document.documentElement.classList.add("js");
 
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -21,6 +21,7 @@ const video = document.getElementById("hero-video");
 if (video && video.play) {
   if (reduced) {
     video.removeAttribute("autoplay");
+    video.removeAttribute("loop");
     video.pause();
   } else {
     new IntersectionObserver(([e]) => {
@@ -63,13 +64,14 @@ if (!reduced && innerWidth >= 760) {
   });
 }
 
-// the hero preview gets the height left on the first screen; mark it when the screenshot is taller than that, so the
-// bottom fades out instead of being cut by the fold
-const stageFig = document.querySelector(".hero .stage");
-const stageImg = stageFig && stageFig.querySelector(".stage-media img");
-if (stageFig && stageImg) {
-  const crop = () => { const box = stageImg.parentElement; stageFig.classList.toggle("cropped", stageImg.getBoundingClientRect().height > box.clientHeight + 2); };
-  new ResizeObserver(crop).observe(stageImg.parentElement);
-  stageImg.addEventListener("load", crop);
-  crop();
+// The rollout loop is four recorded tasks back to back; the label follows the playhead.
+const taskEl = document.getElementById("hero-task");
+if (video && taskEl) {
+  const TASKS = [[0, "touch the yellow block"], [2.13, "put the blue block in the blue bowl"], [10.07, "push the green block onto the blue square"], [16.1, "stack the yellow block on the red block"]];
+  let at = -1;
+  video.addEventListener("timeupdate", () => {
+    let k = 0;
+    TASKS.forEach(([t], i) => { if (video.currentTime >= t) k = i; });
+    if (k !== at) { at = k; taskEl.textContent = TASKS[k][1]; }
+  });
 }
