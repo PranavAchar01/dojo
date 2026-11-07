@@ -3,8 +3,8 @@
 // the embodiment the next skill trains on.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+import { setupRenderer, makeEnvironment, addStudioLights, robotMaterial as studioMaterial } from "./studio.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {
@@ -19,7 +19,7 @@ const SLOTS = [
   ["wrist", "Wrist", "keep every wrist joint, or lock the roll for a smaller action space", "wrists"],
   ["effector", "End effector", "keep the arm's jaw or mount a sourced gripper on the last link", "effectors"],
 ];
-const SKILL_NAMES = { reach: "Reach", push: "Push", lift: "Lift", pick_place: "Pick and place", stack: "Stack" };
+const SKILL_NAMES = { reach: "Reach", push: "Push", lift: "Lift", pick_place: "Pick and place", stack: "Stack", kit: "Kit a tray slot", insert: "Insert", rotate: "Rotate and insert" };
 
 let CAT = null;
 const sel = { arm: "so101", wrist: "native", effector: "native" };
@@ -57,25 +57,13 @@ function geometry(key, data) {
   geoms.set(key, g);
   return g;
 }
-const mats = new Map();
-function material(rgba) {
-  const key = rgba.map((x) => x.toFixed(2)).join(",");
-  if (!mats.has(key)) {
-    // near-white source colours wash out on the pale stage: pull them down a little so the shape reads
-    const lum = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2];
-    const k = lum > 0.8 ? 0.72 / lum : 1;
-    const c = new THREE.Color().setRGB(rgba[0] * k, rgba[1] * k, rgba[2] * k, THREE.SRGBColorSpace);
-    mats.set(key, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4 }));
-  }
-  return mats.get(key);
-}
 function partGroup(view) {
   const g = new THREE.Group();
   for (const p of view.geoms) {
     const data = view.meshes[String(p.mesh)];
     // the same source mesh shows up in several previews (every SO-101 variant): build its geometry once
     const id = `${data.v.length}:${data.f.length}:${data.v.slice(0, 48)}`;
-    const m = new THREE.Mesh(geometry(id, data), material(p.rgba));
+    const m = new THREE.Mesh(geometry(id, data), studioMaterial(p.rgba, p.name));
     m.position.fromArray(p.pos);
     m.quaternion.set(p.quat[1], p.quat[2], p.quat[3], p.quat[0]);
     m.castShadow = m.receiveShadow = true;
@@ -114,18 +102,11 @@ function closeUp(v) { // a box around the tool point big enough for the wrist an
 function stage(canvas) {
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, alpha: true });
   r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  r.toneMapping = THREE.ACESFilmicToneMapping;
-  r.shadowMap.enabled = true;
+  setupRenderer(r);
   const s = new THREE.Scene();
-  const pm = new THREE.PMREMGenerator(r);
-  s.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-  s.environmentIntensity = 0.8;
-  const key = new THREE.DirectionalLight(0xfff4e6, 2.0);
-  key.position.set(0.9, -0.6, 1.6);
-  s.add(key);
-  const rim = new THREE.DirectionalLight(0xdfe8ff, 0.6);
-  rim.position.set(-0.8, 0.9, 0.9);
-  s.add(rim);
+  s.environment = makeEnvironment(r);
+  s.environmentIntensity = 1.0;
+  addStudioLights(s, { target: [0.1, 0, 0.1], extent: 0.7, reach: 0.8 });
   const cam = new THREE.PerspectiveCamera(30, 1, 0.005, 20);
   cam.up.set(0, 0, 1);
   return { r, s, cam };
@@ -203,7 +184,7 @@ function initAssembly() {
   // the table workspace the checks are measured over, drawn as a thin plate
   const plate = new THREE.Mesh(
     new THREE.RingGeometry(0.125, 0.285, 48, 1, -0.663, 1.326),
-    new THREE.MeshBasicMaterial({ color: 0xe4e4e7, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0xb9bcc1, roughness: 0.9, side: THREE.DoubleSide }),
   );
   plate.position.z = -0.0005;
   asm.s.add(plate);
