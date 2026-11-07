@@ -105,6 +105,8 @@ class Layout:
     belt: bool = False
     # fixtures from sim/props.py (kitting tray, sockets, ...): name -> (kind, color, x, y, yaw)
     props: dict[str, tuple[str, str, float, float, float]] = field(default_factory=dict)
+    # a factory dressing from scenes/<name>.json (assets_scene.py): scenery, floor, lamps, the hero product
+    dressing: str = ""
 
     def key(self) -> tuple:
         """Structure only (names and colours): layouts with the same key share a compiled model."""
@@ -114,6 +116,7 @@ class Layout:
             tuple((n, v[0]) for n, v in sorted(self.pads.items())),
             tuple((n, v[0]) for n, v in sorted(self.bins.items())),
             self.belt,
+            self.dressing,
             *(
                 [tuple((n, v[0], v[1]) for n, v in sorted(self.props.items()))]
                 if self.props
@@ -136,6 +139,8 @@ class Layout:
             d.update(bins=self.bins, belt=self.belt)
         if self.props:
             d["props"] = self.props
+        if self.dressing:
+            d["dressing"] = self.dressing
         return d
 
     @staticmethod
@@ -147,6 +152,7 @@ class Layout:
             {k: tuple(v) for k, v in d.get("bins", {}).items()},
             bool(d.get("belt", False)),
             {k: tuple(v) for k, v in d.get("props", {}).items()},
+            str(d.get("dressing", "")),
         )
 
 
@@ -403,6 +409,10 @@ def build_spec(
         r = calibrate(robot)
         grip = next(b for b in spec.bodies if b.name == r.tcp_body)
         grip.add_camera(name="wrist", fovy=75, **r.wrist_cam)
+    if layout.dressing:
+        from ..assets_scene import dress
+
+        dress(spec, layout.dressing)
     return spec
 
 
