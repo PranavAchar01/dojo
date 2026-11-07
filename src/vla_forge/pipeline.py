@@ -277,7 +277,7 @@ class Forge:
     def plan(self, run: Run) -> list[dict]:
         """Which published skill agent does each step, and which steps must be trained first."""
         seed = int(hashlib.sha1(run.id.encode()).hexdigest()[:8], 16)
-        run.layouts = [compose_layout(run.steps, np.random.default_rng(seed)).to_json()]
+        run.layouts = [compose_layout(run.steps, np.random.default_rng(seed), robot=run.robot).to_json()]
         run.plan = []
         for k, st in enumerate(run.steps):
             sk = self.registry.exact(st.instruction, run.robot)
@@ -313,7 +313,7 @@ class Forge:
         """Run the composed task with the step skills' own policies in EVAL_N held-out composed scenes."""
         seed = int(hashlib.sha1(run.id.encode()).hexdigest()[:8], 16)
         rng = np.random.default_rng(seed)
-        run.layouts = [compose_layout(run.steps, rng).to_json() for _ in range(EVAL_N)]
+        run.layouts = [compose_layout(run.steps, rng, robot=run.robot).to_json() for _ in range(EVAL_N)]
         models = []
         for p in run.plan:
             sk = self.registry.skills[p["skill_id"]]
@@ -400,13 +400,15 @@ class Forge:
         """A training or held-out scene. A step trained for a composed task sees that task's tables."""
         assert run.spec is not None
         if run.parent:
-            lay = step_layout(self.runs[run.parent].steps, run.step_index, rng)
+            lay = step_layout(
+                self.runs[run.parent].steps, run.step_index, rng, robot=run.robot
+            )
         elif run.station:
             from . import factory
 
             lay = factory.train_layout(run.station, rng)
         else:
-            lay = sample_layout(run.spec, rng)
+            lay = sample_layout(run.spec, rng, robot=run.robot)
         lay.scenery = run.scenery
         return lay
 
@@ -665,7 +667,7 @@ class Forge:
         if sk.composite:
             subs = [self.registry.skills[st["skill_id"]] for st in sk.steps]
             steps = [Step(s.task().skill, s.task().obj, s.task().target) for s in subs]
-            lays = [compose_layout(steps, rng).to_json() for _ in range(n)]
+            lays = [compose_layout(steps, rng, robot=sk.robot).to_json() for _ in range(n)]
             self.emit(
                 f"test-{tid}",
                 "test_start",
@@ -687,7 +689,7 @@ class Forge:
             instructions = [st.instruction for st in steps]
         else:
             spec = sk.task()
-            lays = [sample_layout(spec, rng).to_json() for _ in range(n)]
+            lays = [sample_layout(spec, rng, robot=sk.robot).to_json() for _ in range(n)]
             self.emit(
                 f"test-{tid}",
                 "test_start",

@@ -894,7 +894,9 @@ def rerender_hero(oid: str) -> dict:
     sk = Registry().skills[d["skill"]["id"]]
     spec, dev = sk.task(), device()
     i = d["hero"]["scene"]
-    lay = sample_layout(spec, np.random.default_rng(SEED0 + i)).to_json()
+    lay = sample_layout(
+        spec, np.random.default_rng(SEED0 + i), robot=sk.robot
+    ).to_json()
     stage = montage.Stage(sk.robot)
     res = {}
     for tag, path in (("a", ROOT / sk.model), ("b", out / "final.pt")):

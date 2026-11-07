@@ -27,7 +27,9 @@ def demo_job(args: dict) -> dict:
     layout = (
         Layout.from_json(args["layout"])
         if args.get("layout")
-        else sample_layout(spec, rng, near=args.get("near"))
+        else sample_layout(
+            spec, rng, near=args.get("near"), robot=args.get("robot", "so101")
+        )
     )
     look = Look.sample(rng, args.get("look_strength", 1.0))
     sc = Scene(layout, args.get("robot", "so101"))

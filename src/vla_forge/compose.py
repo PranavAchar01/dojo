@@ -25,7 +25,14 @@ from .sim.scene import (
     PAD_HALF,
     Layout,
 )
-from .sim.tasks import TaskSpec, _polar, _seg_dist, canonical_instruction
+from .sim.tasks import (
+    TaskSpec,
+    _polar,
+    _seg_dist,
+    bands,
+    canonical_instruction,
+    workspace_of,
+)
 
 COMPOSABLE = ("push", "pick_place", "stack")
 MAX_STEPS = 3
@@ -131,11 +138,17 @@ def entities(steps: list[Step]) -> tuple[list[str], list[str], list[str]]:
 
 
 def sample_layout(
-    steps: list[Step], rng: np.random.Generator, distractors: int = 1, tries: int = 4000
+    steps: list[Step],
+    rng: np.random.Generator,
+    distractors: int = 1,
+    tries: int = 4000,
+    robot: str | None = None,
 ) -> Layout:
     """One composed scene. Every step keeps the geometry its skill was trained on: the block a radial-ish
     grasp away from its goal, a push lane 8-17 cm long with the pusher's standoff reachable, no other object
     in a step's path, and grasp faces within 34 degrees of radial."""
+    bd = bands(workspace_of(robot))
+    fix_r = (0.17, 0.27) if robot is None else (max(0.17, bd["fix_r"][0]), bd["fix_r"][1])
     blocks, bowls, pads = entities(steps)
     spare = [c for c in BLOCK_COLORS if c not in blocks]
     for _ in range(tries):
@@ -145,7 +158,7 @@ def sample_layout(
             (f"sq_{c}", PAD_HALF) for c in pads
         ]:
             for _ in range(80):
-                p = _polar(rng, (0.17, 0.27), math.radians(42))
+                p = _polar(rng, fix_r, bd["fix_ang"])
                 if all(
                     np.linalg.norm(p - q) > half + _half(n) + 0.03
                     for n, q in fx.items()
@@ -162,7 +175,7 @@ def sample_layout(
             for c in [s.obj] + ([s.target] if s.skill == "stack" else []):
                 if c in pos:
                     continue
-                p = _block_for(s, c, fx, pos, rng)
+                p = _block_for(s, c, fx, pos, rng, bd)
                 if p is None:
                     ok = False
                     break
@@ -174,8 +187,8 @@ def sample_layout(
             continue
         for k in range(distractors):
             for _ in range(80):
-                p = _polar(rng, (0.14, 0.27), math.radians(36))
-                if _free(p, fx, pos) and all(
+                p = _polar(rng, bd["block_r"], bd["block_ang"])
+                if _free(p, fx, pos, bd) and all(
                     _seg_dist(p, pos[s.obj], _goal(s, fx, pos)) > 0.055 for s in steps
                 ):
                     c = spare[k % len(spare)]
@@ -203,10 +216,10 @@ def _goal(s: Step, fx: dict, pos: dict) -> np.ndarray:
     return pos[s.target] if s.skill == "stack" else fx[s.fixture()]
 
 
-def _free(p, fx, pos) -> bool:
+def _free(p, fx, pos, bd) -> bool:
     r = np.linalg.norm(p)
     return (
-        0.125 < r < 0.285
+        bd["r_ok"][0] < r < bd["r_ok"][1]
         and all(np.linalg.norm(p - q) > 0.065 for q in pos.values())
         and all(
             np.linalg.norm(p - q) > _half(n) + CUBE_HALF + 0.04 for n, q in fx.items()
@@ -215,10 +228,10 @@ def _free(p, fx, pos) -> bool:
     )
 
 
-def _block_for(s: Step, c: str, fx, pos, rng):
+def _block_for(s: Step, c: str, fx, pos, rng, bd):
     for _ in range(120):
-        p = _polar(rng, (0.14, 0.27), math.radians(36))
-        if not _free(p, fx, pos):
+        p = _polar(rng, bd["block_r"], bd["block_ang"])
+        if not _free(p, fx, pos, bd):
             continue
         if (
             s.skill == "stack"
@@ -235,7 +248,7 @@ def _block_for(s: Step, c: str, fx, pos, rng):
             gap = np.linalg.norm(p - g)
             if not 0.08 < gap < 0.17:
                 continue
-            if not 0.11 < np.linalg.norm(p - (g - p) / gap * 0.05) < 0.29:
+            if not bd["behind"][0] < np.linalg.norm(p - (g - p) / gap * 0.05) < bd["behind"][1]:
                 continue
         return p
     return None
@@ -255,7 +268,11 @@ def _paths_clear(steps: list[Step], fx: dict, pos: dict) -> bool:
 
 
 def step_layout(
-    steps: list[Step], k: int, rng: np.random.Generator, done_p: float = 0.5
+    steps: list[Step],
+    k: int,
+    rng: np.random.Generator,
+    done_p: float = 0.5,
+    robot: str | None = None,
 ) -> Layout:
     """A scene for training step k on its own, drawn from the composed task's scenes.
 
@@ -264,7 +281,7 @@ def step_layout(
     task. With probability done_p the earlier steps are shown finished (their block already in its bowl or on
     its square). The step's own block and fixture are renamed "target" and "goal", the names the expert and the
     single-skill success check use; every other block becomes a distractor that must stay where it is."""
-    lay = sample_layout(steps, rng)
+    lay = sample_layout(steps, rng, robot=robot)
     if rng.random() < done_p:
         for s in steps[:k]:
             name = f"blk_{s.obj}"

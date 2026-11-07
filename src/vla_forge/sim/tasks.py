@@ -252,6 +252,82 @@ GOAL_R = (0.18, 0.26)
 GOAL_ANG = math.radians(30)
 
 
+@dataclass(frozen=True)
+class Workspace:
+    """The annular sector of table a robot works: radius r_lo..r_hi from its base, +/- ang (radians)."""
+
+    r_lo: float
+    r_hi: float
+    ang: float
+
+
+# the SO-101's sector; sampling with no workspace (or this one's robot) draws from the stock bounds below, bit for bit
+DEFAULT_WS = Workspace(0.125, 0.285, math.radians(38))
+
+# what a task needs of the sector, from the constraints in sample_layout: a push lane is at least 8 cm long and the
+# pusher stands 5 cm behind the block, with 1.5 cm of margin each end; the target and two distractors (6.5 cm apart)
+# must fit abreast at mid radius
+PUSH_GAP_MIN = 0.08
+PUSHER_STANDOFF = 0.05
+EDGE_MARGIN = 0.015
+BLOCK_SPACING = 0.065
+
+
+def required_workspace(r_lo: float, r_hi: float) -> tuple[float, float]:
+    """(depth in m, half-angle in rad) a workspace starting at r_lo and ending at r_hi must have for the tasks."""
+    depth = PUSH_GAP_MIN + PUSHER_STANDOFF + 2 * EDGE_MARGIN
+    mid = max((r_lo + r_hi) / 2, 1e-3)
+    return depth, math.asin(min(1.0, BLOCK_SPACING / mid))
+
+
+def bands(ws: Workspace | None) -> dict:
+    """Every radius / angle bound the samplers use. None gives the stock SO-101 numbers literally (so saved seeds do
+    not move); any other workspace gets the same margins from its own sector edges."""
+    if ws is None:
+        return dict(
+            block_r=BLOCK_R,
+            block_ang=BLOCK_ANG,
+            goal_r=GOAL_R,
+            goal_ang=GOAL_ANG,
+            r_ok=(0.125, 0.285),
+            behind=(0.11, 0.29),
+            hard_block_r=HARD_BLOCK_R,
+            tray_r=TRAY_R,
+            tray_ang=TRAY_ANG,
+            hard_c=(0.15, 0.28),
+            hard_c_ang=0.55,
+            fix_r=(0.16, 0.27),
+            fix_ang=math.radians(42),
+        )
+    # the stock bounds are these offsets from the SO-101's sector; any sector gets the same offsets
+    lo, hi, a = ws.r_lo, ws.r_hi, ws.ang
+    d = math.radians
+    return dict(
+        block_r=(lo + 0.015, hi - 0.015),
+        block_ang=a - d(2),
+        goal_r=(lo + 0.055, hi - 0.025),
+        goal_ang=a - d(8),
+        r_ok=(lo, hi),
+        behind=(lo - 0.015, hi + 0.005),
+        hard_block_r=(lo + 0.04, hi - 0.025),
+        tray_r=(lo + 0.065, hi - 0.035),
+        tray_ang=a - d(16),
+        hard_c=(lo + 0.025, hi - 0.005),
+        hard_c_ang=a - d(6.5),
+        fix_r=(lo + 0.035, hi - 0.015),
+        fix_ang=a + d(4),
+    )
+
+
+def workspace_of(robot: str | None) -> Workspace | None:
+    """The workspace sample_layout should draw from for a robot id (None for the SO-101 or no robot)."""
+    if robot is None:
+        return None
+    from .robots import task_workspace
+
+    return task_workspace(robot)
+
+
 def _polar(rng, rr, ang):
     r = rng.uniform(*rr)
     a = rng.uniform(-ang, ang)
@@ -275,14 +351,19 @@ def sample_layout(
     near: dict | None = None,
     tries: int = 400,
     extra_p: float = EXTRA_P,
+    robot: str | None = None,
 ) -> Layout:
     """Random layout for a spec. `near` pins the target block / goal near given xy (the critic's focus).
 
     With probability extra_p each, a distractor bowl and a distractor square of other colours share the table,
     so the policy has to read the goal's colour from the instruction, and scenes with several fixtures (the
-    composed tasks) stay inside the training distribution."""
+    composed tasks) stay inside the training distribution.
+
+    `robot` is a robot id: its fitted workspace narrows the radius and angle bounds (sim/robots.py workspace()).
+    None or the SO-101 draws from the stock bounds, so its saved seeds and held-out scenes do not move."""
+    bd = bands(workspace_of(robot))
     if spec.skill in HARD_SKILLS:
-        return _sample_hard(spec, rng, near, tries)
+        return _sample_hard(spec, rng, near, tries, bd)
     others = [
         c
         for c in BLOCK_COLORS
@@ -291,18 +372,18 @@ def sample_layout(
     for _ in range(tries):
         lay = Layout()
         if spec.skill in ("pick_place", "push", "stack"):
-            goal = _polar(rng, GOAL_R, GOAL_ANG)
+            goal = _polar(rng, bd["goal_r"], bd["goal_ang"])
             if near and "goal" in near:
                 goal = np.asarray(near["goal"]) + rng.uniform(-0.015, 0.015, 2)
         else:
             goal = None
-        blk = _polar(rng, BLOCK_R, BLOCK_ANG)
+        blk = _polar(rng, bd["block_r"], bd["block_ang"])
         if near and "target" in near:
             blk = np.asarray(near["target"]) + rng.uniform(-0.015, 0.015, 2)
         r = np.linalg.norm(blk)
         if (
-            not (0.125 < r < 0.285)
-            or abs(math.atan2(blk[1], blk[0])) > BLOCK_ANG + 0.05
+            not (bd["r_ok"][0] < r < bd["r_ok"][1])
+            or abs(math.atan2(blk[1], blk[0])) > bd["block_ang"] + 0.05
         ):
             continue
         if goal is not None:
@@ -317,7 +398,7 @@ def sample_layout(
                 # the pusher stands behind the block on the block->goal line; keep that point reachable
                 u = (goal - blk) / gap
                 behind = blk - u * 0.05
-                if not (0.11 < np.linalg.norm(behind) < 0.29):
+                if not (bd["behind"][0] < np.linalg.norm(behind) < bd["behind"][1]):
                     continue
         # target yaw within +-34 deg of the radial direction: the expert's grasp face (and so the wrist roll) is
         # then a smooth function of the scene, never a 90 degree flip a policy would have to guess
@@ -351,7 +432,7 @@ def sample_layout(
             goal_kind = {"pick_place": "bowls", "push": "pads"}.get(spec.skill)
             pool_c = [c for c in colors if kind != goal_kind or c != spec.target]
             for _ in range(60):
-                p = _polar(rng, (0.16, 0.27), math.radians(42))
+                p = _polar(rng, bd["fix_r"], bd["fix_ang"])
                 if any(np.linalg.norm(p - q) < half + CUBE_HALF + 0.04 for q in placed):
                     continue
                 if any(np.linalg.norm(p - f) < half + BOWL_R + 0.03 for f in fixtures):
@@ -370,7 +451,7 @@ def sample_layout(
                 break
         for i in range(spec.distractors):
             for _ in range(60):
-                p = _polar(rng, BLOCK_R, BLOCK_ANG)
+                p = _polar(rng, bd["block_r"], bd["block_ang"])
                 if any(np.linalg.norm(p - q) < 0.065 for q in placed):
                     continue
                 if any(
@@ -410,7 +491,7 @@ TRAY_FOOT = 0.091  # the tray's corner radius
 JAW_BACK = 0.05  # the gripper body sits this far inboard of the block while it grasps
 
 
-def _hard_goal(spec, rng, near) -> tuple[dict, np.ndarray, np.ndarray, float, float]:
+def _hard_goal(spec, rng, near, bd) -> tuple[dict, np.ndarray, np.ndarray, float, float]:
     """(props, goal xy, fixture centre xy, fixture radius, fixture yaw) for kit / insert / rotate."""
     if spec.skill == "kit":
         yaw = float(rng.uniform(-0.1, 0.1))
@@ -422,14 +503,14 @@ def _hard_goal(spec, rng, near) -> tuple[dict, np.ndarray, np.ndarray, float, fl
             goal = np.asarray(near["goal"]) + rng.uniform(-0.015, 0.015, 2)
             centre = goal - rot @ off
         else:
-            centre = _polar(rng, TRAY_R, TRAY_ANG)
+            centre = _polar(rng, bd["tray_r"], bd["tray_ang"])
             goal = centre + rot @ off
         props = {
             "tray": ("tray", "gray", float(centre[0]), float(centre[1]), yaw),
             "goal": ("marker", "gray", float(goal[0]), float(goal[1]), yaw),
         }
         return props, goal, centre, TRAY_FOOT, yaw
-    centre = _polar(rng, GOAL_R, GOAL_ANG)
+    centre = _polar(rng, bd["goal_r"], bd["goal_ang"])
     if near and "goal" in near:
         centre = np.asarray(near["goal"]) + rng.uniform(-0.015, 0.015, 2)
     yaw = math.atan2(centre[1], centre[0]) + (
@@ -439,21 +520,25 @@ def _hard_goal(spec, rng, near) -> tuple[dict, np.ndarray, np.ndarray, float, fl
     return props, centre, centre, SOCKET_FOOT, yaw
 
 
-def _sample_hard(spec, rng, near, tries) -> Layout:
+def _sample_hard(spec, rng, near, tries, bd) -> Layout:
     """kit / insert / rotate: one fixture on the table (a tray with a goal point, or a socket) and the block."""
     others = [c for c in BLOCK_COLORS if c != spec.obj]
     for _ in range(tries):
-        props, _goal, centre, foot, _fy = _hard_goal(spec, rng, near)
+        props, _goal, centre, foot, _fy = _hard_goal(spec, rng, near, bd)
         r_c = np.linalg.norm(centre)
-        if not (0.15 < r_c < 0.28) or abs(math.atan2(centre[1], centre[0])) > 0.55:
+        if (
+            not (bd["hard_c"][0] < r_c < bd["hard_c"][1])
+            or abs(math.atan2(centre[1], centre[0])) > bd["hard_c_ang"]
+        ):
             continue
-        blk = _polar(rng, HARD_BLOCK_R, BLOCK_ANG)
+        hr = bd["hard_block_r"]
+        blk = _polar(rng, hr, bd["block_ang"])
         if near and "target" in near:
             blk = np.asarray(near["target"]) + rng.uniform(-0.015, 0.015, 2)
         r = np.linalg.norm(blk)
         if (
-            not (HARD_BLOCK_R[0] - 0.01 < r < HARD_BLOCK_R[1] + 0.015)
-            or abs(math.atan2(blk[1], blk[0])) > BLOCK_ANG + 0.05
+            not (hr[0] - 0.01 < r < hr[1] + 0.015)
+            or abs(math.atan2(blk[1], blk[0])) > bd["block_ang"] + 0.05
         ):
             continue
         jaw = blk * (1 - JAW_BACK / r)
@@ -474,7 +559,7 @@ def _sample_hard(spec, rng, near, tries) -> Layout:
         ok = True
         for i in range(spec.distractors):
             for _t in range(60):
-                p = _polar(rng, BLOCK_R, BLOCK_ANG)
+                p = _polar(rng, bd["block_r"], bd["block_ang"])
                 if any(np.linalg.norm(p - q) < 0.065 for q in placed):
                     continue
                 if np.linalg.norm(p - centre) < foot + 0.04:
