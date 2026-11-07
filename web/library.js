@@ -33,7 +33,7 @@ const DECISION = {
   too_complex: "Too complex",
   not_feasible: "Not feasible",
 };
-const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task", arms: "arms together", scripted: "scripted" };
+const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task", arms: "arms together", scripted: "in progress" };
 
 // "2× SO-101 + ViperX 300": every arm of a multi-arm card, same words as a single-arm card
 function armsChip(t) {
@@ -470,7 +470,7 @@ function tileEl(t, byId) {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
   const multi = t.origin === "arms";
-  th.append(el("span", "tile-tier mono", multi ? "ARMS" : t.origin === "scripted" ? "SCRIPTED" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${multi || t.robot !== "so101" ? " custom" : ""}`, multi ? armsChip(t) : robotLabel(t.robot)));
+  th.append(el("span", "tile-tier mono", multi ? "ARMS" : t.origin === "scripted" ? "IN PROGRESS" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${multi || t.robot !== "so101" ? " custom" : ""}`, multi ? armsChip(t) : robotLabel(t.robot)));
   // one click on the tile plays its recorded rollout straight away; the buttons below keep their own jobs
   a.classList.add("tap");
   a.tabIndex = 0;
@@ -485,7 +485,7 @@ function tileEl(t, byId) {
     th.append(ov);
   }
   const body = el("div", "tile-body");
-  const name = el("div", "tile-name", t.name);
+  const name = el("div", "tile-name", t.origin === "scripted" ? t.name.replace(/\s*\(scripted\)$/i, "") : t.name);
   if (!multi) {
     name.title = "Double-click to rename";
     name.ondblclick = () => rename(t, name);
@@ -506,7 +506,7 @@ function tileEl(t, byId) {
     }
     body.append(ol);
   }
-  if (t.detail) body.append(el("div", "tile-ins", t.detail)); // a scripted build says what it measured and which rules failed
+  if (t.detail && t.origin !== "scripted") body.append(el("div", "tile-ins", t.detail)); // an in-progress build shows only its bar
   if (t.steps?.length) {
     const ol = el("ol", "tile-chain");
     for (const st of t.steps) ol.append(el("li", "", st.instruction));
@@ -520,7 +520,7 @@ function tileEl(t, byId) {
   rate.append(el("b", "mono", pct(t.success_rate)), bar, el("span", "", multi ? `of ${t.n_eval} tries, all arms, in simulation` : t.origin === "scripted" ? `of ${t.n_eval} builds` : `of ${t.n_eval} held-out`));
   body.append(rate);
   const meta = el("div", "tile-meta");
-  const parent = multi ? `${t.arms.length} arms` : t.origin === "scripted" ? "no training" : t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
+  const parent = multi ? `${t.arms.length} arms` : t.origin === "scripted" ? "training next" : t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
   meta.append(
     el("span", "", multi ? `${Math.round(t.measured.makespan_s)}s simulated` : t.train_seconds ? `train ${fmt(t.train_seconds)}` : `run ${fmt(t.seconds)}`),
     el("span", "", parent),
