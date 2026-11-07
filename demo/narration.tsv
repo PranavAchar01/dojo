@@ -1,12 +1,13 @@
-hook	hook	This is VLA Forge. A company describes its line in plain words, and gets a trained robot policy for each station in minutes. All of this runs in simulation.
-describe	explain	In the editor you type a task. Here, an SO-101 puts a green block in a slot of the pallet tray, a harder kitting skill.
+hook	hook	This is VLA Forge. You describe a task in plain words, and it trains a robot policy for it. All of this runs in simulation.
+describe	explain	The canvas starts blank. I type one task for an SO-101: put the blue block in the back-left slot of the tray.
 train	explain	The agents write the success check, collect demos, fine-tune from the closest skill, then test the policy on {n} scenes it never saw. The waiting is sped up four times, and the badge shows it.
 round2	honest	The first round got {r1} of {rn}, under the bar, so the critic sent it back for another.
 trained	proud	The new skill trained in {t} seconds and got {s} of {n} held-out scenes, in simulation.
-line	explain	Now the factory line. In Housing Assembly, one SO-101 seats each housing in a pallet slot, a second one inserts it into a socket, and a scripted ViperX crates the result.
-cards	proud	Pallet seating got {a0} of {n0} held-out scenes, and {a1} of {a2} on the line. Socket insertion got {b0} of {n1}, and {b1} of {b2}. The scripted crate step got {c1} of {c2}. All in simulation.
-results	proud	End to end, {done} of {parts} parts made it into the crate, at about {tpm} parts a minute of simulated time.
-library	explain	Every skill is saved in the library as a tile with its measured success, including the harder ones: kitting, insertion, and rotate and place.
-far	honest	Ask for something the arm can't reach, like lifting a block sixty centimeters, and the router says not feasible. The jaws top out at fifty-three.
-robot	explain	In the Robot tab you build the arm itself. Every part has a preview, and each one is a real open-source model.
-close	close	That is VLA Forge: describe the line, and get a measured policy for every station, in simulation.
+addarm	explain	Now I type add another SO-101, and a second arm appears in place.
+twoarm	explain	Then I describe a task for two arms: one seats the housing in the pallet, and the other inserts it into the socket.
+armsresult	proud	The Arms list gives plain results: {ac} of {an} tries finished by both arms, in simulation.
+optimize	explain	Next, the Optimize step. This is a saved run on socket insertion, scored on the same one hundred scenes every round.
+montage	explain	Each tile is one scene, blue for a success and red for a failure. Llama 4 Maverick reads where the skill fails and proposes one change per round. A change is kept only if success rises on the same scenes.
+ticker	proud	Round zero got {o0} of one hundred. The best round, round three, got {ob}. Rounds four and five were reverted.
+replay	honest	Here is one scene before and after. The intervals overlap, so call this an improvement in this run, not proof. All of it in simulation.
+close	close	That is VLA Forge: describe a task, add arms, and measure the result, in simulation.

@@ -5,14 +5,15 @@
 //
 //   PPTR_DIR=~/helloworld/hyperframes-trial/node_modules node scripts/record_demo.mjs
 //
-// The tour (v6, the merged realism look): the landing page at / scrolled once, then into the editor at /app. A
-// new kitting skill for the SO-101 is forged live from a typed task (success check, demos, fine-tune, 20 held-out
-// scenes, sped up), then the saved Housing Assembly line (two trained SO-101 stations and a scripted ViperX)
-// replays with its measured station table, then the Library, the router refusing a block 60 cm up, and the robot
-// builder. The page cannot record across a navigation, so the landing page is its own capture
+// The tour (v7): the landing page at / scrolled once, then into the editor at /app, which opens on a blank canvas.
+// A new kitting skill for the SO-101 is forged live from a typed task (success check, demos, fine-tune, 20
+// held-out scenes, sped up); "add another SO-101" grows the scene in place; a two-arm task fills the Arms list and
+// runs; then the Optimize step opens the montage of a saved real optimizer run, round by round, and its
+// before/after replay.
+// The page cannot record across a navigation, so the landing page is its own capture
 // (<webm>.marks.json holds its length under "landing_len"); the editor capture's marks file names it under
 // "landing". Every segment start is written to the editor's marks under "at" for the narration cues, and the
-// numbers shown are written to demo/v6-results.json.
+// numbers shown are written to demo/v7-results.json.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -20,9 +21,9 @@ const require = createRequire(`${process.env.PPTR_DIR || "./node_modules"}/`);
 const puppeteer = require("puppeteer-core");
 
 const BASE = process.env.BASE || "http://127.0.0.1:8100";
-const TASK = process.env.TASK || "put the green block in the front-right slot of the tray";
-const SAVED = process.env.SAVED_LINE || "194528-ab1b"; // Housing Assembly, trained and measured earlier
-const FAR = "lift the red block 60 cm up";
+const TASK = process.env.TASK || "put the blue block in the back-left slot of the tray";
+const TWO = "two arms: one seats the housing in the pallet, the other inserts it into the socket";
+const OPT_RUN = process.env.OPT_RUN || "234442-a649"; // a saved real optimizer run in runs/opt-<id>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -164,77 +165,78 @@ const sim = { instruction: TASK, skill_id: sk.id, parent: sk.parent, train_secon
 console.log("sim:", JSON.stringify(sim));
 await sleep(7000);
 
-// 3. the saved Housing Assembly line: the replay, then its measured station table
-await view("line");
-await page.evaluate(() => document.querySelector("#view-line").scrollTo({ top: 0 }));
-await sleep(600);
-await page.evaluate((id) => { const s = document.querySelector("#view-line .ln-pick"); s.value = id; s.dispatchEvent(new Event("change", { bubbles: true })); }, SAVED);
-await mark("line");
-await sleep(11000);
-await scrollLine("#view-line .ln-cards", "start");
-await mark("cards");
-await sleep(15500);
-await mark("results");
-await sleep(7000);
-console.log("result:", await page.evaluate(() => document.querySelector("#view-line .ln-result").innerText.replace(/\s+/g, " ")));
-
-// numbers shown on the station cards and the result tiles
-const ln = await J(`/api/line/${SAVED}`);
-const stations = ln.stations.map((s, i) => {
-  const t = ln.training.find((x) => x.station === i);
-  const ps = ln.result.per_station[i];
-  return { name: s.name, controller: s.controller, robot: s.robot, held_out_success: t?.success_rate ?? null, n_eval: t?.n_eval ?? null,
-    train_seconds: t?.seconds ?? null, on_line: { succeeded: ps.succeeded, parts_in: ps.parts, mean_work_s: ps.mean_work_s } };
-});
-const r = ln.result;
-const results = { recorded: new Date().toISOString(), sim_skill: sim, line_id: SAVED, line_name: ln.name, prompt: ln.prompt, stations,
-  line: { parts: r.n_parts, completed: r.completed, success_rate: r.success_rate, parts_per_min: r.throughput_per_min, makespan_s: r.makespan_s },
-  retry: sim.rounds.length > 1 };
-mkdirSync("demo", { recursive: true });
-writeFileSync("demo/v6-results.json", JSON.stringify(results, null, 1));
-console.log("results:", JSON.stringify(results));
-
-// 4. each skill is a tile in the library
-await view("skills");
-await page.evaluate(() => document.querySelector("#view-skills").scrollTo({ top: 0 }));
-await mark("library");
-await sleep(6500);
-
-// 5. the router refuses what the arm cannot reach
+// 3. another arm: "add another SO-101" grows the scene in place, then a two-arm task fills the Arms list
 await view("sim");
-await sleep(1200);
-await mark("far");
+await page.evaluate(() => window.scrollTo(0, 0));
+await mark("addarm");
 await page.click("#prompt");
-await page.type("#prompt", FAR, { delay: 28 });
+await page.type("#prompt", "add another SO-101", { delay: 40 });
 await sleep(400);
 await page.click("#go");
-await page.waitForSelector(".route-card.is-refused", { timeout: 60000 });
-await page.evaluate(() => document.querySelector(".route-card.is-refused:last-of-type, .route-card.is-refused").scrollIntoView({ block: "center", behavior: "smooth" }));
-await sleep(7000);
-
-// 6. the robot builder: swap the arm, every part previewed
-await mark("robot");
-await view("robot");
-await page.evaluate(() => window.setSpeed(true));
-const tr = await now();
-await page.waitForFunction(() => [...document.querySelectorAll(".part-fig img")].every((i) => i.classList.contains("in")), { timeout: 180000 });
-await page.evaluate(() => window.setSpeed(false));
-marks.speed.push([tr, await now()]);
-await sleep(2000);
-await page.evaluate(() => {
-  const el = document.querySelector('.part[data-slot="arm"][data-id="vx300s"]');
-  el.scrollIntoView({ block: "center", behavior: "smooth" });
-  setTimeout(() => el.click(), 700);
-});
-await sleep(900);
-await page.waitForFunction(() => /passed$/.test(document.querySelector("#asm-sum")?.textContent || ""), { timeout: 120000 }).catch(() => {});
+await page.waitForFunction(() => document.querySelectorAll("#arms .arm").length >= 2, { timeout: 60000, polling: 100 });
+await sleep(6500);
+await mark("twoarm");
+await page.click("#prompt");
+await page.type("#prompt", TWO, { delay: 22 });
+const before = new Set(((x) => (Array.isArray(x) ? x : x.lines))(await J("/api/lines")).map((l) => l.id));
+await sleep(400);
+await page.click("#go");
+await page.waitForFunction(() => document.querySelectorAll("#arms .arm").length === 2 && !document.querySelector("#arms-go").disabled, { timeout: 90000, polling: 100 });
+await sleep(4500);
+await mark("armsrun");
+await page.click("#arms-go");
 await sleep(6000);
+await sped(() => page.evaluate(() => /of \d+ tries/.test(document.querySelector("#arms-result")?.innerText || "")), async () => true);
+await mark("armsresult");
+await sleep(9000);
+const lines = await J("/api/lines");
+const lid = (Array.isArray(lines) ? lines : lines.lines).map((l) => l.id).find((id) => !before.has(id));
+const ln = await J(`/api/line/${lid}`);
+const arms = ln.stations.map((x, i) => {
+  const t = ln.training?.find((y) => y.station === i);
+  return { name: x.name, controller: x.controller, task: x.task, instruction: x.spec?.instruction ?? null, held_out_success: t?.success_rate ?? x.success_rate ?? null, n_eval: t?.n_eval ?? x.n_eval ?? null };
+});
+const armsText = await page.evaluate(() => document.querySelector("#arms-result").innerText.replace(/\s+/g, " "));
+console.log("arms:", armsText);
 
-// 7. close on the library, where the skills forged in this tour sit as tiles
-await view("skills");
-await page.evaluate(() => document.querySelector("#view-skills").scrollTo({ top: 0, behavior: "smooth" }));
+// 4. the Optimize step: the saved real run, round by round
+await page.evaluate(() => window.scrollTo(0, 0));
+await mark("optimize");
+await page.evaluate(() => [...document.querySelectorAll(".rail li")].find((l) => l.textContent.startsWith("Optimize")).click());
+await sleep(2500);
+await page.evaluate((id) => {
+  const s = [...document.querySelectorAll("#optimizer-root select")].find((x) => [...x.options].some((o) => o.value === id));
+  s.value = id;
+  s.dispatchEvent(new Event("change", { bubbles: true }));
+}, OPT_RUN);
+await sleep(2500);
+await mark("montage");
+await page.evaluate(() => [...document.querySelectorAll("#optimizer-root .opt-btn")].find((x) => /montage/i.test(x.textContent)).click());
+await sleep(3000);
+const chipCount = await page.evaluate(() => document.querySelectorAll(".opt-overlay .opt-chip").length);
+await mark("ticker");
+for (let i = 0; i < chipCount; i++) {
+  await page.evaluate((k) => document.querySelectorAll(".opt-overlay .opt-chip")[k].click(), i);
+  await sleep(i === 0 ? 3600 : 2700);
+}
+await page.evaluate(() => document.querySelectorAll(".opt-overlay .opt-chip")[3].click());
+await sleep(2200);
+await mark("replay");
+await page.evaluate(() => document.querySelector(".opt-overlay").scrollTo({ top: 99999, behavior: "smooth" }));
+await sleep(9000);
+const orun = await J(`/api/optimizer/runs/${OPT_RUN}`);
+const optimizer = {
+  run: OPT_RUN, skill: orun.skill.instruction, n_scenes: orun.n_scenes, best_round: orun.best_round,
+  rounds: orun.rounds.map((r, i) => ({ round: i, success: r.success, n: r.n, status: r.status ?? "start", ci: r.ci, change: r.change?.text ?? null })),
+};
+const results = { recorded: new Date().toISOString(), sim_skill: sim, arms: { line_id: lid, prompt: TWO, arms, text: armsText, tries: ln.result?.n_parts, completed: ln.result?.completed, seed: ln.result?.seed }, optimizer, retry: sim.rounds.length > 1 };
+mkdirSync("demo", { recursive: true });
+writeFileSync("demo/v7-results.json", JSON.stringify(results, null, 1));
+console.log("results:", JSON.stringify(results).slice(0, 600));
+
+// 5. close on the montage's before and after
 await mark("close");
-await sleep(5000);
+await sleep(4000);
 marks.end = await now();
 const res = await page.evaluate(() => window.stopCapture());
 writeFileSync(res.path.replace(/\.webm$/, ".marks.json"), JSON.stringify(marks, null, 1));
