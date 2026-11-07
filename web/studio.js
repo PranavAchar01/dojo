@@ -99,12 +99,12 @@ function concreteTexture(size = 2048) {
   c.width = c.height = size;
   const g = c.getContext("2d", { willReadFrequently: true });
   const r = rng(11);
-  g.fillStyle = "#9fa2a6";
+  g.fillStyle = "#93969b";
   g.fillRect(0, 0, size, size);
   for (let i = 0; i < 420; i++) {
     const x = r() * size, y = r() * size, rad = 60 + r() * 340;
     const light = r() < 0.5;
-    const a = 0.025 + r() * 0.05;
+    const a = 0.01 + r() * 0.025;
     for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
       const cx = x + ox, cy = y + oy;
       if (cx + rad < 0 || cy + rad < 0 || cx - rad > size || cy - rad > size) continue;
@@ -183,12 +183,12 @@ export function hazardStrip(g, x0, y0, x1, y1, w = 0.04) {
   g.add(decal(len, w, mat, (x0 + x1) / 2, (y0 + y1) / 2, 0.0007, Math.atan2(y1 - y0, x1 - x0)));
 }
 // stencilled floor text (cell number and what stands in it)
-export function floorLabel(g, text, x, y, rot = 0, h = 0.045) {
+export function floorLabel(g, text, x, y, rot = 0, h = 0.045, color = "rgba(246,247,248,0.92)") {
   const c = document.createElement("canvas");
   c.width = 1024; c.height = 128;
   const k = c.getContext("2d");
   k.font = "700 84px Figtree, system-ui, sans-serif";
-  k.fillStyle = "rgba(246,247,248,0.92)";
+  k.fillStyle = color;
   k.textBaseline = "middle";
   k.fillText(text, 4, 66);
   const t = new THREE.CanvasTexture(c);
