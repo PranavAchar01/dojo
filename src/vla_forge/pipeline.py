@@ -36,7 +36,7 @@ from .rollout import (
     summarize,
     summarize_composed,
 )
-from .sim import feasibility
+from .sim import feasibility, routing
 from .sim.robots import calibrate, is_default
 from .sim.scene import Layout, Scene
 from .sim.tasks import TIER, TaskSpec, sample_layout
@@ -99,6 +99,7 @@ class Run:
     route: dict = field(default_factory=dict)
     scenery: str = ""  # library model id the prompt carried as its reference (shown in every scene of the run)
     robot: str = "so101"  # robot id from the robot builder (sim/robots.py), fixed when the run starts
+    pinned: bool = False  # the user chose the robot; the router then only advises
     # factory line: the station this run trains (factory.py); its scenes are that station's conveyor cell
     station: dict = field(default_factory=dict)
 
@@ -166,6 +167,7 @@ class Forge:
         self.subscribers: set[asyncio.Queue] = set()
         self.replay: Demos | None = None
         self.robot = "so101"  # the robot new runs train on; set from the Build tab
+        self.robot_pinned = False  # set when the user picks a robot in the Build tab
         self.compute = threading.Lock()  # one run's heavy stages at a time
         self.ready = False
         self.tests: dict[str, dict] = {}  # test id -> {skill, rolls, instructions}
@@ -225,6 +227,7 @@ class Forge:
             mode=mode,
             from_skill=from_skill,
             robot=robot,
+            pinned=bool(station) or self.robot_pinned,
             station=station or {},
             scenery=scenery,
         )
@@ -240,7 +243,7 @@ class Forge:
             run.station
         ):  # the line planner already wrote this station's task and success check
             run.spec = TaskSpec.from_json(run.station["spec"])
-            run.spec.feasibility = feasibility.for_spec(run.spec, run.robot)
+            self._judge(run, run.spec)
             run.parse_info = {
                 "model": "line planner",
                 "seconds": 0.0,
@@ -254,8 +257,18 @@ class Forge:
         else:
             run.spec = out
             if out is not None:
-                out.feasibility = feasibility.for_spec(out, run.robot)
+                self._judge(run, out)
         return out
+
+    def _judge(self, run: Run, spec: TaskSpec) -> None:
+        """Feasibility on the run's robot, then the routing over every arm; an unpinned run moves to the arm chosen."""
+        spec.feasibility = feasibility.for_spec(spec, run.robot)
+        spec.routing = routing.for_spec(spec, pinned=run.robot if run.pinned else None)
+        if spec.routing and not run.pinned and spec.routing["chosen"]:
+            pick = spec.routing["chosen"][0]
+            if pick != run.robot:
+                run.robot = pick
+                spec.feasibility = feasibility.for_spec(spec, pick)
 
     def route(self, run: Run) -> router_mod.Route:
         """What the prompt needs (reuse / train / chain) or why it is refused; see router.py."""

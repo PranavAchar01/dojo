@@ -345,6 +345,7 @@ async def use_robot(u: UseRobot):
     if not ok:
         raise HTTPException(409, why)
     FORGE.robot = u.robot
+    FORGE.robot_pinned = True
     return {"robot": FORGE.robot}
 
 
