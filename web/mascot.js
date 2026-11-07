@@ -313,6 +313,10 @@ function watchRail() {
       if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); setTimeout(() => roamer.bow(), 500); setTimeout(rankUp, 1500); }
       if (k === "optimizer" && !optLive()) continue;
       if (k === "critic" && /retrain/i.test(m)) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); }
+    } else if (st === "" && was === "live") {
+      // the step stopped being this skill's (a background optimizer on another skill, a tile picked): its bubble goes
+      if (bub && bub.id === k) dropBubble(0);
+      if (!liveStage()) goHomeSoon(600);
     } else if (st === "fail") {
       failAt = performance.now();
       showBubble(`${li.querySelector("span")?.textContent || k} failed`, { id: k, failed: true }); dropBubble(1400);
@@ -398,6 +402,16 @@ addEventListener("forge:event", (ev) => {
   else if (e.kind === "rejected" || (e.kind === "route" && e.refused)) { each((b) => b.eyes.emote("wince")); holdState("confused", 4000); }
   else if (e.kind === "reused") { each((b) => { b.eyes.emote("pleased"); b.wobble(0.8); }); holdState("success", 2500); }
   else if (e.kind === "published" && !e.child) { each((b) => b.eyes.emote("delight")); }
+});
+
+// a finished tile picked in the library: the bot says what that skill really is, saved, with its measured score
+addEventListener("dojo:skill", (ev) => {
+  const d = ev.detail || {};
+  clearHold();
+  each((b) => b.eyes.react("nod"));
+  showBubble(`${d.name}: saved, ${d.held} held-out`, { id: "skill", done: true });
+  dropBubble(2600);
+  apply();
 });
 
 // ---------------------------------------------------------------- watching the page

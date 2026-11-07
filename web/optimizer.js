@@ -117,7 +117,7 @@ export function mount(root, ctx = {}) {
     } else summary.textContent = r.status === "running" ? `Now: ${phaseText(r)}.` : "";
     if (ctx.stage) {
       const m = first && best ? `${first.success} to ${best.success}/${first.n}` : "";
-      ctx.stage("optimizer", r.status === "running" ? "live" : r.status === "done" || r.status === "stopped" ? "done" : "fail", m);
+      ctx.stage("optimizer", r.status === "running" ? "live" : r.status === "done" || r.status === "stopped" ? "done" : "fail", m, r.skill && r.skill.id);
     }
   }
 
