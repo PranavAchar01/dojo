@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Optimizer mount test</title>
-<style>body{margin:0;padding:24px;background:#f1f4f7;max-width:1100px}</style>
+<style>body{margin:0;padding:24px;background:#f1f4f7}#optimizer-root{width:320px;margin-left:auto}</style>
 <link rel="stylesheet" href="/static/optimizer.css"></head>
-<body><div id="optimizer-root"></div><script src="/static/optimizer.js"></script></body></html>
+<body><div id="optimizer-root"></div>
+<script type="module">
+import { mount } from "/static/optimizer.js";
+mount(document.getElementById("optimizer-root"), { stage: (n, s, m) => console.log(n, s, m) });
+if (location.hash === "#open") setTimeout(() => document.querySelector(".opt-ghost").click(), 300);
+</script></body></html>
