@@ -30,6 +30,7 @@ import { createEyes } from "./eyes.js";
 import { spring, reducedMotion } from "./spring.js";
 import { gooLayer, spawnBlob } from "./goo.js";
 import { createRoamer } from "./roam.js";
+import { buildActive, buildSite, buildCaption } from "./build.js";
 import { tick } from "./spring.js";
 
 const $ = (s) => document.querySelector(s);
@@ -76,34 +77,35 @@ export const roamer = createRoamer({ mountBot, slot: document.querySelector(".ag
 let visitSeq = 0;
 export function goTo(sel, o = {}) { visitSeq++; return roamer.visit(sel, o); }
 
-// ---------------------------------------------------------------- the loading screen: reps in empty space
-// While a stage runs and the area it will fill is still empty (the sim floor before the scene, the loss chart before
-// the first step), the bot trains there instead of pointing at nothing. The caption is the stage's own words and the
-// rail's real metric, nothing else. As soon as content lands, it leaves.
+// ---------------------------------------------------------------- the loading screen: this run, being built
+// While a run is under way the bot builds the run's own arm and task (build.js) in the sim view: large on the bare
+// floor before the scene exists, then as a small card in a free corner once the real scene is drawn. Every change
+// there follows an event from the run; the caption is the stage's own words and the rail's real metric.
 let optAt = 0; // the last optimizer event from the stream: a saved run that is not running must not look live
 const optLive = () => (optAt > 0 && performance.now() - optAt < 20000) || !!document.querySelector("#optimizer-root .opt-live, #optimizer-root [data-live='1']");
 const shown = (n) => { if (!n || !n.isConnected) return false; const r = n.getBoundingClientRect(); return r.width > 40 && r.height > 40 && !n.closest(".hidden"); };
-function workspaceFor(k) {
-  const sim = $("#view-sim"), loss = $("#loss"), lossSec = $("#loss-sec");
-  const phone = innerWidth < 760;
-  const simFree = sim && sim.classList.contains("blank") && shown(sim) && !$("#boot:not(.gone)");
-  const lossFree = loss && lossSec && lossSec.dataset.empty === "1" && shown(loss) && !$(".app.no-right, .app.immersive");
-  if (k === "trainer" && lossFree) return { el: loss, inset: { l: 2, r: 2, t: 2, b: 2 } };
-  if (simFree && (k === "task" || k === "router" || k === "planner" || k === "scene" || k === "data" || k === "trainer"))
-    return { el: sim, inset: phone ? { l: 10, r: 10, t: 40, b: 272 } : { l: 64, r: 104, t: 56, b: 96 } };
-  return null;
+function workspaceFor() {
+  const sim = $("#view-sim");
+  if (!buildActive() || !shown(sim) || $("#boot:not(.gone)")) return null;
+  const phone = innerWidth < 760, r = sim.getBoundingClientRect();
+  if (sim.classList.contains("blank")) return { el: sim, compact: false, inset: phone ? { l: 10, r: 10, t: 40, b: 272 } : { l: 64, r: 104, t: 56, b: 96 } };
+  const w = Math.round(Math.min(phone ? 220 : 300, r.width - 70)), h = Math.round(w * 0.66);
+  const l = phone ? r.width - w - 10 : 64, t = phone ? 50 : r.height - 160 - h;
+  return { el: sim, compact: true, inset: { l, t, r: r.width - l - w, b: r.height - t - h } };
 }
 function captionFor(k) {
   const m = ($(`#rail li[data-stage="${k}"] .m`)?.textContent || "").trim();
   return STAGE[k] ? STAGE[k][2] + (m ? ` · ${m}` : "") : "";
 }
+let wsCompact = null;
 function updateWork() {
   const k = liveStage();
-  const ws = k && workspaceFor(k);
+  const ws = workspaceFor();
   if (!ws) { if (roamer.working) { roamer.stopWork(); if (k && TARGET[k]) goTo(TARGET[k], { dwell: 0 }); } return false; }
-  if (roamer.working && roamer.working !== ws.el) roamer.stopWork(true);
+  if (roamer.working && (roamer.working !== ws.el || wsCompact !== ws.compact)) roamer.stopWork(true);
   if (!roamer.working) { visitSeq++; dropBubble(0); }
-  roamer.work(ws.el, { caption: captionFor(k), inset: ws.inset });
+  wsCompact = ws.compact;
+  roamer.work(ws.el, { site: buildSite, compact: ws.compact, caption: k ? captionFor(k) : buildCaption(), inset: ws.inset });
   return true;
 }
 setInterval(updateWork, 900);
@@ -308,7 +310,7 @@ function watchRail() {
       showBubble(line, { id: k, done: true }); dropBubble(650);
       each((b) => b.eyes.react("nod"));
       goHomeSoon(k === "registry" ? 2600 : 2200);
-      if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); setTimeout(() => roamer.bow(), 500); setTimeout(rankBelt, 1500); }
+      if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); setTimeout(() => roamer.bow(), 500); setTimeout(rankUp, 1500); }
       if (k === "optimizer" && !optLive()) continue;
       if (k === "critic" && /retrain/i.test(m)) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); }
     } else if (st === "fail") {
@@ -424,22 +426,21 @@ function showreel() {
   setTimeout(step, 2800);
 }
 
-// ---------------------------------------------------------------- the belt: white to black as the library's skills pass
-const BELT_AT = [0, 1, 3, 6, 10, 20, 40];
-let beltRank = -1;
-async function rankBelt() {
+// ---------------------------------------------------------------- rank: a bow when the library passes the next mark
+const RANK_AT = [0, 1, 3, 6, 10, 20, 40];
+let rankNow = -1;
+async function rankUp() {
   if (!$("#rail")) return;
   try {
     const lib = await (await fetch("/api/library")).json();
     const n = (lib.tiles || []).length;
-    const rank = BELT_AT.reduce((r, at, i) => (n >= at ? i : r), 0);
-    if (beltRank >= 0 && rank > beltRank) { roamer.bow(); say("Belt up", 2600); }
-    beltRank = rank;
-    roamer.setBelt(rank);
+    const rank = RANK_AT.reduce((r, at, i) => (n >= at ? i : r), 0);
+    if (rankNow >= 0 && rank > rankNow) { roamer.bow(); say("Level up", 2600); }
+    rankNow = rank;
     roamer.root.title = `${n} skill${n === 1 ? "" : "s"} passed`;
-  } catch { /* the server is still warming up; the belt stays white */ }
+  } catch { /* the server is still warming up */ }
 }
-setTimeout(rankBelt, 1200);
+setTimeout(rankUp, 1200);
 
 // ---------------------------------------------------------------- go
 decorate(document);

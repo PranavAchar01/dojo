@@ -1,73 +1,57 @@
-/* The roaming Dojo bot (roam.js): the Etch eyes in Meta blue (eyes.js) on a short gi torso with a belt, a shoulder
-   servo arm and hover jets. Its work site (.rb-site) is a mat with three blocks it carries as reps. */
-.rb { position: fixed; left: 0; top: 0; width: 84px; height: 66px; z-index: 72; pointer-events: none; will-change: transform; transform-origin: 42px 33px; --belt: #fff; }
+/* The roaming Dojo bot (roam.js): the flat face from eyes.js and a single stroke for a hand. Its build site
+   (.bd, build.js) draws this run's arm and task in flat monochrome. */
+.rb { position: fixed; left: 0; top: 0; width: 84px; height: 66px; z-index: 72; pointer-events: none; will-change: transform; transform-origin: 42px 33px; }
 .rb-bob { position: absolute; inset: 0; display: block; }
 .rb:not([data-mode="home"]) .rb-bob { animation: rb-bob 2.6s ease-in-out infinite; }
 @keyframes rb-bob { 50% { transform: translateY(-3px); } }
 .rb-body { position: absolute; inset: 0; display: block; transform-origin: 50% 80%; will-change: transform; }
 .rb-head { position: absolute; left: 0; top: 0; width: 84px; pointer-events: auto; cursor: pointer; }
 .rb-head:focus-visible { outline: 2px solid #0866ff; outline-offset: 6px; border-radius: 22px; }
-.rb-shell { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.rb-pod rect { fill: #e8f1ff; stroke: #0a1d45; stroke-opacity: .85; stroke-width: 1.3; }
-.rb-led { fill: #3d85ff; }
-.rb[data-mode="fly"] .rb-led, .rb[data-mode="work"] .rb-led { fill: #8fe3ff; animation: rb-blink .5s steps(2) infinite; }
-@keyframes rb-blink { 50% { opacity: .25; } }
-.rb-vent path { fill: none; stroke: #9fc9ff; stroke-opacity: .7; stroke-width: 1.3; stroke-linecap: round; }
-
-/* the gi torso under the head, belt colour = --belt (white to black as the library's skills pass) */
-.rb-torso { position: absolute; left: 18px; top: 51px; width: 48px; height: 26px; overflow: visible; transition: opacity .25s; }
-.rb-gi { fill: #fff; stroke: #0a1d45; stroke-opacity: .5; stroke-width: 1.1; }
-.rb-lapel { fill: none; stroke: #0a1d45; stroke-opacity: .45; stroke-width: 1.1; stroke-linecap: round; }
-.rb-belt { fill: var(--belt); stroke: #0a1d45; stroke-opacity: .55; stroke-width: .9; stroke-linejoin: round; transition: fill .6s; }
-.rb-noz { fill: #1c2b33; }
-
-/* the arm: white segments, Meta-blue servos, a dark gripper */
 .rb-arm { position: absolute; left: 0; top: 0; width: 64px; height: 28px; margin: -14px 0 0 -7px; transform-origin: 7px 14px; will-change: transform; transition: opacity .2s; }
 .rb-arm svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.rb-up, .rb-fore { fill: #fff; stroke: #0a1d45; stroke-opacity: .45; stroke-width: 1.1; }
-.rb-hl { stroke: #cfe0ff; stroke-width: 1.4; stroke-linecap: round; }
-.rb-servo { fill: #0866ff; stroke: #0a1d45; stroke-opacity: .5; stroke-width: 1; }
-.rb-hub { fill: #cfe0ff; }
-.rb-claw { fill: #1c2b33; }
-.rb-claw.b { fill: #2b3a46; }
-
-/* hover jets under the torso's nozzles, lit by speed (--jet is set per frame) and idling while it works */
-.rb-jets { position: absolute; left: 0; top: 75px; width: 84px; height: 18px; opacity: var(--jet, 0); }
-.rb-jets i { position: absolute; top: 0; left: 28.5px; display: block; width: 9px; height: 17px; border-radius: 50% 50% 60% 60% / 30% 30% 70% 70%;
-  background: linear-gradient(#fff, #8fd0ff 35%, rgba(8, 102, 255, 0)); transform-origin: 50% 0; animation: rb-jet .16s ease-in-out infinite alternate; filter: blur(.4px); }
-.rb-jets i + i { left: 46.5px; animation-delay: -.08s; }
-@keyframes rb-jet { from { transform: scaleY(.75); } to { transform: scaleY(1.15); } }
-/* a soft ground shadow that breathes with the bob */
-.rb-shadow { position: absolute; left: 22px; top: 96px; width: 40px; height: 7px; border-radius: 50%; background: radial-gradient(closest-side, rgba(10, 29, 69, .22), rgba(10, 29, 69, 0)); opacity: 0; transition: opacity .3s; }
+.rb-hand { fill: none; stroke: #0b0b0c; stroke-width: 1.5px; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+@media (prefers-color-scheme: dark) { .rb-hand { stroke: #fff; } }
+.rb-shadow { position: absolute; left: 22px; top: 76px; width: 40px; height: 7px; border-radius: 50%; background: radial-gradient(closest-side, rgba(10, 29, 69, .22), rgba(10, 29, 69, 0)); opacity: 0; transition: opacity .3s; }
 .rb[data-mode="perch"] .rb-shadow { opacity: 1; animation: rb-shadow 2.6s ease-in-out infinite; }
 @keyframes rb-shadow { 50% { transform: scaleX(.85); opacity: .7; } }
-
-/* resting in the dock pill: just the head, as before */
-.rb[data-mode="home"] .rb-torso, .rb[data-mode="home"] .rb-jets { opacity: 0; }
 .rb[data-mode="home"] .rb-arm { opacity: 0; transition: opacity .25s; }
 .rb[data-mode="home"]:hover .rb-arm { opacity: 1; }
 
-/* the work site: a mat, a pad mark, three blocks and a caption with the real stage */
-.rb-site { position: fixed; inset: 0; z-index: 71; pointer-events: none; animation: rb-site-in .35s ease both; }
-.rb-site.out { animation: rb-site-out .3s ease both; }
-@keyframes rb-site-in { from { opacity: 0; } }
-@keyframes rb-site-out { to { opacity: 0; } }
-.rb-mat { position: absolute; border-radius: 6px; background: repeating-linear-gradient(90deg, #dbe7fb 0 46px, #cfdef8 46px 48px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 1px 2px rgba(10, 29, 69, .08); }
-.rb-padmark { position: absolute; height: 4px; border-radius: 2px; background: #0866ff; opacity: .35; }
-.rb-blk { position: absolute; left: 0; top: 0; border-radius: 4px; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .14), inset 0 1px 0 rgba(255, 255, 255, .45), 0 2px 4px rgba(10, 29, 69, .16); will-change: transform; }
-.rb-blk.c0 { background: #0866ff; }
-.rb-blk.c1 { background: #ff8a1f; }
-.rb-blk.c2 { background: #2fb36b; }
-.rb-blk.set { animation: rb-set .28s ease-out; }
-@keyframes rb-set { 40% { filter: brightness(1.25); } }
-.rb-cap { position: absolute; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 11px 0 9px; border-radius: 999px; background: rgba(255, 255, 255, .94);
+/* the build site: this run's arm and task pieces, drawn flat; every change follows a real event */
+.bd { position: fixed; left: 0; top: 0; z-index: 71; pointer-events: none; animation: bd-in .35s ease both; --ink: #0b0b0c; --paper: #fff; }
+.bd.out { animation: bd-out .3s ease both; }
+@keyframes bd-in { from { opacity: 0; } }
+@keyframes bd-out { to { opacity: 0; } }
+.bd.compact { background: rgba(255, 255, 255, .94); border: 1px solid #dfe5ec; border-radius: 14px; box-shadow: 0 1px 2px rgba(16, 24, 32, .06); }
+.bd svg { position: absolute; overflow: visible; }
+.bd svg text, .bd-mat { stroke: none; }
+.bd-mat { fill: #e9ecf0; }
+.bd-part path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: stroke-opacity .5s; }
+.bd-part .o { stroke: var(--ink); stroke-width: 9; }
+.bd-part .i { stroke: var(--paper); stroke-width: 6; }
+.bd-part .s { stroke: var(--ink); stroke-width: 6; }
+.bd-part.grip .o { stroke-width: 5; } .bd-part.grip .i, .bd-part.grip .s { stroke-width: 2.4; }
+.bd-part.ghost .o { stroke-width: 1.2; stroke-dasharray: 3 3; stroke-opacity: .35; }
+.bd-part.ghost .i, .bd-part.ghost .s { display: none; }
+.bd-part.pop { animation: bd-pop .32s ease-out; }
+@keyframes bd-pop { 40% { stroke-width: 11; } }
+.bd-joint { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.bd-piece { stroke: var(--ink); stroke-width: 1.2; }
+.bd-piece.hidden, .bd-joint.hidden { display: none; }
+.bd-piece.ghost { fill-opacity: .25; stroke-dasharray: 2 2; }
+.bd-flash { fill: none; stroke-width: 2.5; opacity: 0; }
+.bd-flash.ok { stroke: #1e9e50; animation: bd-flash .7s ease-out; }
+.bd-flash.bad { stroke: #d93025; animation: bd-flash .7s ease-out; }
+@keyframes bd-flash { 0% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5); } }
+.bd-read, .bd-count { font: 600 11px/1 Figtree, system-ui, sans-serif; fill: var(--ink); }
+.bd-count { font-weight: 500; fill: #5d6c7b; }
+.bd-cap { position: absolute; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 11px 0 9px; border-radius: 999px; background: rgba(255, 255, 255, .94);
   border: 1px solid #dfe5ec; box-shadow: 0 1px 2px rgba(16, 24, 32, .06); font: 600 12px/1 Figtree, system-ui, sans-serif; color: #1c2b33; white-space: nowrap; overflow: hidden; }
-.rb-cap .t { overflow: hidden; text-overflow: ellipsis; }
-.rb-cap.sm { height: 20px; font-size: 10.5px; gap: 6px; padding: 0 8px 0 6px; }
-.rb-cap .t:empty { display: none; }
-/* the region's own placeholder text steps aside while the bot works there */
+.bd-cap .t { overflow: hidden; text-overflow: ellipsis; }
+.bd-cap .t:empty { display: none; }
+.bd.compact .bd-cap { height: 20px; font-size: 10.5px; gap: 6px; padding: 0 8px 0 6px; }
 .rb-busy text.ph, .rb-busy .empty-note, .rb-busy .ph { visibility: hidden; }
 
-@media (prefers-reduced-motion: reduce) { .rb-jets i, .rb[data-mode="fly"] .rb-led, .rb[data-mode="work"] .rb-led, .rb-bob, .rb-shadow { animation: none !important; } }
-/* phones: no flying tours, but the bot still works in empty space as the loading screen */
+@media (prefers-reduced-motion: reduce) { .rb-bob, .rb-shadow, .bd-part.pop, .bd-flash { animation: none !important; } }
+/* phones: no flying tours, but the bot still builds in empty space as the loading screen */
 @media (max-width: 760px) { .rb:not(.working) { display: none; } }

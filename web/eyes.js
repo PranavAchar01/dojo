@@ -90,18 +90,14 @@ export function createEyes(host, opts = {}) {
   svg.setAttribute("overflow", "visible");
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", opts.label || "Dojo");
-  svg.innerHTML = `<defs><linearGradient id="${id}-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a82ff"/><stop offset="1" stop-color="#0050c0"/></linearGradient></defs>`
-    // Meta: the antenna sits behind the body, the glasses' lenses behind the eyes and their frame in front of them
-    + `<g class="ag-eyes-body"><g class="ag-eyes-ant"><path class="ag-ant-arm" d="M27 -26 L27 -38"/><g class="ag-ant-bulb"><path class="ag-ant-loop" d="M27 -43 C24.4 -48.4 16.6 -48.4 16.6 -43 C16.6 -37.6 24.4 -37.6 27 -43 C29.6 -48.4 37.4 -48.4 37.4 -43 C37.4 -37.6 29.6 -37.6 27 -43 Z"/></g></g>`
-    + `<rect x="-40" y="-30" width="80" height="60" rx="25" fill="url(#${id}-g)"/>`
-    + `<path d="M-26 -24.5 Q0 -30.5 26 -24.5" stroke="#fff" stroke-opacity=".10" stroke-width="3" fill="none" stroke-linecap="round"/>`
-    // Dojo: a hachimaki headband over the brow, knotted on the right, its two tails trailing with their own spring
-    + `<g class="ag-hb-tails"><path class="ag-hb-tail" d="M36 -22.6 Q43 -26.5 50.5 -23.2 L49 -19.6 Q43.5 -21.8 36.4 -20.4 Z"/><path class="ag-hb-tail b" d="M36.2 -20.6 Q42.5 -18.6 46.6 -12.4 L43.2 -11 Q40.4 -15.6 35.6 -18.8 Z"/></g>`
-    + `<path class="ag-hb" d="M-31 -25 Q0 -29.4 31 -25 L35.8 -18.6 Q0 -23 -35.8 -18.6 Z"/><rect class="ag-hb-knot" x="32.6" y="-24.4" width="6.4" height="6.6" rx="2.4"/>`
-    + `<g class="ag-gl-back"><rect class="ag-lens" x="-29" y="-16" width="27" height="32" rx="11"/><rect class="ag-lens" x="2" y="-16" width="27" height="32" rx="11"/></g>`
+  // Dojo (simple): one flat rounded face, two plain eye pills, a thin accent headband whose tails spring. No glasses,
+  // no antenna, no gradient: the restraint of a flat monochrome mark.
+  svg.innerHTML = `<defs><clipPath id="${id}-c"><rect x="-40" y="-30" width="80" height="60" rx="25"/></clipPath></defs>`
+    + `<g class="ag-eyes-body"><g class="ag-hb-tails"><path class="ag-hb-tail" d="M36 -18.6 Q43 -22 50 -19.4"/><path class="ag-hb-tail" d="M36 -17.4 Q42 -13.6 45.4 -8.6"/></g>`
+    + `<rect class="ag-face" x="-40" y="-30" width="80" height="60" rx="25"/>`
+    + `<rect class="ag-hb" x="-41" y="-20.4" width="82" height="4.2" clip-path="url(#${id}-c)"/>`
     + `<g class="ag-eyes-pair"><path class="ag-eye"/><path class="ag-eye"/></g>`
-    + `<g class="ag-gl-front"><rect class="ag-frame" x="-29" y="-16" width="27" height="32" rx="11"/><rect class="ag-frame" x="2" y="-16" width="27" height="32" rx="11"/><path class="ag-frame" d="M-29 -6 L-38 -8 M29 -6 L38 -8"/><circle class="ag-cam" cx="24" cy="-11" r="1.7"/></g>`
-    + `<g class="ag-eyes-glint" opacity="0"><circle r="3.4" fill="none" stroke="#9fc0ff" stroke-width="1.4"/><path d="M2.4 2.4 5.4 5.4" stroke="#9fc0ff" stroke-width="1.6" stroke-linecap="round"/><circle cx="-1.1" cy="-1.1" r=".9" fill="#fff"/></g></g>`
+    + `<g class="ag-eyes-glint" opacity="0"><circle r="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.4 2.4 5.4 5.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></g>`
     + `<g class="ag-eyes-dots"><circle r="2.6"/><circle r="2.6"/><circle r="2.6"/></g>`;
   host.append(svg);
   const body = svg.querySelector(".ag-eyes-body"), pair = svg.querySelector(".ag-eyes-pair");
@@ -117,7 +113,7 @@ export function createEyes(host, opts = {}) {
   const bl = spring(0, { preset: "blink", precision: 0.004 });
   // Meta: the antenna's own spring, loosely tied to the body so it trails and rings after a kick
   const ant = spring({ r: 0, s: 0 }, { preset: { stiffness: 150, damping: 7 }, precision: 0.01 });
-  const hbT = svg.querySelector(".ag-hb-tails"), antG = svg.querySelector(".ag-eyes-ant"), antBulb = svg.querySelector(".ag-ant-bulb"), cam = svg.querySelector(".ag-cam");
+  const hbT = svg.querySelector(".ag-hb-tails");
   let job = null, last = "", act = null, actT0 = 0, flashS = null, flashT = 0;
   const pickT = { at: 0, x: 0, y: 0, cx: 0, cy: 0 };
   const springs = [main, gaze, kick, bl, ant];
@@ -169,17 +165,14 @@ export function createEyes(host, opts = {}) {
     const sway = working ? (state === "thinking" ? 7 : 4) * Math.sin(t * (state === "thinking" ? 2.4 : 5)) : 0;
     const droop = state === "error" ? -22 : state === "offline" ? -34 : 0;
     const antR = tilt * 1.3 - (kv.by + by) * 0.18 + av.r + sway + lerp(0, droop, Math.min(1, m.dim * 3));
-    const loopS = 1 + av.s + (working ? 0.09 * Math.sin(t * (state === "thinking" ? 4.8 : 8)) : 0) + 0.14 * m.happy;
-    const antT = `rotate(${antR.toFixed(2)} 27 -26)`, bulbT = `translate(27 -43) scale(${loopS.toFixed(3)} ${(loopS * (1 - m.flat * 0.4)).toFixed(3)}) translate(-27 43)`;
     // Dojo: the headband tails share the antenna's lag, hang lower when it droops and flutter while the bot trains
     const hbR = antR * 0.75 + (working ? 5 * Math.sin(t * 9.5 + 1) : 0) - lerp(0, droop, Math.min(1, m.dim * 3)) * -0.6;
-    const hbTf = `rotate(${hbR.toFixed(2)} 36 -21)`;
-    const key = dL + dR + bodyT + antT + bulbT + hbTf + m.dim.toFixed(3) + m.dots.toFixed(3) + ex.toFixed(2) + ey.toFixed(2);
+    const hbTf = `rotate(${hbR.toFixed(2)} 36 -18)`;
+    const key = dL + dR + bodyT + hbTf + m.dim.toFixed(3) + m.dots.toFixed(3) + ex.toFixed(2) + ey.toFixed(2);
     if (key !== last) {
       last = key;
       eL.setAttribute("d", dL); eR.setAttribute("d", dR);
       body.setAttribute("transform", bodyT);
-      antG.setAttribute("transform", antT); antBulb.setAttribute("transform", bulbT);
       hbT.setAttribute("transform", hbTf);
       pair.setAttribute("transform", `translate(${ex.toFixed(2)} ${ey.toFixed(2)})`);
       const eo = (1 - 0.55 * m.dim).toFixed(3);
@@ -200,8 +193,6 @@ export function createEyes(host, opts = {}) {
     const gl = doing && act === "scan" ? 1 : 0;
     glint.setAttribute("opacity", String(gl));
     if (gl) glint.setAttribute("transform", `translate(${(gap / 2 + ex + 6).toFixed(2)} ${(m.cy + ey - 7).toFixed(2)}) scale(${(0.8 + 0.25 * Math.abs(Math.sin(t * 7.5))).toFixed(3)})`);
-    // Meta: the camera on the glasses blinks while the bot works, like a recording light
-    cam.setAttribute("opacity", working || doing ? (0.55 + 0.45 * Math.sin(t * 6)).toFixed(2) : "1");
     const alive = springs.some((s) => s.moving) || (LIVE.has(state) && !red) || lvS > 0 || m.dots > 0.01 && !red || doing || working;
     if (!alive) job = null;
     return alive;
