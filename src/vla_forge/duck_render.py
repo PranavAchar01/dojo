@@ -110,7 +110,7 @@ def target_poses(upto: int | None = None, lift: dict | None = None) -> dict:
 def photo(path, size: int = 1024) -> None:
     """The finished duck as a clean instruction photo (the image Muse Spark sees)."""
     img = render(
-        scene(target_poses(), size=size), camera(az=145, el=30, dist=0.11), size, size
+        scene(target_poses(), size=size), camera(az=65, el=24, dist=0.11), size, size
     )
     Image.fromarray(img).save(path)
 
@@ -120,10 +120,10 @@ def exploded(path, panel: int = 640) -> None:
     labels = {
         "base": "Lay the 2x4 flat",
         "body": "Second 2x4, one stud back",
-        "beak": "1x2 orange on the front studs",
-        "back": "2x3 on the body, back end",
-        "head": "2x2 head over body and beak",
-        "tail": "2x2 slope on the back, high edge rear",
+        "neck": "2x3 on the front of the body",
+        "head": "2x2 head on the neck",
+        "beak": "1x2 orange on the neck's front studs",
+        "tail": "2x2 slope on the tail, high edge rear",
     }
     sheet = Image.new(
         "RGB", (panel * 3, int(panel * 2 + 40)), tuple(int(c * 255) for c in BG)
@@ -134,7 +134,7 @@ def exploded(path, panel: int = 640) -> None:
         lift = {b.name: 0.022}
         poses = target_poses(i + 1, lift)
         img = render(
-            scene(poses, size=panel), camera(az=145, el=32, dist=0.145), panel, panel
+            scene(poses, size=panel), camera(az=65, el=26, dist=0.145), panel, panel
         )
         x, y = (i % 3) * panel, (i // 3) * (panel + 20)
         sheet.paste(Image.fromarray(img), (x, y))
