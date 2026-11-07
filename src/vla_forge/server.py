@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
-from . import factory, tiles
+from . import factory, optimizer_api, tiles
 from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(optimizer_api.router)
 
 
 class Prompt(BaseModel):
