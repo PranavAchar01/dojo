@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/landing.css">
+<link rel="stylesheet" href="/static/roam.css">
 </head>
 <body class="lp">
 <span id="ready-dot" class="dot on" hidden></span>
@@ -19,6 +20,7 @@
     <a class="brand" href="/"><span class="logo-tile"><span class="mascot sm" data-follow></span></span>vla-forge</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#how">How it works</a>
+      <a href="#agents">Agents</a>
       <a href="#arms">Several arms</a>
       <a href="#skills">Skills</a>
       <a href="#robots">Robots</a>
@@ -37,7 +39,7 @@
         <div class="hero-copy">
           <p class="eyebrow rv"><span class="tag">In simulation</span>Vision-language-action policies for SO-101 arms</p>
           <h1 class="rv" style="--d:60ms">Describe the task.<br>Get a <em>policy</em> for every arm.</h1>
-          <p class="lede rv" style="--d:140ms">Turning one sentence into a trained robot skill takes a frontier model to plan the task, critique the failures and optimize the next round. Here that model is Llama. Say what the arm should do, and VLA Forge trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
+          <p class="lede rv" style="--d:140ms">Building a robot skill from a sentence needs a frontier model to plan the task, critique the failures and optimize the next round. Here it is Llama, orchestrated by Fetch.ai agents. Say what the arm should do, and VLA Forge trains a policy for it and measures it on scenes it never trained on. If the task needs more than one arm, ask for another SO-101 in the same chat and each arm gets its own sub-task.</p>
           <div class="hero-cta rv" style="--d:220ms">
             <a class="cta big" href="/app">Start forging<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5"/></svg></a>
             <a class="cta ghost big" href="#watch">See several arms</a>
@@ -88,6 +90,25 @@
         <li><span class="n">08</span><h3>Publish</h3><p>The skill joins the library and becomes its own agent that other agents can call.</p></li>
       </ol>
       <p class="fine rv">Inputs to the policy: two camera images, the instruction and the joint positions. Output: the next 10 joint targets. Budget: 3 minutes per prompt.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ fetch.ai agents + llama -->
+  <section class="band tint" id="agents">
+    <div class="wrap">
+      <p class="kicker rv">Fetch.ai and Llama</p>
+      <h2 class="rv">Agents that talk to each other. <em>Llama</em> behind the three that think.</h2>
+      <p class="sub rv">The forge is a Bureau of Fetch.ai uAgents that pass typed messages. Three of them ask Llama 4 Maverick for a judgement; the rest are plain code, and the app says which is which. Open the Agents tab to watch the messages go by.</p>
+      <ul class="agt rv">
+        <li class="llm"><b>task</b><span>Parses the sentence into a task and a success check.</span><i>uAgent · Llama 4 Maverick</i></li>
+        <li class="llm"><b>critic</b><span>Reads the failed rollouts and picks what to train next.</span><i>uAgent · Llama 4 Maverick</i></li>
+        <li class="llm"><b>optimizer</b><span>Proposes each change for the next round of improvement. The gateway reaches it over a typed OptimizeRequest.</span><i>uAgent · Llama 4 Maverick</i></li>
+        <li><b>router</b><span>Picks the nearest skill and checks the robot can do the task.</span><i>uAgent</i></li>
+        <li><b>planner</b><span>Splits a task across arms.</span><i>uAgent</i></li>
+        <li><b>scene, data, trainer, eval</b><span>Build the scene, collect demos, fine-tune, and score on held-out layouts.</span><i>uAgent</i></li>
+        <li><b>registry</b><span>Saves the skill, which becomes an agent other agents can call.</span><i>uAgent</i></li>
+      </ul>
+      <p class="fine rv">The agents run in one local Bureau and are not registered on Agentverse. Every message in the app is a real uAgents message.</p>
     </div>
   </section>
 
@@ -201,7 +222,7 @@
           <div class="mrole">Policy backbone</div>
           <div class="mlist">
             <div class="m live"><b>DINOv2-small</b><span>Meta AI. Frozen vision features from the front and wrist cameras.</span><i class="status live">Live</i></div>
-            <div class="m live"><b>SigLIP2 base</b><span>Google. Frozen text tower for the instruction.</span><i class="status live">Live</i></div>
+            <div class="m live"><b>SigLIP2 base</b><span>Frozen text tower for the instruction.</span><i class="status live">Live</i></div>
             <div class="m live"><b>Action head</b><span>4.9 M parameters, trained here: FiLM, a Perceiver read-out and a small transformer.</span><i class="status live">Live</i></div>
           </div>
         </div>

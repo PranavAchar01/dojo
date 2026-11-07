@@ -41,3 +41,15 @@ JSON record of every round.
   request, not run two.
 - Results are simulation results on one skill and one robot. The agent's description says so.
 - A hired optimizer improves a checkpoint it is given; it does not see the other agent's data.
+
+## Status after round 9
+
+- Steps 1 and 2 are built locally. The `optimizer` agent is in the Bureau with the `forge-optimize 1.0` protocol:
+  `OptimizeRequest`, `OptimizeProgress`, `OptimizeResult`, plus an `OptimizeAccepted` reply added so the gateway learns
+  the run id or the refusal. The gateway sends the request over the protocol (`POST /api/optimizer/start`), the agent
+  starts the run and reports each round as `OptimizeProgress`, then `OptimizeResult`. Manifests: `GET /api/agents/manifests`.
+- Every uAgents message is recorded (`src/vla_forge/agentbus.py`) and streamed as `agent_msg` events; `GET
+  /api/agents/messages` returns the log. The Agents tab draws it. Agent log lines stream as `thought` events for the
+  Thinking panel.
+- Step 3 is not done: no Agentverse key, so no registration. The app says "local Bureau, not registered on
+  Agentverse". `register_on_agentverse` stays ready.

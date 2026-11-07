@@ -736,7 +736,7 @@ function setView(v) {
   const prev = app.dataset.view;
   app.dataset.view = v;
   app.classList.toggle("immersive", v !== "sim");
-  for (const k of ["sim", "robot", "ladder", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  for (const k of ["sim", "robot", "ladder", "agents", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();

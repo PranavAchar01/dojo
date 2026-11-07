@@ -32,6 +32,11 @@ Third-party material and design credits.
    Etch's dock (js/ui/dock.js): it maps the page's events to the bot's states, emotes and bubbles. The earlier
    head-and-gripper bot drawn for this project was replaced by it.
 
+4b. Dock, trace and voice
+   web/dock.js, trace.js, dock.css and voice-adapter.js are carried over from Etch (js/ui/dock.js, js/ui/trace.js,
+   css/agent.css, js/ui/voice-adapter.js) with the edits listed in docs/etch-port.md. web/roam.js (the roaming body)
+   is new and uses Etch's spring.js.
+
 5. Fonts
    Figtree and Averia Serif Libre (SIL Open Font License 1.1), loaded from Google Fonts, the same pair
    Etch uses. No other typeface.

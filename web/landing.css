@@ -212,3 +212,13 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   .belt, .belt .blk { animation: none; }
   html, body.lp { scroll-behavior: auto; }
 }
+
+/* Fetch.ai agents section */
+.agt { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.agt li { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: var(--ring); display: flex; flex-direction: column; gap: 6px; }
+.agt li.llm { box-shadow: 0 0 0 1.5px #0866ff, 0 8px 24px rgba(8, 102, 255, .08); }
+.agt b { font: 700 18px var(--serif); }
+.agt span { font-size: 14px; line-height: 1.45; color: var(--ink2); flex: 1; }
+.agt i { font: 600 11.5px var(--ui); font-style: normal; color: var(--ink3); }
+.agt .llm i { color: #0064e0; }
+@media (max-width: 900px) { .agt { grid-template-columns: 1fr; } }
