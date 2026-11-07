@@ -100,6 +100,7 @@ export function mount(root, ctx = {}) {
   document.body.append(overlay);
   const setOpen = (v) => { if (!v && typeof closeZoom === "function") closeZoom(); overlay.hidden = !v; root.dataset.optOpen = v ? "1" : ""; };
   openBtn.onclick = () => setOpen(true);
+  window.forgeOptimizer = { show: (id) => { S.follow = true; open(id); setOpen(true); }, hide: () => setOpen(false), isOpen: () => !overlay.hidden };
   closeBtn.onclick = () => setOpen(false);
   document.addEventListener("keydown", (e) => e.key === "Escape" && setOpen(false));
   window.addEventListener("forge:newchat", () => setOpen(false));

@@ -63,6 +63,141 @@ function note(d) {
   return bits.join(" ");
 }
 
+// ---- the RSI example: the optimizer run that improved this tile, played with the replay.
+// The grid is the same 100 MuJoCo scenes the Optimize view shows (its own rendered sheets), moving together; the
+// replay's position steps it through the rounds, R0 to the final held-out result. Reads /api/optimizer/runs/{id} only.
+const pctN = (v) => `${Math.round(v * 100)}%`;
+const mkEl = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const MOMENTS = 8, COLS = 10, TW = 96, TH = 72;
+let rsiUI = null;
+function rsiClose() { if (rsiUI) { clearInterval(rsiUI.timer); removeEventListener("resize", rsiUI.place); rsiUI.box.remove(); rsiUI = null; } }
+async function rsiPanel(rsi) {
+  const r = await fetch(`/api/optimizer/runs/${rsi.run}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  if (!r || !R || !bar || r.status === "running") return;
+  rsiClose();
+  const rows = r.rounds.filter((x) => x.success != null && x.outcomes);
+  if (rows.length < 2) return;
+  const API = `/api/optimizer/runs/${rsi.run}`;
+  const best = r.rounds[r.best_round] || rows[rows.length - 1];
+  const c = r.test && r.test.compare, h = r.hero;
+  const box = mkEl("section", "rp-rsi");
+  box.setAttribute("data-keepclear", "");
+  box.setAttribute("aria-label", "Recursive self-improvement example");
+  const top = mkEl("header", "rsi-top");
+  top.append(mkEl("span", "rsi-tag", "RSI"), mkEl("h3", "", `The optimizer lifted this skill from ${rows[0].success} to ${best.success} of ${best.n} scenes`));
+  const x = mkEl("button", "rsi-x", "×");
+  x.setAttribute("aria-label", "Hide the RSI example");
+  x.onclick = rsiClose;
+  top.append(x);
+  const main = mkEl("div", "rsi-main");
+  const left = mkEl("div", "rsi-left");
+  const cv = mkEl("canvas", "rsi-grid");
+  cv.width = COLS * TW; cv.height = 10 * TH;
+  const sims = mkEl("span", "rsi-sims", `${rows[0].n} simulations, in parallel`);
+  const wrap = mkEl("div", "rsi-gridwrap");
+  const stamp = mkEl("span", "rsi-stamp");
+  wrap.append(cv, sims, stamp);
+  const cap = mkEl("div", "rsi-cap");
+  const capR = mkEl("b", "", ""), capT = mkEl("span", "", "");
+  cap.append(capR, capT);
+  const meter = mkEl("div", "rsi-meter");
+  const big = mkEl("div", "rsi-big");
+  const bigN = mkEl("b", "", String(rows[0].success)), bigD = mkEl("span", "", `/ ${rows[0].n} succeeded`);
+  const chip = mkEl("span", "rsi-chip", "");
+  big.append(bigN, bigD, chip);
+  const bar2 = mkEl("div", "rsi-bar"), fill = mkEl("i", "", ""), base = mkEl("u", "", "");
+  bar2.append(fill, base);
+  meter.append(big, bar2);
+  left.append(wrap, cap, meter);
+  const right = mkEl("div", "rsi-right");
+  const list = mkEl("ol", "rsi-rounds");
+  const lis = rows.map((rw, i) => {
+    const li = mkEl("li", i ? rw.status || "" : "start");
+    li.append(mkEl("span", "rsi-r", `R${i}`), mkEl("span", "rsi-c", i ? rw.change.text : "the skill as trained"), mkEl("span", "rsi-v", i ? (rw.status === "kept" ? "kept" : "reverted") : "start"), mkEl("b", "rsi-n", `${rw.success}`));
+    li.onclick = () => rsiUI && rsiUI.pin(i);
+    list.append(li);
+    return li;
+  });
+  right.append(mkEl("div", "rsi-h", "Round by round"), list);
+  const strips = [];
+  if (h) {
+    const pair = mkEl("div", "rsi-pair");
+    for (const [lab, file, cp] of [["Before", "hero_r0.jpg", h.a_failure || "failed"], ["After", "hero_final.jpg", h.b_success ? "seated" : "failed"]]) {
+      const f = mkEl("figure", "");
+      const im = mkEl("div", "rsi-strip");
+      im.style.backgroundImage = `url(${API}/img/${file})`;
+      strips.push(im);
+      f.append(im, mkEl("figcaption", "", ""));
+      f.lastChild.append(mkEl("b", "", lab), document.createTextNode(` ${cp}`));
+      pair.append(f);
+    }
+    right.append(mkEl("div", "rsi-h", `Scene ${h.scene + 1}, the first try against the best round`), pair);
+  }
+  const foot = mkEl("div", "rsi-foot");
+  if (c) foot.append(mkEl("p", "", `${pctN(c.after.k / c.n)} vs ${pctN(c.before.k / c.n)} on ${c.n} fresh scenes, in simulation. A small gain, not statistically significant (McNemar p ${c.mcnemar.p}).`));
+  const open = mkEl("button", "rsi-open", "Open the full Optimize view");
+  open.onclick = () => window.forgeOptimizer?.show(rsi.run);
+  foot.append(open);
+  right.append(foot);
+  main.append(left, right);
+  box.append(top, main);
+  document.body.append(box);
+  const place = () => { // under the replay bar, centred in the stage column (never over the side rail)
+    const b = bar.getBoundingClientRect(), v = $("#view-sim").getBoundingClientRect();
+    const gap = v.width >= 1000 ? 372 : 16; // the stage's floating arm card keeps the left edge
+    const w = Math.min(900, v.width - gap - 16);
+    box.style.width = `${w}px`;
+    box.style.top = `${Math.round(b.bottom + 12)}px`;
+    box.style.left = `${Math.round(v.left + gap + w / 2)}px`;
+    box.style.maxHeight = `${Math.max(240, window.innerHeight - b.bottom - 28)}px`;
+  };
+  place();
+  addEventListener("resize", place);
+  R.rsi = rsi;
+
+  const imgs = new Map();
+  const sheet = (rd, k) => { const key = `${rd}/${k}`; if (!imgs.has(key)) { const im = new Image(); im.src = `${API}/img/r${rd}/m${k}.jpg`; imgs.set(key, im); } return imgs.get(key); };
+  for (let k = 0; k < MOMENTS; k++) sheet(0, k);
+  const g = cv.getContext("2d");
+  const U = { box, tick: 0, round: 0, frac: 0, pinned: null, count: rows[0].success, pin(i) { U.pinned = U.pinned === i ? null : i; draw(); } };
+  U.place = place;
+  rsiUI = U;
+  const roundOf = () => (U.pinned != null ? U.pinned : Math.min(rows.length - 1, Math.floor(U.frac * (rows.length + 1))));
+  function draw() {
+    const i = roundOf(), rw = rows[i];
+    const t = U.tick % (MOMENTS + 4), k = Math.min(t, MOMENTS - 1), settled = t >= MOMENTS - 2;
+    g.fillStyle = "#eef1f4"; g.fillRect(0, 0, cv.width, cv.height);
+    const im = sheet(rw.round, k);
+    if (im.complete && im.naturalWidth) g.drawImage(im, 0, 0);
+    for (let n = 0; n < rw.outcomes.length; n++) {
+      const tx = (n % COLS) * TW, ty = Math.floor(n / COLS) * TH, ok = rw.outcomes[n];
+      if (settled) { g.fillStyle = ok ? "rgba(8,102,255,.14)" : "rgba(217,48,37,.24)"; g.fillRect(tx, ty, TW, TH); }
+      g.lineWidth = 6; g.strokeStyle = ok ? "#0866ff" : "#d93025"; g.strokeRect(tx + 3, ty + 3, TW - 6, TH - 6);
+    }
+    if (i + 1 < rows.length) sheet(rows[i + 1].round, 0);
+    capR.textContent = i ? `R${i}` : "R0";
+    capT.textContent = i ? rw.change.text : "the skill as trained";
+    stamp.textContent = i ? (rw.status === "kept" ? "kept" : "reverted") : "start";
+    stamp.className = `rsi-stamp ${i ? rw.status : "start"}`;
+    lis.forEach((li, j) => { li.classList.toggle("on", j === i); li.classList.toggle("done", j < i); });
+    const tgt = rw.success;
+    U.count += Math.sign(tgt - U.count) * Math.max(1, Math.ceil(Math.abs(tgt - U.count) / 3));
+    if (Math.abs(tgt - U.count) < 1) U.count = tgt;
+    bigN.textContent = String(U.count);
+    const d = tgt - rows[0].success;
+    chip.textContent = i ? `${d >= 0 ? "+" : ""}${d} vs R0` : "baseline";
+    chip.className = `rsi-chip ${d > 0 ? "up" : d < 0 ? "down" : ""}`;
+    fill.style.width = `${(U.count / rw.n) * 100}%`;
+    base.style.left = `${(rows[0].success / rw.n) * 100}%`;
+    const fi = U.tick % 16;
+    strips.forEach((s) => { s.style.backgroundPosition = `${(fi / 15) * 100}% 0`; });
+    box.classList.toggle("final", i === rows.length - 1);
+  }
+  U.draw = draw;
+  U.timer = setInterval(() => { U.tick++; draw(); place(); }, 320);
+  draw();
+}
+
 async function open(tile) {
   if (R) close();
   if (F().replay.busy()) return F().note?.("A live run is still going. Replay waits until it finishes.");
@@ -80,6 +215,7 @@ async function open(tile) {
   setSpeed(1);
   restart();
   tick(performance.now());
+  if (window.forgeRSI && tile.id === window.forgeRSI.tile) rsiPanel(window.forgeRSI);
 }
 
 const stamp = (e) => ({ ...e, run: `rp:${R.sid}@${R.gen}:${e.run}`, ...(e.child ? { child: `rp:${R.sid}@${R.gen}:${e.child}` } : {}) });
@@ -106,6 +242,7 @@ function seek(target) {
 }
 
 function paint() {
+  if (rsiUI) rsiUI.frac = R.pos / R.total;
   const sc = bar.querySelector(".rp-scrub");
   if (document.activeElement !== sc) sc.value = String(Math.round((R.pos / R.total) * 1000));
   bar.querySelector(".rp-time").textContent = `${fmt(R.pos)} / ${fmt(R.total)}`;
@@ -143,6 +280,7 @@ function close() {
   cancelAnimationFrame(R.raf);
   while (R.thread.children.length > R.base) R.thread.lastElementChild.remove();
   R = null;
+  rsiClose();
   bar.hidden = true;
   F().replay.end();
 }

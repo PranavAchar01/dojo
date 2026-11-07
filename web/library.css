@@ -154,3 +154,4 @@
 
 /* the RSI-improved card leads the list */
 .tile-rsi { position: absolute; left: 8px; bottom: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 9px; border-radius: 999px; background: var(--accent-600, #0866ff); color: #fff; box-shadow: 0 1px 2px rgba(16, 24, 32, .18); }
+.tile-thumb canvas.rsi-thumb { display: block; width: 100%; height: 100%; object-fit: cover; }
