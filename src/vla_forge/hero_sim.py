@@ -26,15 +26,15 @@ ARMS = {"a_": ([0.20, -0.26, 0.0], 90.0), "b_": ([0.20, 0.26, 0.0], -90.0)}
 JAW_BODIES = ("gripper", "moving_jaw_so101_v1")
 
 # loose-brick slots on the table, (x, y, yaw deg), near the arm that serves them; bricks take them in build order
-SLOTS = (
+SLOTS = (  # the b_ slots are the a_ slots turned half a turn about the table centre, as the arms are
     (0.145, -0.115, 20.0),
     (0.255, -0.105, -30.0),
     (0.115, -0.060, 70.0),
-    (0.230, 0.115, -15.0),
-    (0.150, 0.105, 40.0),
-    (0.290, 0.110, 70.0),
+    (0.255, 0.115, 20.0),
+    (0.145, 0.105, -30.0),
+    (0.285, 0.060, 70.0),
     (0.300, -0.060, 10.0),
-    (0.100, 0.050, -20.0),
+    (0.100, 0.060, 10.0),
     (0.200, -0.140, 0.0),
     (0.200, 0.140, 0.0),
 )
@@ -177,6 +177,8 @@ def build_model(size: int = 960) -> mujoco.MjModel:
                 solimp=S.GRASP_SOLIMP,
                 group=3,
             )
+    for part in db.PART_FOOTPRINT:  # every part's mesh first, so mesh ids do not depend on the plan (the player caches them)
+        dr.ensure_mesh(spec, part)
     for b in db.DUCK:
         body = w.add_body(name=b.name, pos=[0.2, 0, 0.02])
         body.add_freejoint(name=f"{b.name}_free")

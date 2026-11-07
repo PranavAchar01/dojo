@@ -483,7 +483,7 @@ function setRef(r) {
   if (r && r.kind === "model") $("#nm-ref-name").textContent = `${r.name} (shown in the scene)`;
   if (!plan) return window.forgePlan?.close();
   const note = r.kind === "image" ? `Reference: your image "${r.name}". Read it into steps below.` : "";
-  window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note });
+  setTimeout(() => window.forgePlan?.open({ image: r.kind === "image" ? r.image : null, ref: note }), 0); // let the click return before the plan loads its meshes
 }
 $("#nm-attach").addEventListener("click", () => {
   const m = $("#nm-menu");

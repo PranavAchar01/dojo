@@ -63,6 +63,14 @@ class Skill:
     tests: list = field(
         default_factory=list
     )  # [{t, n, succeeded}], every Test run on fresh scenes
+    record: dict = field(
+        default_factory=dict
+    )  # scripted builds: the run's summary as the rail shows it (spec, route, rounds), kept so a restart still has it
+
+    @property
+    def scripted(self) -> bool:
+        """A scripted build (hero_flow): a recorded expert with no checkpoint, so never a starting point or a policy."""
+        return self.origin == "scripted"
 
     @property
     def composite(self) -> bool:
@@ -76,24 +84,25 @@ class Registry:
     def __init__(self, path: Path = SKILLS_DIR / "registry.json"):
         self.path = path
         self.lock = threading.Lock()
-        self.skills: dict[str, Skill] = {}
+        self.skills: dict[str, Skill] = {}  # trained skills: everything that has a policy
+        self.scripted: dict[str, Skill] = {}  # recorded scripted builds: shown in the library, never routed to
         if path.exists():
             known = {f.name for f in fields(Skill)}
             for d in json.loads(path.read_text()):
-                self.skills[d["id"]] = Skill(
-                    **{k: v for k, v in d.items() if k in known}
-                )
+                sk = Skill(**{k: v for k, v in d.items() if k in known})
+                (self.scripted if sk.scripted else self.skills)[sk.id] = sk
         self._emb: dict[str, torch.Tensor] = {}
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps([asdict(s) for s in self.skills.values()], indent=1))
+        everything = [*self.skills.values(), *self.scripted.values()]
+        tmp.write_text(json.dumps([asdict(s) for s in everything], indent=1))
         tmp.replace(self.path)
 
     def add(self, skill: Skill) -> None:
         with self.lock:
-            self.skills[skill.id] = skill
+            (self.scripted if skill.scripted else self.skills)[skill.id] = skill
             self._save()
 
     def set_address(self, skill_id: str, address: str) -> None:
@@ -103,11 +112,14 @@ class Registry:
 
     def update(self, skill_id: str, **changes) -> Skill:
         with self.lock:
-            sk = self.skills[skill_id]
+            sk = self.get(skill_id)
             for k, v in changes.items():
                 setattr(sk, k, v)
             self._save()
             return sk
+
+    def get(self, skill_id: str) -> Skill:
+        return self.skills.get(skill_id) or self.scripted[skill_id]
 
     def add_test(self, skill_id: str, result: dict) -> Skill:
         with self.lock:
@@ -122,7 +134,7 @@ class Registry:
             HIDDEN.exists() and set(json.loads(HIDDEN.read_text())["hidden"]) or set()
         )
         return sorted(
-            (s for s in self.skills.values() if s.id not in hide),
+            (s for s in (*self.skills.values(), *self.scripted.values()) if s.id not in hide),
             key=lambda s: -s.created,
         )
 

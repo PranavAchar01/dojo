@@ -100,6 +100,8 @@ class Run:
     scenery: str = ""  # library model id the prompt carried as its reference (shown in every scene of the run)
     robot: str = "so101"  # robot id from the robot builder (sim/robots.py), fixed when the run starts
     pinned: bool = False  # the user chose the robot; the router then only advises
+    # the scripted brick bridge (hero_flow): its plan, scene, recorded builds and the record the skill keeps
+    bridge: dict = field(default_factory=dict)
     # factory line: the station this run trains (factory.py); its scenes are that station's conveyor cell
     station: dict = field(default_factory=dict)
     # everything the page was sent for this run, kept for the Library replay (records.save_capture)
@@ -111,6 +113,8 @@ class Run:
 
     @property
     def tier(self) -> int:
+        if self.bridge:
+            return 3
         if self.steps:
             return 3
         return TIER.get(self.spec.skill, 1) if self.spec else 0
@@ -127,7 +131,11 @@ class Run:
             "prompt": self.prompt,
             "status": self.status,
             "elapsed": round(self.elapsed() if not self.seconds else self.seconds, 1),
-            "spec": self.spec.to_json() if self.spec else None,
+            "spec": self.bridge.get("spec")
+            if self.bridge.get("spec")
+            else self.spec.to_json()
+            if self.spec
+            else None,
             "parse": self.parse_info,
             "init_from": self.init_from,
             "rounds": [
@@ -776,6 +784,8 @@ class Forge:
         }
 
     def rollout_payload(self, run: Run, rnd: int, index: int) -> dict:
+        if run.bridge:
+            return run.bridge["rolls"][index]
         r = run.rollouts[rnd][index]
         if run.composite:
             return {
