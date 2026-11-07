@@ -306,3 +306,13 @@ def test_population_database_roundtrip(tmp_path):
     assert (
         max(db2.programs.values(), key=lambda p: p.metrics["combined_score"]).id == "p1"
     )
+
+
+def test_saved_run_with_no_process_is_not_reported_live(tmp_path, monkeypatch):
+    from vla_forge import optimizer_api
+
+    d = {"id": "x1", "status": "running", "rounds": [], "skill": {}}
+    monkeypatch.setattr(optimizer, "load_run", lambda oid: dict(d))
+    monkeypatch.setattr(optimizer, "list_runs", lambda: [dict(d)])
+    assert optimizer_api.run("x1")["status"] == "stopped"
+    assert optimizer_api.runs()[0]["status"] == "stopped"

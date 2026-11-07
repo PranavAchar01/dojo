@@ -132,7 +132,13 @@ def frame(
 
 @router.get("/runs")
 def runs():
-    return optimizer.list_runs()
+    live = {o for o, v in LIVE.items() if v.status in ("starting", "running")}
+    return [
+        r | {"status": "stopped"}
+        if r["status"] in ("starting", "running") and r["id"] not in live
+        else r
+        for r in optimizer.list_runs()
+    ]
 
 
 @router.get("/runs/{oid}")
@@ -142,6 +148,8 @@ def run(oid: str):
     d = optimizer.load_run(oid)
     if d is None:
         raise HTTPException(404, "no such run")
+    if d.get("status") in ("starting", "running"):
+        d["status"] = "stopped"  # nothing is running it, so it cannot show as live
     return d
 
 
