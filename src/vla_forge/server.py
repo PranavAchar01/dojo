@@ -28,6 +28,7 @@ from . import (
     factory,
     hero_api,
     hero_replay,
+    multi,
     optimizer_api,
     records,
     robotcache,
@@ -161,7 +162,7 @@ async def prompt(p: Prompt):
 @app.get("/api/library")
 def library():
     return {
-        "tiles": [tiles.tile(s) for s in FORGE.registry.ordered()],
+        "tiles": [tiles.tile(s) for s in FORGE.registry.ordered()] + multi.tiles(),
         "active": FORGE.runs[AGENTS.active].summary()
         if AGENTS and AGENTS.active in FORGE.runs
         else None,
@@ -181,6 +182,11 @@ def _policy(sid: str):
 
 @app.get("/api/skills/{sid}/thumb.png")
 def thumb(sid: str):
+    if sid.startswith(multi.PREFIX):  # a multi-arm card: its picture sits beside its record
+        f = tiles.TILES_DIR / sid / "thumb.png"
+        if not f.exists():
+            _404()
+        return FileResponse(f, media_type="image/png", headers={"Cache-Control": "no-cache"})
     sk = _skill(sid)
     if not sk.thumb_png:
         _404()
@@ -529,6 +535,8 @@ async def _run_line(ln: factory.Line, n_parts: int, seed: int) -> None:
     except Exception as exc:  # noqa: BLE001  (surfaced to the page; the line stays inspectable)
         ln.status, ln.result = "failed", {"error": str(exc)}
     factory.save(ln)
+    if ln.status == "done" and ln.result.get("completed"):
+        multi.register(ln.to_json(full=True), FORGE.registry.skills)  # the demo joins the Library as a card
     _line_emit(
         ln,
         "status",

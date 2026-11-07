@@ -42,9 +42,8 @@ function bowlGeometry(r, h) {
   return g;
 }
 let current = null;
-window.shoot = async ({ scene: sc, frame, meshes, robot }) => {
-  if (current) st.scene.remove(current);
-  const root = new THREE.Group();
+// one cell (an arm, its objects and its pose frame) hung on `root`; returns the bodies it drew and what the task is about
+async function addCell(root, { scene: sc, frame, meshes, robot }) {
   const bodies = sc.bodies.map(() => { const o = new THREE.Group(); root.add(o); return o; });
   for (const g of sc.robot) {
     const m = shade(new THREE.Mesh(meshGeometry(`${robot}|${g.mesh}`, meshes[String(g.mesh)]), robotMaterial(g.rgba, g.name)));
@@ -76,6 +75,15 @@ window.shoot = async ({ scene: sc, frame, meshes, robot }) => {
     }
     tracked.push(bodies[p.body]);
   }
+  for (const b of sc.bins || []) { // totes of a factory-line cell
+    const mat = new THREE.MeshPhysicalMaterial({ color: srgb(b.rgb), roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.45, envMapIntensity: 0.6 });
+    for (const g of b.boxes) {
+      const m = shade(new THREE.Mesh(new RoundedBoxGeometry(g.size[0] * 2, g.size[1] * 2, g.size[2] * 2, 3, 0.0012), mat));
+      m.position.set(...g.pos);
+      bodies[b.body].add(m);
+    }
+    tracked.push(bodies[b.body]);
+  }
   for (const p of sc.props || []) {
     const g = partsMesh(p.parts, p.rgb, p.kind);
     g.traverse((x) => { if (x.isMesh) x.castShadow = x.receiveShadow = true; });
@@ -89,18 +97,31 @@ window.shoot = async ({ scene: sc, frame, meshes, robot }) => {
     o.position.set(frame[k], frame[k + 1], frame[k + 2]);
     o.quaternion.set(frame[k + 4], frame[k + 5], frame[k + 6], frame[k + 3]);
   });
-  const plate = basePlate(0.17);
-  root.add(plate);
-  st.scene.add(root);
-  current = root;
-  root.updateMatrixWorld(true);
+  root.add(basePlate(0.17));
+  return bodies;
+}
+async function show(root, cells, origins, dir = [0.55, -0.75, 0.6], fill = 0.92) {
+  if (current) st.scene.remove(current);
   const box = new THREE.Box3();
-  for (const o of bodies) box.expandByObject(o);
-  box.expandByPoint(new THREE.Vector3(0, 0, 0));
-  frameBox(st, box, [0.55, -0.75, 0.6], 0.92);
+  current = root;
+  st.scene.add(root);
+  for (const [i, c] of cells.entries()) {
+    const cell = new THREE.Group();
+    cell.position.set(0, origins[i], 0);
+    root.add(cell);
+    const bodies = await addCell(cell, c);
+    cell.updateMatrixWorld(true);
+    for (const o of bodies) box.expandByObject(o);
+    box.expandByPoint(new THREE.Vector3(0, origins[i], 0));
+  }
+  frameBox(st, box, dir, fill);
   st.render();
   return { size: box.getSize(new THREE.Vector3()).toArray() };
-};
+}
+// a trained-model tile: one cell
+window.shoot = (job) => show(new THREE.Group(), [job], [0]);
+// a multi-arm card: every arm's cell side by side along y, as the Sim's multi-arm view stands them
+window.shootCells = ({ cells, pitch }) => show(new THREE.Group(), cells, cells.map((_, i) => i * pitch), [0.95, -0.12, 0.5], 0.68); // seen from the front, so the arms stand side by side
 window.draw = () => { st.render(); st.render(); }; // the canvas keeps its buffer: the PNG is read from it, not screenshotted
 window.ready = true;
 </script>

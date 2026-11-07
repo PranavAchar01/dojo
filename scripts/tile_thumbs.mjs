@@ -27,7 +27,9 @@ try {
   for (const f of readdirSync(jobs).filter((n) => n.endsWith(".json") && !n.startsWith("meshes-"))) {
     const j = JSON.parse(readFileSync(join(jobs, f)));
     try {
-      const info = await page.evaluate((a) => window.shoot(a), { scene: j.scene, frame: j.frame, robot: j.robot, meshes: meshes[j.robot] });
+      const info = j.cells
+        ? await page.evaluate((a) => window.shootCells(a), { pitch: j.pitch, cells: j.cells.map((c) => ({ ...c, meshes: meshes[c.robot] })) })
+        : await page.evaluate((a) => window.shoot(a), { scene: j.scene, frame: j.frame, robot: j.robot, meshes: meshes[j.robot] });
       const png = await page.evaluate(() => { window.draw(); return document.getElementById("c").toDataURL("image/png"); });
       writeFileSync(j.out, Buffer.from(png.split(",")[1], "base64"));
       stampPng(j.out);

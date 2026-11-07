@@ -33,7 +33,14 @@ const DECISION = {
   too_complex: "Too complex",
   not_feasible: "Not feasible",
 };
-const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task", scripted: "scripted" };
+const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task", arms: "arms together", scripted: "scripted" };
+
+// "2× SO-101 + ViperX 300": every arm of a multi-arm card, same words as a single-arm card
+function armsChip(t) {
+  const n = new Map();
+  for (const a of t.arms) n.set(a.robot, (n.get(a.robot) || 0) + 1);
+  return [...n].map(([r, k]) => `${k > 1 ? `${k}× ` : ""}${robotLabel(r)}`).join(" + ");
+}
 
 let tiles = [];
 let loaded = false;
@@ -340,6 +347,7 @@ function onTest(e) {
 // ---------------------------------------------------------------- replay a tile's recorded rollouts
 async function replay(id, i = 0) {
   const t = tiles.find((x) => x.id === id);
+  if (t?.origin === "arms") return replayArms(t);
   performance.mark("dojo-click");
   const want = F().replayData(id, i, t?.replay_source || ""); // the request goes out before any UI work
   F().simLoading(`Loading “${t?.name || "the model"}”`);
@@ -362,6 +370,19 @@ async function replay(id, i = 0) {
   });
   $("#round-label").textContent = `Recorded · ${p.source}`;
   $("#pb-label").textContent = `rollout ${i + 1}/${p.all.length}`;
+}
+
+// a multi-arm card plays its saved line run in the Sim with every arm moving (arms.js)
+async function replayArms(t) {
+  F().simLoading(`Loading “${t.name}”`);
+  F().setView("sim");
+  F().selectSkill(t);
+  try {
+    await window.forgeArms.openLine(t.line, t.name);
+  } catch (err) {
+    toast("No recording", err.message);
+  }
+  F().simLoading(null);
 }
 
 // ---------------------------------------------------------------- composer mode (remix / from scratch)
@@ -448,14 +469,15 @@ function tileEl(t, byId) {
   } else {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
-  th.append(el("span", "tile-tier mono", t.origin === "scripted" ? "SCRIPTED" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${t.robot !== "so101" ? " custom" : ""}`, robotLabel(t.robot)));
+  const multi = t.origin === "arms";
+  th.append(el("span", "tile-tier mono", multi ? "ARMS" : t.origin === "scripted" ? "SCRIPTED" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${multi || t.robot !== "so101" ? " custom" : ""}`, multi ? armsChip(t) : robotLabel(t.robot)));
   // one click on the tile plays its recorded rollout straight away; the buttons below keep their own jobs
   a.classList.add("tap");
   a.tabIndex = 0;
   a.setAttribute("aria-label", `${t.name}: play its recorded rollout`);
   a.addEventListener("click", (ev) => { if (!ev.target.closest("button, a, input, .tile-name")) replay(t.id); });
   a.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target === a) replay(t.id); });
-  if (t.replay) a.addEventListener("pointerenter", () => F().replayData(t.id, 0, t.replay_source), { once: true });
+  if (t.replay && !multi) a.addEventListener("pointerenter", () => F().replayData(t.id, 0, t.replay_source), { once: true });
   if (testing[t.id]) {
     const T = tests[testing[t.id]];
     const ov = el("div", "tile-testing");
@@ -464,10 +486,26 @@ function tileEl(t, byId) {
   }
   const body = el("div", "tile-body");
   const name = el("div", "tile-name", t.name);
-  name.title = "Double-click to rename";
-  name.ondblclick = () => rename(t, name);
+  if (!multi) {
+    name.title = "Double-click to rename";
+    name.ondblclick = () => rename(t, name);
+  }
   body.append(name);
   if (t.name !== t.instruction) body.append(el("div", "tile-ins", t.instruction));
+  if (multi) {
+    const ol = el("ol", "tile-chain tile-arms");
+    for (const [i, ar] of t.arms.entries()) {
+      const li = el("li", "");
+      li.append(el("b", "", `Arm ${i + 1} · ${ar.controller}`), document.createTextNode(` ${ar.instruction}`));
+      const facts = [robotLabel(ar.robot)];
+      if (ar.held_out) facts.push(`${ar.held_out.k}/${ar.held_out.n} held-out`);
+      else if (ar.controller === "trained VLA") facts.push("held-out not measured");
+      if (ar.in_run) facts.push(`${ar.in_run.succeeded}/${ar.in_run.parts} in the run`);
+      li.append(el("span", "arm-facts", facts.join(" · ")));
+      ol.append(li);
+    }
+    body.append(ol);
+  }
   if (t.detail) body.append(el("div", "tile-ins", t.detail)); // a scripted build says what it measured and which rules failed
   if (t.steps?.length) {
     const ol = el("ol", "tile-chain");
@@ -479,12 +517,12 @@ function tileEl(t, byId) {
   const fill = el("i");
   fill.style.width = pct(t.success_rate);
   bar.append(fill);
-  rate.append(el("b", "mono", pct(t.success_rate)), bar, el("span", "", t.origin === "scripted" ? `of ${t.n_eval} builds` : `of ${t.n_eval} held-out`));
+  rate.append(el("b", "mono", pct(t.success_rate)), bar, el("span", "", multi ? `of ${t.n_eval} tries, all arms, in simulation` : t.origin === "scripted" ? `of ${t.n_eval} builds` : `of ${t.n_eval} held-out`));
   body.append(rate);
   const meta = el("div", "tile-meta");
-  const parent = t.origin === "scripted" ? "no training" : t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
+  const parent = multi ? `${t.arms.length} arms` : t.origin === "scripted" ? "no training" : t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
   meta.append(
-    el("span", "", t.train_seconds ? `train ${fmt(t.train_seconds)}` : `run ${fmt(t.seconds)}`),
+    el("span", "", multi ? `${Math.round(t.measured.makespan_s)}s simulated` : t.train_seconds ? `train ${fmt(t.train_seconds)}` : `run ${fmt(t.seconds)}`),
     el("span", "", parent),
     el("span", "", ORIGIN[t.origin] || t.origin),
     el("span", "", ago(t.created)),
@@ -508,6 +546,12 @@ function tileEl(t, byId) {
     acts.append(b);
     return b;
   };
+  if (multi) {
+    mk("Play", () => replay(t.id));
+    a.append(th, body);
+    body.append(acts);
+    return a;
+  }
   const tb = mk(testing[t.id] ? "Testing..." : "Test", () => startTest(t.id));
   tb.disabled = !!testing[t.id];
   mk("Replay", () => window.forgeReplay.open(t), "replay-btn");
