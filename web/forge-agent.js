@@ -71,7 +71,9 @@ function renderAll() {
 }
 function paintFoot() {
   const b = st.graph ? (st.graph.backends || []).join(", ") || "stub" : "";
-  foot.textContent = st.graph ? `Agents run as uAgents in one local Bureau, not registered on Agentverse. Model backend answering here: ${b}.` : "";
+  const av = st.graph && st.graph.agentverse;
+  const where = av && av.registered.length ? "VLA Forge and VLA Forge Optimizer are registered on Agentverse" : "not registered on Agentverse";
+  foot.textContent = st.graph ? `Agents run as uAgents in one local Bureau, ${where}. Model backend answering here: ${b}.` : "";
 }
 function pushThought(t) {
   st.thoughts.push(t);
@@ -136,7 +138,7 @@ async function compose(q) {
     return `**${named}** is a uAgent in the Fetch.ai Bureau. ${n.description}${n.llm ? " It asks Llama 4 Maverick." : " It runs plain code, no model call."}${said ? ` Last thing it said: "${said.text}"` : " It has not said anything in this session yet."}`;
   }
   if (/model|llama|backend|who.*(answer|power)/.test(s) && g) {
-    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Llama 4 Maverick**. The backend that actually answered in this process is **${(g.backends || []).join(", ") || "a stub"}**. The Fetch.ai agents run in a local Bureau and are not registered on Agentverse.`;
+    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Llama 4 Maverick**. The backend that actually answered in this process is **${(g.backends || []).join(", ") || "a stub"}**. The Fetch.ai agents run in a local Bureau${g.agentverse && g.agentverse.registered.length ? "; the task agent and the optimizer are registered on Agentverse" : " and are not registered on Agentverse"}.`;
   }
   if (/agent|fetch|uagent|who/.test(s) && g) {
     return `${g.nodes.filter((n) => !n.skill).length} uAgents pass typed messages: ${g.nodes.filter((n) => !n.skill).map((n) => n.id).join(", ")}. Open the **Agents** tab to watch the messages move.`;
