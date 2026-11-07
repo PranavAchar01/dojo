@@ -17,20 +17,6 @@ const onScroll = () => nav.classList.toggle("scrolled", scrollY > 8);
 addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
-const video = document.getElementById("hero-video");
-if (video && video.play) {
-  if (reduced) {
-    video.removeAttribute("autoplay");
-    video.removeAttribute("loop");
-    video.pause();
-  } else {
-    new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) video.play().catch(() => {});
-      else video.pause();
-    }, { threshold: 0.2 }).observe(video);
-  }
-}
-
 // The roaming bot guides the page: it greets, then flies to each section's heading as it scrolls into view and says
 // one line about it. It is the same robot as in the app (roam.js through mascot.js). Skipped on phones and with
 // reduced motion, where the page reads the same without it.
@@ -64,14 +50,65 @@ if (!reduced && innerWidth >= 760) {
   });
 }
 
-// The rollout loop is four recorded tasks back to back; the label follows the playhead.
-const taskEl = document.getElementById("hero-task");
-if (video && taskEl) {
-  const TASKS = [[0, "touch the yellow block"], [2.13, "put the blue block in the blue bowl"], [10.07, "push the green block onto the blue square"], [16.1, "stack the yellow block on the red block"]];
-  let at = -1;
-  video.addEventListener("timeupdate", () => {
+// Every number and picture below comes from the published models (/api/library): success_rate and n_eval from the
+// held-out evaluation, train_seconds from the run, the frame from the model's own recorded rollout.
+const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const hits = (t) => Math.round(t.success_rate * t.n_eval);
+const thumb = (t) => `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent(t.replay_source || "")}`;
+
+async function fill() {
+  let tiles;
+  try { tiles = (await (await fetch("/api/library")).json()).tiles; } catch { return; }
+  const pub = tiles.filter((t) => t.n_eval > 0 && t.thumb);
+  if (!pub.length) return;
+
+  // the proof row: counts and means over every published model
+  const evals = pub.reduce((a, t) => a + t.n_eval, 0), ok = pub.reduce((a, t) => a + hits(t), 0);
+  const best = pub.reduce((a, t) => (t.success_rate > a.success_rate ? t : a));
+  const tiers = new Set(pub.map((t) => t.tier)).size;
+  const dl = $("proof-nums");
+  dl.innerHTML = [
+    ["Published models", `${pub.length}`, ""],
+    ["Held-out scenes passed", `${ok}`, ` / ${evals}`],
+    ["Best model, held-out scenes", `${hits(best)}`, ` / ${best.n_eval}`],
+    ["Task tiers covered", `${tiers}`, ""],
+  ].map(([k, v, of]) => `<div><dt>${k}</dt><dd class="num">${v}<span class="of">${of}</span></dd></div>`).join("");
+  $("proof-fine").textContent = "Live from this Dojo's library, in simulation. Each model is scored on layouts it never trained on; the best one is \"" + best.instruction + "\".";
+
+  // the hero: a frame from each model's own rollout, one after another
+  const hero = pub.filter((t) => t.replay).slice(0, 6);
+  const img = $("hero-img");
+  if (hero.length && img) {
     let k = 0;
-    TASKS.forEach(([t], i) => { if (video.currentTime >= t) k = i; });
-    if (k !== at) { at = k; taskEl.textContent = TASKS[k][1]; }
-  });
+    const show = () => {
+      const t = hero[k % hero.length]; k++;
+      img.src = thumb(t); img.hidden = false;
+      $("hero-task").textContent = t.instruction;
+      $("hero-sub").textContent = `${hits(t)} / ${t.n_eval} on held-out scenes, in simulation`;
+    };
+    show();
+    if (!reduced && hero.length > 1) setInterval(show, 4000);
+  }
+
+  // the model library: the newest model at each tier
+  const list = $("tile-list");
+  for (const tier of [1, 2, 3]) {
+    for (const t of pub.filter((x) => x.tier === tier).slice(-2).reverse()) {
+      const li = el("li", "tile rv in", `<img src="${thumb(t)}" alt="Simulator view of the model: ${esc(t.instruction)}" width="480" height="360" loading="lazy"><div class="tb"><span class="t${tier}">Tier ${tier}</span><h3>${esc(t.instruction)}</h3><p class="res"><b class="num">${hits(t)} / ${t.n_eval}</b> in simulation</p></div>`);
+      list.append(li);
+    }
+  }
+
+  // the line: stations that were trained for a factory cell; the section is hidden when there are none
+  const st = pub.filter((t) => t.origin === "station").slice(-3);
+  if (st.length) {
+    const chain = $("chain");
+    st.forEach((t, i) => chain.append(el("article", "st", `<header><span class="idx">0${i + 1}</span><span class="kind vla">VLA</span></header><h3>${esc(t.instruction)}</h3><p>Trained in ${t.train_seconds.toFixed(1)} s.</p><div class="meter"><b style="--w:${Math.round(t.success_rate * 100)}%"></b></div><p class="res"><b class="num">${hits(t)} / ${t.n_eval}</b> on held-out scenes, in simulation</p>`)));
+    chain.style.gridTemplateColumns = `repeat(${st.length}, 1fr)`;
+    $("arms").hidden = false;
+    io.observe(chain);
+  }
 }
+function $(id) { return document.getElementById(id); }
+fill();

@@ -1,4 +1,4 @@
-"""Still images of the Robot tab's cards: one per arm, per gripper, and per wrist or jaw option on each arm.
+"""Still images of the robot builder's cards: one per arm, per gripper, and per wrist or jaw option on each arm.
 
 Rendered once with MuJoCo's offscreen renderer from the same source models the live preview uses, framed like the
 live preview, on a transparent background, and kept as webp files under assets/thumbs/. The cards show the image;

@@ -200,8 +200,9 @@ class Forge:
         mode: str = "auto",
         from_skill: str = "",
         station: dict | None = None,
+        scenery: str = "",
     ) -> Run:
-        run = FORGE.new_run(prompt, mode, from_skill, station)
+        run = FORGE.new_run(prompt, mode, from_skill, station, scenery)
         self.pending[run.id] = self.loop.create_future()
         self.loop.create_task(self._go(run))
         return run

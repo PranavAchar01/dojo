@@ -95,7 +95,8 @@ class Run:
     mode: str = "auto"  # auto | train (never reuse) | scratch (from the base) | remix (from from_skill)
     from_skill: str = ""
     route: dict = field(default_factory=dict)
-    robot: str = "so101"  # robot id from the Robot tab (sim/robots.py), fixed when the run starts
+    scenery: str = ""  # library model id the prompt carried as its reference (shown in every scene of the run)
+    robot: str = "so101"  # robot id from the robot builder (sim/robots.py), fixed when the run starts
     # factory line: the station this run trains (factory.py); its scenes are that station's conveyor cell
     station: dict = field(default_factory=dict)
 
@@ -208,6 +209,7 @@ class Forge:
         mode: str = "auto",
         from_skill: str = "",
         station: dict | None = None,
+        scenery: str = "",
     ) -> Run:
         rid = (
             time.strftime("%H%M%S")
@@ -222,6 +224,7 @@ class Forge:
             from_skill=from_skill,
             robot=robot,
             station=station or {},
+            scenery=scenery,
         )
         self.runs[rid] = run
         self.order.append(rid)
@@ -397,12 +400,15 @@ class Forge:
         """A training or held-out scene. A step trained for a composed task sees that task's tables."""
         assert run.spec is not None
         if run.parent:
-            return step_layout(self.runs[run.parent].steps, run.step_index, rng)
-        if run.station:
+            lay = step_layout(self.runs[run.parent].steps, run.step_index, rng)
+        elif run.station:
             from . import factory
 
-            return factory.train_layout(run.station, rng)
-        return sample_layout(run.spec, rng)
+            lay = factory.train_layout(run.station, rng)
+        else:
+            lay = sample_layout(run.spec, rng)
+        lay.scenery = run.scenery
+        return lay
 
     def scene(self, run: Run) -> dict:
         assert run.spec is not None

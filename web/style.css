@@ -488,7 +488,7 @@ html:not([data-mood="think"]) .loss path { stroke-dasharray: 2000; animation: dr
 /* welcome: with nothing picked, the floor loops real recorded rollouts, no card and no controls */
 .welcome { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 4; width: min(640px, 88%); pointer-events: none; animation: wl-in .5s var(--soft) both; }
 .welcome[hidden] { display: none; }
-.welcome video { display: block; width: 100%; height: auto; max-height: calc(100% - 20px); aspect-ratio: 880 / 690; object-fit: cover; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); }
+.welcome img { display: block; width: 100%; height: auto; max-height: calc(100% - 20px); aspect-ratio: 880 / 690; object-fit: cover; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); }
 .wl-now { margin: -6px 0 0; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink3); }
 @keyframes wl-in { from { opacity: 0; } }
 /* the moment a tile is picked: a quiet card until its first frame is on the floor */

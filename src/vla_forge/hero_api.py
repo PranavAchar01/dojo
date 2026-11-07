@@ -1,4 +1,4 @@
-"""HTTP surface of the Build plan view (web/plan.js is its only client). Mounted by server.py with one line."""
+"""HTTP surface of the build plan (inline in the prompt window) (web/plan.js is its only client). Mounted by server.py with one line."""
 
 from __future__ import annotations
 

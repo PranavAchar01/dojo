@@ -298,7 +298,7 @@ ACTIVE = ROOT / "runs" / "hero_build.json"
 
 
 def save_active(rules: Rules, bricks) -> None:
-    """The build the Build plan view hands to the MuJoCo table ("Use this build")."""
+    """The build the build plan hands to the MuJoCo table ("Use this build")."""
     ACTIVE.parent.mkdir(parents=True, exist_ok=True)
     ACTIVE.write_text(
         json.dumps({"rules": rules.as_dict(), "bricks": to_json(bricks)}, indent=1)

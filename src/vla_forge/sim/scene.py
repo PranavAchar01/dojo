@@ -107,6 +107,8 @@ class Layout:
     props: dict[str, tuple[str, str, float, float, float]] = field(default_factory=dict)
     # a factory dressing from scenes/<name>.json (assets_scene.py): scenery, floor, lamps, the hero product
     dressing: str = ""
+    # a library model (assets/library/<id>) shown beside the arm, visual only: the model a prompt was given as its reference
+    scenery: str = ""
 
     def key(self) -> tuple:
         """Structure only (names and colours): layouts with the same key share a compiled model."""
@@ -122,6 +124,7 @@ class Layout:
                 else []
             ),
             *(["dressing:" + self.dressing] if self.dressing else []),
+            *(["scenery:" + self.scenery] if self.scenery else []),
         )
 
     def fixtures(self) -> dict[str, tuple[str, float, float]]:
@@ -141,6 +144,8 @@ class Layout:
             d["props"] = self.props
         if self.dressing:
             d["dressing"] = self.dressing
+        if self.scenery:
+            d["scenery"] = self.scenery
         return d
 
     @staticmethod
@@ -153,6 +158,7 @@ class Layout:
             bool(d.get("belt", False)),
             {k: tuple(v) for k, v in d.get("props", {}).items()},
             str(d.get("dressing", "")),
+            str(d.get("scenery", "")),
         )
 
 
@@ -413,6 +419,10 @@ def build_spec(
         from ..assets_scene import dress
 
         dress(spec, layout.dressing)
+    if layout.scenery:
+        from ..assets_scene import add_scenery
+
+        add_scenery(spec, layout.scenery)
     return spec
 
 
