@@ -144,17 +144,17 @@ function slotRaw(i) {
 // Nodes carry a step index (into STEPS) so status and slots stay the single source of truth. The optimizer duel (step 7)
 // is drawn as a branch after Publish: Muse Wonder and SubQ Snap in parallel, merging into "winner vs parent".
 const NODES = [
-  { id: "n0", s: 0, name: "Prompt", tool: "You", logos: ["user"] },
-  { id: "n1", s: 1, name: "Understand", logos: ["meta", "subq"] },
-  { id: "n2", s: 2, name: "Build the scene", logos: ["mujoco"] },
-  { id: "n3", s: 3, name: "Demonstrations", logos: ["hf"] },
-  { id: "n4", s: 4, name: "Train", logos: ["torch"] },
-  { id: "n5", s: 5, name: "Test on new scenes", logos: ["mujoco"] },
-  { id: "n6", s: 6, name: "Critic", logos: ["meta", "subq"] },
-  { id: "n8", s: 8, name: "Publish", tool: "Model library", logos: ["dojo"] },
-  { id: "w", s: 7, name: "Muse Wonder", tool: "proposes a change", logos: ["meta"], opt: 1 },
-  { id: "q", s: 7, name: "SubQ Snap", tool: "proposes a change", logos: ["subq"], opt: 2 },
-  { id: "v", s: 7, name: "Winner vs parent", tool: "Optimizer duel", logos: ["versus"], opt: 3 },
+  { id: "n0", s: 0, name: "Prompt", tool: "You", d: "You describe the task in one sentence, the way you would ask a person. No code, no reward function.", logos: ["user"] },
+  { id: "n1", s: 1, name: "Understand", d: "Muse Spark turns your sentence into a task spec: which objects matter, where they start, and what counts as done.", logos: ["meta", "subq"] },
+  { id: "n2", s: 2, name: "Build the scene", d: "MuJoCo builds the table, the blocks and the SO-101 arm, then shuffles the layout so every scene is a little different.", logos: ["mujoco"] },
+  { id: "n3", s: 3, name: "Demonstrations", d: "A scripted expert does the task over and over. Only the clean runs are kept as examples for the model to learn from.", logos: ["hf"] },
+  { id: "n4", s: 4, name: "Train", d: "A vision-language-action policy is fine-tuned on those examples with PyTorch, learning to map camera frames to arm motion.", logos: ["torch"] },
+  { id: "n5", s: 5, name: "Test on new scenes", d: "The new model runs on 20 layouts it has never seen, and every attempt is scored.", logos: ["mujoco"] },
+  { id: "n6", s: 6, name: "Critic", d: "Muse Spark and SubQ watch the failed runs, explain what went wrong, and pick what to train on next.", logos: ["meta", "subq"] },
+  { id: "n8", s: 8, name: "Publish", tool: "Model library", d: "Once it passes, the model joins the library with its success rate and training time, ready to run or remix.", logos: ["dojo"] },
+  { id: "w", s: 7, name: "Muse Wonder", tool: "proposes a change", d: "Muse Wonder suggests a change to the training recipe and tries it.", logos: ["meta"], opt: 1 },
+  { id: "q", s: 7, name: "SubQ Snap", tool: "proposes a change", d: "SubQ Snap suggests its own change, trained in parallel for a fair head-to-head.", logos: ["subq"], opt: 2 },
+  { id: "v", s: 7, name: "Winner vs parent", tool: "Optimizer duel", d: "The better of the two is tested against the current model, and only kept if it actually wins.", logos: ["versus"], opt: 3 },
 ];
 // [from, to, from side, to side (wide), from side, to side (narrow), kind]
 const EDGES = [
@@ -203,12 +203,13 @@ function caption(n) {
 
 function nodeHTML(n) {
   const st = D.stat[n.s];
-  const tool = n.tool || STEPS[n.s][2];
+  const tool = n.tool || STEPS[n.s][2], cap = caption(n);
   return `<button type="button" class="wn ${st}${n.opt ? " opt" : ""}${pop === n.id ? " sel" : ""}" data-n="${n.id}" style="grid-area:${n.id}">
     ${st === "done" ? `<i class="wn-ok"><svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7"/></svg></i>` : st === "live" ? `<i class="wn-live"></i>` : ""}
     <span class="wn-top"><span class="wn-lgs">${n.logos.map(logo).join("")}</span><b>${n.name}</b></span>
     <span class="wn-tool">${tool}</span>
-    <span class="wn-cap">${esc(caption(n))}</span></button>`;
+    <span class="wn-desc">${esc(n.d)}</span>
+    ${cap === "Runs on your next prompt." ? "" : `<span class="wn-cap">${esc(cap)}</span>`}</button>`;
 }
 
 function popHTML() {
