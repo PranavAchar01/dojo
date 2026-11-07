@@ -1520,6 +1520,9 @@ async function openRailCard(k) {
   railCard = c;
 }
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && railCard) closeRailCard(); });
+$("#replay-open").addEventListener("click", () => savedModel && window.forgeReplay?.open(savedModel.sk));
+// the Replay button shows only while a saved Library model is open in Sim
+setInterval(() => { $("#replay-open").hidden = !savedModel || !!window.forgeReplay?.active(); }, 500);
 async function showSavedModel(sk) {
   savedModel = { sk };
   let run = null;

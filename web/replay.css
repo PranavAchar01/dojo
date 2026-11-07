@@ -19,3 +19,5 @@
 .replay-bar .rp-x:hover { background: #f1f4f7; color: var(--ink); }
 .replay-bar .rp-note { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink3); line-height: 1.35; }
 .replay-bar .rp-note b { color: var(--ink2); font-weight: 600; }
+.tabs .replay-open { margin-left: auto; flex: none; background: var(--accent-bg); color: var(--accent-700); font-weight: 650; }
+.tabs .replay-open:hover { background: var(--accent-600); color: #fff; }
