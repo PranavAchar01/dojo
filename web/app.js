@@ -1027,7 +1027,7 @@ window.forge = {
   setCaption(text) { $("#vp-caption").textContent = text; },
   setShown(v) { shown = v; },
   THREE, scene3, camera, controls, renderer,
-  meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage,
+  meshesFor, meshGeometry, studioMaterial, srgb, addLineParts, RoundedBoxGeometry, postStage, applyFrame, buildWorld, populate, armScale: (rid) => ARM_SCALE[String(rid || "so101").split(".")[0]] || 1,
 };
 
 idleScene();
