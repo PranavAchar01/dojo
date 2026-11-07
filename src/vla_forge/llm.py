@@ -1,109 +1,29 @@
 """Language-model calls: turning a sentence into a TaskSpec, and the critic's plan for the next round.
 
-OpenAI by default (OPENAI_API_KEY from the environment, else the macOS Keychain item of the same name).
-VLA_FORGE_LLM_PROVIDER=meta routes the same calls to Meta's Llama API (META_API_KEY), falling back to OpenAI
-when it errors. Model output is data: every field is validated and clamped before it touches the pipeline.
+Every call goes to Llama through llama.py (the Meta Llama API client, with a stub backend until a key works).
+Model output is data: every field is validated and clamped before it touches the pipeline.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
-import subprocess
 import time
-from functools import lru_cache
 
-import openai
-
+from . import llama
 from .compose import Step, validate
 from .sim.props import KIT_SLOTS
 from .sim.scene import BLOCK_COLORS, BOWL_COLORS, PAD_COLORS
 from .sim.tasks import PREDICATES, SKILLS, TaskSpec, default_success
 
-MODEL = os.environ.get("VLA_FORGE_LLM", "gpt-6.1-sol")
-META_MODEL = os.environ.get(
-    "VLA_FORGE_META_LLM", "Llama-4-Maverick-17B-128E-Instruct-FP8"
-)
+MODEL = llama.MODEL
 
 
-def _keychain(name: str) -> str | None:
-    try:
-        out = subprocess.run(
-            ["security", "find-generic-password", "-s", name, "-w"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        return out.stdout.strip() or None
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-@lru_cache(maxsize=2)
-def _client(provider: str):
-    from openai import OpenAI
-
-    if provider == "meta":
-        key = os.environ.get("META_API_KEY") or _keychain("META_API_KEY")
-        return (
-            OpenAI(api_key=key, base_url="https://api.llama.com/compat/v1/")
-            if key
-            else None
-        )
-    key = os.environ.get("OPENAI_API_KEY") or _keychain("OPENAI_API_KEY")
-    return OpenAI(api_key=key) if key else None
-
-
-def _chat_json(system: str, user: str, schema: dict) -> tuple[dict, str]:
-    """Returns (parsed JSON, which model answered)."""
-    order = (
-        ["meta", "openai"]
-        if os.environ.get("VLA_FORGE_LLM_PROVIDER") == "meta"
-        else ["openai"]
-    )
-    last: Exception | None = None
-    for provider in order:
-        c = _client(provider)
-        if c is None:
-            continue
-        try:
-            if provider == "meta":
-                r = c.chat.completions.create(
-                    model=META_MODEL,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {"name": "out", "schema": schema},
-                    },
-                )
-                return json.loads(r.choices[0].message.content), META_MODEL
-            r = c.responses.create(
-                model=MODEL,
-                instructions=system,
-                input=user,
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": "out",
-                        "schema": schema,
-                        "strict": True,
-                    }
-                },
-            )
-            return json.loads(r.output_text), MODEL
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            openai.OpenAIError,
-        ) as e:  # next provider
-            last = e
-    raise RuntimeError(f"no language model available: {last}")
+def _chat_json(
+    system: str, user: str, schema: dict, kind: str = "task"
+) -> tuple[dict, str]:
+    """Returns (parsed JSON, which model answered). kind: task, plan, critic or optimizer."""
+    return llama.chat_json(kind, system, user, schema)
 
 
 # ------------------------------------------------------------------ task parsing
@@ -389,7 +309,7 @@ def critic_plan(
         }
     )
     try:
-        raw, model = _chat_json(CRITIC_SYSTEM, user, CRITIC_SCHEMA)
+        raw, model = _chat_json(CRITIC_SYSTEM, user, CRITIC_SCHEMA, "critic")
     except RuntimeError:
         raw, model = _rule_critic(report, settings, seconds_left, target), "rules"
     plan = {

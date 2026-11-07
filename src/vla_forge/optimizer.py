@@ -5,8 +5,8 @@ summary and proposes exactly one change to the policy's training (from a fixed m
 is applied, the policy is fine-tuned from the current weights and scored again on the same 100 scenes. The change
 is kept when the success count rises and reverted otherwise. Every round is written to runs/opt-<id>/run.json.
 
-The proposing model is Llama through the Meta Llama API when VLA_FORGE_LLM_PROVIDER=meta and the key works;
-otherwise the existing provider answers, and the record says which model actually did.
+The proposing model is Llama through the Meta Llama API (llama.py). Until a key works, the stub backend replays
+the changes recorded in a saved run.
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ def propose(report: dict, history: list[dict], rnd: int) -> tuple[dict, str]:
     """One change from the language model, validated. Returns (change, model that answered)."""
     user = json.dumps({"round": rnd, "failure_report": report, "history": history})
     try:
-        raw, model = llm._chat_json(SYSTEM, user, SCHEMA)
+        raw, model = llm._chat_json(SYSTEM, user, SCHEMA, "optimizer")
         return clean_change(raw), model
     except (RuntimeError, ValueError, TypeError) as e:
         order = [
