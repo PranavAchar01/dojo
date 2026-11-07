@@ -107,6 +107,8 @@ class Layout:
     props: dict[str, tuple[str, str, float, float, float]] = field(default_factory=dict)
     # a factory dressing from scenes/<name>.json (assets_scene.py): scenery, floor, lamps, the hero product
     dressing: str = ""
+    # real library tools lying on the table (sim/toolbox.py): name -> (tool id, x, y, yaw)
+    tools: dict[str, tuple[str, float, float, float]] = field(default_factory=dict)
 
     def key(self) -> tuple:
         """Structure only (names and colours): layouts with the same key share a compiled model."""
@@ -122,6 +124,7 @@ class Layout:
                 else []
             ),
             *(["dressing:" + self.dressing] if self.dressing else []),
+            *([tuple((n, v[0]) for n, v in sorted(self.tools.items()))] if self.tools else []),
         )
 
     def fixtures(self) -> dict[str, tuple[str, float, float]]:
@@ -141,6 +144,8 @@ class Layout:
             d["props"] = self.props
         if self.dressing:
             d["dressing"] = self.dressing
+        if self.tools:
+            d["tools"] = self.tools
         return d
 
     @staticmethod
@@ -153,6 +158,7 @@ class Layout:
             bool(d.get("belt", False)),
             {k: tuple(v) for k, v in d.get("props", {}).items()},
             str(d.get("dressing", "")),
+            {k: tuple(v) for k, v in d.get("tools", {}).items()},
         )
 
 
@@ -341,6 +347,11 @@ def build_spec(
         for name, (kind, color, *_pose) in layout.props.items():
             add_prop(spec, name, kind, color)
 
+    if layout.tools:
+        from .toolbox import add_tools
+
+        add_tools(spec, layout.tools)
+
     if layout.belt or layout.bins:
         from . import line
 
@@ -510,6 +521,10 @@ class Scene:
             z = CUBE_HALF + (_belt_top(x) if layout.belt else 0.0)
             d.qpos[adr : adr + 3] = [x, y, z]
             d.qpos[adr + 3 : adr + 7] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
+        if layout.tools:
+            from .toolbox import reset_tools
+
+            reset_tools(self, layout)
         for name, (_c, x, y) in layout.fixtures().items():
             d.mocap_pos[m.body(name).mocapid[0]] = [x, y, 0.0]
         for name, (*_k, yaw) in layout.props.items():

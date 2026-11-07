@@ -29,7 +29,7 @@ PROP_COLORS = {
     "tan": (0.78, 0.66, 0.46),
     "black": (0.16, 0.16, 0.18),
 }
-PROP_KINDS = ("tray", "socket", "marker")
+PROP_KINDS = ("tray", "socket", "marker", "toolbox")
 
 # tray
 SLOT_INNER = 0.055
@@ -123,7 +123,7 @@ def prop_parts(kind: str) -> list[dict]:
         return _tray_parts()
     if kind == "socket":
         return _socket_parts()
-    if kind == "marker":
+    if kind in ("marker", "toolbox"):  # the toolbox is a library mesh (sim/toolbox.py), not boxes
         return []
     raise ValueError(f"unknown prop kind {kind}")
 
@@ -133,6 +133,10 @@ def prop_rgb(color: str) -> tuple[float, float, float]:
 
 
 def add_prop(spec: mujoco.MjSpec, name: str, kind: str, color: str) -> None:
+    if kind == "toolbox":
+        from .toolbox import add_toolbox
+
+        return add_toolbox(spec, name)
     body = spec.worldbody.add_body(name=name, mocap=True, pos=[0.25, 0, 0])
     rgb = np.array(prop_rgb(color))
     for i, p in enumerate(prop_parts(kind)):
