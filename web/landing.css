@@ -222,3 +222,26 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .agt i { font: 600 11.5px var(--ui); font-style: normal; color: var(--ink3); }
 .agt .llm i { color: #0064e0; }
 @media (max-width: 900px) { .agt { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------ the first screen fits the viewport (round 10)
+   Headline, copy, CTAs and the app preview share one screen; the preview takes what height is left and, when that is
+   less than the screenshot, fades out at the bottom (landing.js sets .cropped) instead of being cut by the fold. */
+.hero { padding: clamp(18px, 4.2vh, 44px) 0 72px; }
+.hero-fold { display: flex; flex-direction: column; height: calc(100svh - 64px - clamp(18px, 4.2vh, 44px) - 14px); min-height: 460px; }
+.hero-top { flex: none; }
+.lp .hero h1 { font-size: clamp(32px, min(5.2vw, 7.4vh), 68px); }
+.hero .lede { max-width: 700px; margin-top: clamp(10px, 2.2vh, 22px); font-size: clamp(15px, min(1.5vw, 2.3vh), 19px); }
+.hero .eyebrow { margin-bottom: clamp(10px, 2.2vh, 22px); }
+.hero-cta { margin-top: clamp(14px, 3vh, 30px); }
+.hero .stage { flex: 0 1 auto; min-height: 120px; margin-top: clamp(16px, 4vh, 52px); display: flex; flex-direction: column; }
+.hero .stage-media { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; overflow: hidden; }
+.hero .stage-media img { display: block; width: 100%; height: auto; }
+.hero .stage.cropped .stage-media { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+.hero .stage.cropped figcaption { border-top-color: transparent; }
+@media (max-width: 760px) {
+  .hero-fold { height: calc(100svh - 64px - 20px); min-height: 0; }
+  .hero .lede { font-size: 15px; line-height: 1.5; }
+}
+/* one mascot at a time: on the landing page the roaming bot only shows while it is out touring a section; resting, it
+   is out of sight and the hero's own bot is the one on screen */
+.lp .rb[data-mode="home"] { opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; }
