@@ -1283,7 +1283,13 @@ $("#optimizer-close").addEventListener("click", () => optimizerOpen(false));
 
 idleScene();
 setView("skills"); // the library is the first thing after the landing page
-meshesFor("so101"); // warm the arm's meshes so the first tile or the welcome loop draws at once
+// warm the arm's meshes and build their geometry in idle slices, so the first tile draws at once
+meshesFor("so101").then(async (m) => {
+  for (const k of Object.keys(m)) {
+    meshGeometry(`so101|${k}`, m[k]);
+    await new Promise((r) => setTimeout(r, 0));
+  }
+});
 
 // ---------------------------------------------------------------- live tab capture (?capture=1, demo recording)
 window.setSpeed = (on) => { $("#speed").classList.toggle("hidden", !on); };
