@@ -1,0 +1,6 @@
+_raw/
+_work/
+user/
+library/*/*
+!library/*/meta.json
+!library/env/provenance.json

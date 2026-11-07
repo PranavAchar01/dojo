@@ -1,0 +1,248 @@
+/* VLA Forge landing. Loads after style.css, so it uses the same tokens (Figtree, Meta blue,
+   Etch's workplane), the mascot and the existing keyframes (rise, draw, grow-x, bb-float, tt-now-dot).
+   Everything is scoped to body.lp so nothing leaks into the app shell. */
+body.lp { height: auto; overflow-x: hidden; overflow-y: auto; font-size: 16px; line-height: 1.55; scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+.lp .wrap { width: min(1120px, 100% - 40px); margin-inline: auto; }
+.lp a { color: inherit; text-decoration: none; }
+.lp :where(h1, h2, h3, p) { margin: 0; font-weight: 400; }
+.lp em { font-style: normal; color: var(--accent); font-weight: inherit; }
+
+/* ------------------------------------------------ reveal (only when JS is on, so no-JS still shows everything) */
+.js .rv { opacity: 0; translate: 0 14px; }
+.js .rv.in { opacity: 1; translate: 0 0; transition: opacity .7s var(--soft) var(--d, 0ms), translate .7s var(--soft) var(--d, 0ms); }
+
+/* ------------------------------------------------ buttons */
+.lp .cta { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; font-weight: 600; font-size: 15px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 6px 18px rgba(8, 102, 255, .28); transition: transform .25s var(--bounce), box-shadow .25s, background .2s; }
+.lp .cta svg { width: 17px; height: 17px; stroke-width: 2; transition: transform .25s var(--bounce); }
+.lp .cta:hover { transform: translateY(-1px); background: var(--accent-400); box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 10px 24px rgba(8, 102, 255, .34); }
+.lp .cta:hover svg { transform: translateX(3px); }
+.lp .cta:active { transform: scale(.97); }
+.lp .cta.big { height: 52px; padding: 0 26px; font-size: 16.5px; }
+.lp .cta.sm { height: 36px; padding: 0 14px; font-size: 14px; }
+.lp .cta.dark { background: var(--ink); color: #fff; box-shadow: none; }
+.lp .cta.dark:hover { background: #0057c2; box-shadow: none; }
+.lp .cta.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line2); }
+.lp .cta.ghost:hover { background: #fff; box-shadow: inset 0 0 0 1.5px var(--ink3); }
+
+/* ------------------------------------------------ nav */
+.nav { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid transparent; transition: border-color .25s; }
+.nav.scrolled { border-bottom-color: var(--line); }
+.nav-in { height: 64px; display: flex; align-items: center; gap: 28px; }
+.nav .brand { font-size: 16px; gap: 9px; }
+.nav .logo-tile { width: 30px; height: 30px; border-radius: 9px; }
+.nav-links { display: flex; gap: 26px; margin-left: auto; font-size: 14.5px; font-weight: 500; color: var(--ink2); }
+.nav-links a { padding: 6px 0; transition: color .2s; }
+.nav-links a:hover { color: var(--ink); }
+
+/* ------------------------------------------------ hero */
+.hero { position: relative; overflow: hidden; }
+.plane { position: absolute; inset: 0; z-index: -1; background:
+  linear-gradient(var(--plane-line) 1px, transparent 1px) 0 0 / 24px 24px,
+  linear-gradient(90deg, var(--plane-line) 1px, transparent 1px) 0 0 / 24px 24px,
+  linear-gradient(rgba(72, 152, 204, .13) 1px, transparent 1px) 0 0 / 120px 120px,
+  linear-gradient(90deg, rgba(72, 152, 204, .13) 1px, transparent 1px) 0 0 / 120px 120px, var(--plane-bg);
+  -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+.eyebrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; font-weight: 500; color: var(--ink2); margin-bottom: 22px; }
+.tag { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent-700); box-shadow: inset 0 0 0 1px var(--accent-200); }
+.lp h1 { font: 700 clamp(38px, 5.2vw, 68px)/1.04 var(--serif); letter-spacing: -.015em; color: var(--ink); text-wrap: balance; }
+.lede { margin-top: 22px; max-width: 620px; font-size: clamp(16.5px, 1.5vw, 19px); line-height: 1.55; color: var(--ink2); }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+
+
+.numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border-top: 1px solid var(--line2); }
+.numbers > div { padding: 18px 20px 0 0; }
+.numbers > div + div { padding-left: 20px; border-left: 1px solid var(--line); }
+.numbers dt { font-size: 13px; color: var(--ink3); font-weight: 500; order: 2; }
+.numbers dd { margin: 4px 0 0; font: 700 clamp(34px, 4.4vw, 52px)/1 var(--serif); color: var(--ink); }
+.numbers > div { display: flex; flex-direction: column; }
+.numbers .of { font: 500 14px/1 var(--ui); color: var(--ink3); }
+.fine { margin-top: 14px; font-size: 13px; color: var(--ink3); max-width: 760px; line-height: 1.5; }
+
+/* ------------------------------------------------ sections */
+.band { padding: 104px 0; }
+.band.tint { background: var(--plane-bg); border-block: 1px solid var(--line); }
+.kicker { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-700); margin-bottom: 14px; }
+.lp h2 { font: 700 clamp(30px, 4.2vw, 50px)/1.08 var(--serif); letter-spacing: -.01em; max-width: 820px; text-wrap: balance; }
+.sub { margin-top: 16px; max-width: 680px; font-size: 17px; color: var(--ink2); }
+
+/* pipeline */
+.pipe { list-style: none; margin: 48px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; counter-reset: s; }
+.pipe li { position: relative; background: #fff; border-radius: 18px; padding: 20px 20px 22px; box-shadow: var(--ring); transition: box-shadow .3s, transform .35s var(--bounce); }
+.pipe li:hover { box-shadow: var(--ring-up); transform: translateY(-3px); }
+.pipe .n { display: inline-block; font: 600 12px/1 var(--ui); color: var(--accent-700); background: var(--accent-bg); padding: 5px 8px; border-radius: 8px; margin-bottom: 14px; }
+.pipe h3 { font: 700 24px/1.1 var(--serif); margin-bottom: 8px; }
+.pipe p { font-size: 14.5px; line-height: 1.5; color: var(--ink2); }
+.pipe li::after { content: ""; position: absolute; left: 20px; right: 20px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+.js .pipe.in li::after { animation: grow-x .7s var(--soft) both; animation-delay: calc(var(--i) * 140ms + 200ms); }
+.js .pipe li { opacity: 0; translate: 0 14px; }
+.js .pipe.in li { opacity: 1; translate: 0 0; transition: opacity .6s var(--soft) calc(var(--i) * 90ms), translate .6s var(--soft) calc(var(--i) * 90ms), box-shadow .3s, transform .35s var(--bounce); }
+#how .fine { margin-top: 22px; }
+
+/* factory line */
+.prompt { margin: 40px 0 0; padding: 18px 22px; max-width: 820px; background: #fff; border-radius: 16px; box-shadow: var(--ring); font-size: 17px; line-height: 1.5; color: var(--ink); }
+.prompt .q { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink3); margin-bottom: 6px; }
+.chain { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 44px; padding-top: 46px; }
+.belt { position: absolute; left: 0; right: 0; top: 0; height: 20px; border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(90deg, #2b3238 0 14px, #343c43 14px 22px); background-size: 22px 100%; animation: belt 1.1s linear infinite; box-shadow: 0 -4px 0 -1px #1c2b33 inset; }
+@keyframes belt { to { background-position: 22px 0; } }
+.belt .blk { position: absolute; top: 4px; width: 12px; height: 12px; border-radius: 3px; animation: ride 9s linear infinite; }
+.belt .blk.r { background: #e5484d; } .belt .blk.y { background: #f3b62c; } .belt .blk.b { background: #3e63dd; }
+.belt .blk:nth-child(1) { animation-delay: 0s; } .belt .blk:nth-child(2) { animation-delay: -1.8s; } .belt .blk:nth-child(3) { animation-delay: -3.6s; }
+.belt .blk:nth-child(4) { animation-delay: -5.4s; } .belt .blk:nth-child(5) { animation-delay: -7.2s; }
+@keyframes ride { from { left: -20px; } to { left: 100%; } }
+.st { display: flex; flex-direction: column; position: relative; background: #fff; border-radius: 20px; padding: 20px 22px 22px; box-shadow: var(--ring); }
+.st::before { content: ""; position: absolute; left: 50%; top: -26px; width: 2px; height: 26px; background: var(--line2); }
+.st header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.st .idx { font: 600 13px/1 var(--ui); color: var(--ink3); }
+.kind { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+.kind.vla { background: var(--accent); color: var(--accent-ink); }
+.kind.script { background: var(--ink); color: #fff; }
+.st h3 { font: 700 26px/1.1 var(--serif); margin-bottom: 8px; }
+.st p { font-size: 14.5px; color: var(--ink2); line-height: 1.5; }
+.st > p:first-of-type { margin-bottom: 18px; }
+.meter { height: 8px; border-radius: 8px; background: var(--bg-elevated); margin: auto 0 10px; flex: none; overflow: hidden; }
+.meter b { display: block; height: 100%; width: var(--w, 0); background: var(--accent); border-radius: 8px; transform-origin: left; }
+.js .chain.in .meter b { animation: grow-x 1.1s var(--soft) .5s both; }
+.meter.off { background: repeating-linear-gradient(135deg, var(--line) 0 6px, #fff 6px 12px); }
+.st .res { font-size: 13.5px; color: var(--ink3); margin: 0; }
+.res b { color: var(--ink); font-size: 15px; font-weight: 700; margin-right: 2px; }
+
+/* skill tiles */
+.tiles { list-style: none; margin: 48px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.tile { background: #fff; border-radius: 22px; overflow: hidden; box-shadow: var(--ring); transition: box-shadow .3s, transform .4s var(--bounce); }
+.tile:hover { box-shadow: var(--ring-up); transform: translateY(-4px); }
+.tile img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; background: #efe9df; }
+.tb { padding: 16px 18px 18px; }
+.tb h3 { font: 600 16px/1.3 var(--ui); margin: 8px 0 10px; }
+.tb .res { font-size: 13.5px; color: var(--ink3); }
+.t1, .t2, .t3 { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--bg-elevated); color: var(--ink2); }
+.t2 { background: var(--accent-bg); color: var(--accent-700); } .t3 { background: var(--ink); color: #fff; }
+#skills .fine { margin-top: 22px; }
+
+/* robot parts */
+.lp-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 44px; }
+.pcol { background: #fff; border-radius: 22px; padding: 22px 24px 14px; box-shadow: var(--ring); }
+.pcol h3 { font: 700 24px/1.1 var(--serif); margin-bottom: 8px; }
+.pcol h3.gap { margin-top: 26px; }
+.pcol ul { list-style: none; margin: 0; padding: 0; }
+.pcol li { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.pcol li b { font-weight: 600; font-size: 15.5px; }
+.pcol li > span:not(.lic) { grid-column: 1; font-size: 13px; color: var(--ink3); }
+.pcol .lic { grid-column: 2; grid-row: 1 / 3; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); transition: background .2s, color .2s; }
+.pcol a.lic:hover { background: var(--ok); color: #fff; }
+.pcol .lic.same { background: var(--bg-elevated); color: var(--ink3); }
+#robots .fine { margin-top: 22px; }
+
+/* models */
+.models { margin-top: 44px; border-top: 1px solid var(--line2); }
+.mrow { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 26px 0; border-bottom: 1px solid var(--line); }
+.mrole { font: 700 22px/1.2 var(--serif); }
+.mlist { display: grid; gap: 10px; }
+.m { display: grid; grid-template-columns: 170px 1fr auto; gap: 16px; align-items: center; padding: 14px 18px; background: #fff; border-radius: 14px; box-shadow: var(--ring); }
+.m b { font-weight: 600; font-size: 15.5px; }
+.m span { font-size: 14px; color: var(--ink2); line-height: 1.45; }
+.status { font-style: normal; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+.status.live { background: var(--ok-soft); color: var(--ok); }
+.status.soon { background: transparent; color: var(--ink2); box-shadow: inset 0 0 0 1.5px var(--line2); }
+.m.soon { background: transparent; box-shadow: none; border: 1.5px dashed var(--line2); padding: 12.5px 16.5px; }
+
+/* closing */
+.closer { padding: 96px 0 104px; text-align: center; background: var(--plane-bg); border-top: 1px solid var(--line); position: relative; }
+.closer .wrap { display: flex; flex-direction: column; align-items: center; }
+.closer .mascot.lg { margin-bottom: 18px; }
+.closer h2 { max-width: 680px; }
+.closer .sub { margin-bottom: 30px; }
+.lp-foot { padding: 22px 0 28px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink3); }
+.lp-foot .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; }
+.fl { display: flex; gap: 18px; } .fl a:hover { color: var(--ink); }
+
+/* ------------------------------------------------ small screens */
+@media (max-width: 980px) {
+  .pipe { grid-template-columns: repeat(2, 1fr); }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .nav-links { display: none; }
+  .nav .cta { margin-left: auto; }
+}
+@media (max-width: 760px) {
+  .band { padding: 72px 0; }
+  .numbers { grid-template-columns: 1fr 1fr; }
+  .numbers > div { padding: 16px 12px 16px 0; border-bottom: 1px solid var(--line); }
+  .numbers > div + div { padding-left: 0; border-left: 0; }
+  .numbers > div:nth-child(even) { padding-left: 16px; border-left: 1px solid var(--line); }
+  .chain { grid-template-columns: 1fr; padding-top: 0; }
+  .belt { display: none; }
+  .st::before { display: none; }
+  .lp-parts { grid-template-columns: 1fr; }
+  .mrow { grid-template-columns: 1fr; gap: 12px; }
+  .m { grid-template-columns: 1fr auto; }
+  .m span { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 520px) {
+  .pipe { gap: 10px; }
+  .pipe li { padding: 16px 14px 18px; }
+  .pipe h3 { font-size: 21px; }
+  .pipe p { font-size: 13.5px; }
+  .tiles { gap: 10px; }
+  .tb { padding: 12px 12px 14px; }
+  .tb h3 { font-size: 14px; }
+  .tb .res { font-size: 12.5px; }
+  .lp .wrap { width: calc(100% - 32px); }
+  .hero-cta .cta { flex: 1 1 100%; justify-content: center; }
+  .lp-foot .wrap { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .js .rv, .js .pipe li { opacity: 1; translate: none; }
+  .js .pipe li::after { transform: none; animation: none !important; }
+  .js .meter b { animation: none !important; }
+  .belt, .belt .blk { animation: none; }
+  html, body.lp { scroll-behavior: auto; }
+}
+
+/* Fetch.ai agents section */
+.agt { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.agt li { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: var(--ring); display: flex; flex-direction: column; gap: 6px; }
+.agt li.llm { box-shadow: 0 0 0 1.5px #0866ff, 0 8px 24px rgba(8, 102, 255, .08); }
+.agt b { font: 700 18px var(--serif); }
+.agt span { font-size: 14px; line-height: 1.45; color: var(--ink2); flex: 1; }
+.agt i { font: 600 11.5px var(--ui); font-style: normal; color: var(--ink3); }
+.agt .llm i { color: #0064e0; }
+@media (max-width: 900px) { .agt { grid-template-columns: 1fr; } }
+
+.lp .hero h1 { font-size: clamp(32px, min(5.2vw, 7.4vh), 68px); }
+.hero .lede { max-width: 700px; margin-top: clamp(10px, 2.2vh, 22px); font-size: clamp(15px, min(1.5vw, 2.3vh), 19px); }
+.hero .eyebrow { margin-bottom: clamp(10px, 2.2vh, 22px); }
+.hero-cta { margin-top: clamp(14px, 3vh, 30px); }
+
+/* one mascot at a time: on the landing page the roaming bot only shows while it is out touring a section; resting, it
+   is out of sight and the hero's own bot is the one on screen */
+.lp .rb[data-mode="home"] { opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; }
+
+/* ------------------------------------------------ the first screen (Bara's rhythm: one plate, the robot working, one call)
+   Copy on the left, the recorded rollout on the right with no frame and no app chrome; the whole plate is one viewport
+   tall under the nav. The picture is a frame from a published model rollout (/api/skills/ID/thumb.png). */
+.hero { height: calc(100svh - 64px); min-height: 560px; max-height: 860px; display: flex; align-items: center; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); align-items: center; gap: clamp(16px, 3vw, 48px); height: 100%; }
+.hero-copy { max-width: 560px; }
+.lp .hero h1 { font-size: clamp(34px, min(4.6vw, 7.4vh), 64px); }
+.hero .lede { max-width: 500px; margin-top: clamp(10px, 2.2vh, 22px); font-size: clamp(15.5px, min(1.4vw, 2.3vh), 18px); }
+.hero .eyebrow { margin-bottom: clamp(10px, 2.2vh, 22px); }
+.hero-cta { margin-top: clamp(16px, 3.4vh, 32px); }
+.lp-robot { position: relative; margin: 0; align-self: center; min-width: 0; }
+.lp-robot-media { display: block; width: 100%; height: auto; max-height: calc(100svh - 64px - 72px); aspect-ratio: 880 / 690; object-fit: cover; margin-inline: auto;
+  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 72%, transparent 100%); }
+.lp-robot figcaption { position: absolute; left: 4%; bottom: 6px; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; color: var(--ink3); }
+.lp-robot figcaption span { font-size: 14px; font-weight: 600; color: var(--ink2); }
+.lp-robot figcaption i { font-style: normal; }
+.hero-mascot { position: absolute; right: 6%; bottom: 12%; width: 96px; height: 96px; animation: none; }
+.hero-mascot .mascot { width: 104px; }
+.proof { padding: 44px 0 40px; border-block: 1px solid var(--line); background: #fff; }
+@media (max-width: 900px) {
+  .hero { height: auto; max-height: none; min-height: 0; padding: 20px 0 8px; }
+  .hero-grid { grid-template-columns: 1fr; height: auto; gap: 4px; }
+  .hero-copy { max-width: none; }
+  .lp-robot { align-self: auto; }
+  .lp-robot-media { max-height: min(300px, 38svh); }
+  .hero-mascot { display: none; }
+  .lp .hero h1 { font-size: clamp(30px, 8.4vw, 44px); }
+  .hero .lede { font-size: 15px; line-height: 1.5; }
+}

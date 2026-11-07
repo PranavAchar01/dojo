@@ -1,0 +1,7 @@
+hook	hook	This is VLA Forge, with a new guide. The little robot greets you on the landing page and flies to each section to point things out.
+describe	explain	In the app, I type one task for an SO-101 and send it.
+agents	explain	Every step is a message between Fetch.ai uAgents. Fetch.ai is the multi-agent orchestration, and Llama powers the reasoning agents: task, critic and optimizer.
+roam	explain	Back on the canvas, the robot flies to the stage being worked on and points at it with its gripper.
+thinking	explain	Press T and the Thinking panel shows each agent's reasoning as it happens. I ask the dock what it is doing, and it answers from the live run.
+wait	explain	The wait is sped up four times, and the badge shows it. When training starts, the robot moves to the loss chart.
+close	close	That is the new forge: a guide that roams, a Thinking panel, and agents you can watch, all in simulation.

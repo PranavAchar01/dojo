@@ -1,0 +1,70 @@
+VLA Forge
+
+Third-party material and design credits.
+
+1. SO-101 robot model (vendor/so101)
+   From TheRobotStudio's SO-ARM100 repository, https://github.com/TheRobotStudio/SO-ARM100
+   Licensed under the Apache License 2.0. MJCF and STL meshes are used unmodified.
+
+2. Wood texture (web/assets/wood_diff.jpg, wood_rough.jpg)
+   "Wood Table 001" from Poly Haven, https://polyhaven.com, CC0.
+
+3. three.js (web/vendor/three)
+   https://threejs.org, MIT License.
+
+4. Interface design
+   The whole interface (shell, top bar, toolbar with segmented view tabs, side panels, prompt cards, composer,
+   stage cards and dock, workplane grid, CSS tokens and motion) is ported from Etch, the author's own earlier
+   project (deploy/etch-app at a0bb241d: editor.css, explore.css, new-board.css), with Etch's blue accent
+   swapped for this page's safety orange (#ff5a1f).
+   HeyPCB (https://heypcb.ai) was checked as a possible source and not used: its public repositories
+   (github.com/HeyPCB) hold hardware designs under CERN-OHL-S-2.0, an MIT-licensed MCP server and KiCad
+   boards, and no web interface code, so no HeyPCB code, name, logo or asset is in this project. HeyPCB is
+   not affiliated with this project.
+
+4a. Mascot
+   The bot (web/mascot.js, eyes.js, spring.js, goo.js) is the character from Etch, the author's own earlier project
+   (https://github.com/PranavAchar01/etch, deploy/etch-app at a0bb241d, live at https://etch-app-theta.vercel.app):
+   js/ui/eyes.js (the eyes rig: states, activities, emotes, springs, blink and glance timers, gaze maths),
+   js/ui/spring.js (spring physics), js/ui/goo.js (the gooey bubble) and the .ag-eyes rules of css/agent.css.
+   The logic is carried over unchanged. The edits are marked "Meta:" in eyes.js: Meta blues for the body, smart
+   glasses over the eyes and an infinity-loop antenna with a spring of its own. web/mascot.js plays the part of
+   Etch's dock (js/ui/dock.js): it maps the page's events to the bot's states, emotes and bubbles. The earlier
+   head-and-gripper bot drawn for this project was replaced by it.
+
+4b. Dock, trace and voice
+   web/dock.js, trace.js, dock.css and voice-adapter.js are carried over from Etch (js/ui/dock.js, js/ui/trace.js,
+   css/agent.css, js/ui/voice-adapter.js) with the edits listed in docs/etch-port.md. web/roam.js (the roaming body)
+   is new and uses Etch's spring.js.
+
+5. Fonts
+   Figtree and Averia Serif Libre (SIL Open Font License 1.1), loaded from Google Fonts, the same pair
+   Etch uses. No other typeface.
+
+6. Encoders
+   facebook/dinov2-small (Apache-2.0) and google/siglip2-base-patch16-224 (Apache-2.0), loaded from the
+   local Hugging Face cache.
+
+7. Robot parts for the builder (vendor/menagerie)
+   From MuJoCo Menagerie, https://github.com/google-deepmind/mujoco_menagerie, commit
+   98a70c569c4c1b6da467a20012f766ee1f8dc521, used unmodified, each folder with its upstream LICENSE:
+   trs_so_arm100 (Apache-2.0), low_cost_robot_arm (Apache-2.0), trossen_wx250s and trossen_vx300s
+   (BSD-3-Clause, Trossen Robotics), robotiq_2f85 (BSD-2-Clause, ROS-Industrial), franka_emika_panda hand.xml
+   (Apache-2.0). Full table in SOURCES.md.
+
+8. Factory line tote (vendor/robosuite)
+   bins_arena.xml from robosuite, https://github.com/ARISE-Initiative/robosuite, commit
+   5ce6643f3092639d08f7b0f90ed1c6a84f50552c, MIT License (Copyright (c) 2022 Stanford Vision and Learning Lab
+   and UT Robot Perception and Learning Lab), kept unmodified with its LICENSE; bin1's collision boxes are
+   scaled at run time (src/vla_forge/sim/line.py). The conveyor follows the construction given by MuJoCo's
+   maintainers in google-deepmind/mujoco issue #547. Details in SOURCES.md.
+
+9. Studio rendering (web/vendor/three)
+   three.js r170 examples (MIT License, Copyright 2010-2024 three.js authors): RoomEnvironment, EffectComposer,
+   RenderPass, GTAOPass, OutputPass, SMAAPass and their shaders. The robot meshes are unchanged (items 7 and 8);
+   web/studio.js only assigns black and white materials and builds the lab floor, which is procedural
+   (generated noise texture, no photograph or downloaded image).
+
+10. Fixtures for the harder skills (src/vla_forge/sim/props.py)
+   The kitting tray and the insertion socket are built in code from boxes: no downloaded mesh, no third-party
+   asset, nothing to license. The parts are the forge's own 3 cm cubes.

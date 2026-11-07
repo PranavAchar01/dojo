@@ -1,0 +1,98 @@
+{
+ "version": 1,
+ "models": [
+  {
+   "id": "cassette_body",
+   "name": "Portable Cassette Player (body)",
+   "category": "product",
+   "kind": "static",
+   "description": "Cassette player body with its tape well",
+   "tags": [
+    "body",
+    "cassette",
+    "product",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/portable_cassette_player",
+    "upstream": "portable_cassette_player#portable_cassette_player",
+    "author": "Mateusz Sadek",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0971,
+    0.0373,
+    0.1303
+   ],
+   "mass_kg": null,
+   "faces": 10483,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "cassette_tape",
+   "name": "Portable Cassette Player (cassette)",
+   "category": "product",
+   "kind": "dynamic",
+   "description": "Compact cassette tape",
+   "tags": [
+    "cassette",
+    "dynamic",
+    "product",
+    "tape"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/portable_cassette_player",
+    "upstream": "portable_cassette_player#portable_cassette_player_casette",
+    "author": "Mateusz Sadek",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0617,
+    0.0117,
+    0.0986
+   ],
+   "mass_kg": 0.036,
+   "faces": 2296,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "cassette_lid",
+   "name": "Portable Cassette Player (lid)",
+   "category": "product",
+   "kind": "dynamic",
+   "description": "Cassette player lid",
+   "tags": [
+    "cassette",
+    "dynamic",
+    "lid",
+    "product"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/portable_cassette_player",
+    "upstream": "portable_cassette_player#portable_cassette_player_lid",
+    "author": "Mateusz Sadek",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0706,
+    0.0107,
+    0.1038
+   ],
+   "mass_kg": 0.01,
+   "faces": 528,
+   "hulls": 7,
+   "collision": "coacd"
+  }
+ ]
+}

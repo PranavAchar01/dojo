@@ -1,0 +1,88 @@
+/* How it works: the nine steps as a workflow graph; each node has a live caption and a popover with the full slot. */
+#view-agents:not(.hidden) { display: flex; flex-direction: column; overflow: auto; }
+.wfg { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; min-height: max(560px, 100%); box-sizing: border-box; padding: 8px clamp(18px, 3vw, 56px) 32px; }
+.wf-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 6px 0 14px; }
+.wf-h h2 { margin: 0; font-size: clamp(22px, 1.9vw, 32px); color: var(--ink); font-weight: 650; }
+.wf-h p { margin: 0; color: var(--ink3); font-size: clamp(13.5px, 1.05vw, 17px); flex: 1 1 280px; }
+.wf-tag { font-size: 11.5px; font-weight: 600; color: var(--ink3); background: var(--stage); border-radius: 99px; padding: 3px 10px; }
+.wf-tag.on { color: var(--accent-700); background: var(--accent-bg); }
+.wf-canvas { position: relative; flex: 1 0 auto; display: grid; gap: clamp(34px, 4vh, 64px) clamp(38px, 3.4vw, 72px); padding: 6px 46px 10px 2px; }
+.wf-canvas.wide { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(min-content, 1fr)); grid-template-areas: "n0 n1 n2 n3 n4" "v w n8 n6 n5" "v q . . ."; }
+.wf-canvas.narrow { grid-template-columns: 1fr 1fr; gap: 30px 14px; padding-right: 50px; grid-template-areas: "n0 n0" "n1 n1" "n2 n2" "n3 n3" "n4 n4" "n5 n5" "n6 n6" "n8 n8" "w q" "v v"; }
+.wf-edges { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.wf-e { fill: none; stroke: var(--line2); stroke-width: 2; stroke-linecap: round; }
+.wf-e.opt { stroke-dasharray: 5 6; }
+.wf-e.retry { stroke-dasharray: 2 6; }
+.wf-e.done { stroke: var(--ok); }
+.wf-e.flow { stroke: var(--accent); stroke-dasharray: 7 7; }
+.running .wf-e.flow { animation: wf-dash .9s linear infinite; }
+.wf-ah { fill: var(--line2); }
+.wf-ah.done { fill: var(--ok); }
+.wf-ah.flow { fill: var(--accent); }
+.wf-el { font-size: 11px; font-weight: 650; fill: var(--ink3); paint-order: stroke; stroke: var(--bg, #fff); stroke-width: 4px; }
+.wn { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; font: inherit; color: inherit; cursor: pointer; padding: clamp(10px, 1.3vw, 22px) clamp(12px, 1.3vw, 22px); min-width: 0; background: var(--card); border: 0; border-radius: var(--r); box-shadow: var(--ring); transition: box-shadow .25s var(--soft), background .25s, transform .15s; }
+.wn:hover { transform: translateY(-1px); }
+.wn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wn.sel { box-shadow: 0 0 0 1.5px var(--ink3); }
+.wn[data-n=v] { align-self: center; }
+.wn.live { background: var(--accent-50); box-shadow: 0 0 0 1.5px var(--accent), 0 4px 18px var(--accent-glow); }
+.wn.skip { opacity: .5; }
+.wn.opt { border-radius: var(--r); box-shadow: 0 0 0 1.5px var(--line2); }
+.wn.opt.live { box-shadow: 0 0 0 1.5px var(--accent), 0 4px 18px var(--accent-glow); }
+.wn-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wn-top b { font-size: clamp(13.5px, 1.2vw, 20px); color: var(--ink); font-weight: 650; line-height: 1.2; }
+.wn-lgs { display: flex; gap: 3px; flex: none; }
+.wf-lg { display: grid; place-items: center; width: clamp(24px, 2vw, 34px); height: clamp(24px, 2vw, 34px); border-radius: 7px; background: var(--stage); color: var(--ink2); }
+.wf-lg svg { width: 62%; height: 62%; display: block; }
+.wf-lg.wide { width: clamp(46px, 4vw, 68px); background: none; }
+.wf-lg.wide svg { width: 100%; height: auto; }
+.wf-lg.dojo { background: none; width: clamp(30px, 2.6vw, 44px); }
+.wf-lg.dojo .mascot, .wf-lg.dojo > * { width: 100%; line-height: 0; }
+.wf-lg.dojo svg { width: 100%; height: auto; }
+.wn-tool { font-size: clamp(11px, .95vw, 15px); color: var(--accent-700); background: var(--accent-bg); border-radius: 6px; padding: 1px 6px; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wn-cap { font-size: clamp(11px, .95vw, 15px); line-height: 1.35; color: var(--ink3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; word-break: break-word; }
+.wn.live .wn-cap { color: var(--ink2); }
+.wn-ok { position: absolute; right: -7px; top: -7px; width: 20px; height: 20px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; box-shadow: 0 0 0 2px var(--card); }
+.wn-ok svg { width: 11px; height: 11px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wn-live { position: absolute; right: -4px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); animation: wf-pulse 1.6s ease-in-out infinite; }
+.wf-pop { position: absolute; z-index: 5; box-sizing: border-box; padding: 12px 14px 12px; background: var(--card); border-radius: var(--r); box-shadow: var(--ring), 0 12px 32px rgba(0,0,0,.18); }
+.wf-pop p { margin: 4px 0 8px; font-size: 12.5px; color: var(--ink2); line-height: 1.4; }
+.wf-pt { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; padding-right: 22px; }
+.wf-pt b { font-size: 14.5px; color: var(--ink); font-weight: 650; }
+.wf-tool { font-size: 11.5px; color: var(--accent-700); background: var(--accent-bg); border-radius: 6px; padding: 1px 7px; }
+.wf-x { position: absolute; right: 8px; top: 6px; border: 0; background: none; font-size: 18px; line-height: 1; color: var(--ink3); cursor: pointer; padding: 2px 6px; }
+.wf-slot { font-size: 12px; color: var(--ink2); min-width: 0; align-self: center; font-variant-numeric: tabular-nums; }
+.wf-slot q { display: block; quotes: none; font-size: 13px; color: var(--ink); font-weight: 560; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.wf-none { color: var(--ink3); }
+.wf-l { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 2px 0; }
+.wf-l b { color: var(--ink); font-weight: 650; }
+.wf-l span, .wf-l em { color: var(--ink3); font-style: normal; }
+.wf-l.bad b, .wf-l.bad span { color: var(--bad); }
+.wf-big { font-size: 13px; color: var(--ink2); }
+.wf-big b { font-size: 20px; color: var(--ink); font-weight: 700; }
+.wf-big em { font-style: normal; font-weight: 650; color: var(--ok); margin-left: 6px; }
+.wf-note { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+.wf-note:empty { display: none; }
+.wf-tally { display: flex; gap: 12px; font-size: 12px; color: var(--ink3); padding: 2px 0; }
+.wf-tally b { color: var(--ink); font-weight: 700; }
+.wf-tally .m b { color: var(--accent-600); }
+.wf-sp { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--accent-200); border-top-color: var(--accent); animation: wf-spin .8s linear infinite; flex: none; }
+@keyframes wf-spin { to { transform: rotate(360deg); } }
+@keyframes wf-dash { to { stroke-dashoffset: -14; } }
+@keyframes wf-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); } 50% { box-shadow: 0 0 0 6px transparent; } }
+@media (prefers-reduced-motion: reduce) { .wn-live, .wf-sp, .running .wf-e.flow { animation: none; } }
+/* Wide screens: each card fills itself. Logo on top, then title, tool and caption, sized to the window (cards are 1/5 wide, 1/3 tall). */
+.wf-canvas.wide .wn > * { flex: none; }
+.wf-canvas.wide .wn { justify-content: center; gap: max(4px, min(.7vw, 1.1vh)); }
+.wf-canvas.wide .wn-top { flex-direction: row; align-items: center; gap: max(6px, min(.9vw, 1.4vh)); }
+.wf-canvas.wide .wn-top b { font-size: max(14px, min(1.35vw, 2.4vh)); }
+.wf-canvas.wide .wn-lgs { gap: max(3px, min(.5vw, .8vh)); }
+.wf-canvas.wide .wf-lg { width: max(24px, min(2.5vw, 4.2vh)); height: max(24px, min(2.5vw, 4.2vh)); border-radius: 22%; }
+.wf-canvas.wide .wf-lg.wide { width: max(46px, min(5.4vw, 9vh)); background: none; }
+.wf-canvas.wide .wf-lg.dojo { width: max(30px, min(3vw, 5vh)); height: auto; }
+.wf-canvas.wide .wn-tool { font-size: max(11px, min(1.05vw, 1.8vh)); padding: .15em .5em; white-space: normal; }
+.wf-canvas.wide .wn-cap { font-size: max(11px, min(1vw, 1.7vh)); }
+.wn-desc { font-size: 12px; line-height: 1.45; color: var(--ink2); }
+.wf-canvas.wide .wn-desc { font-size: max(11.5px, min(.92vw, 1.55vh)); }
+.wf-canvas.narrow .wn-desc { font-size: 12.5px; }
+.wf-canvas.wide .wn-cap { color: var(--accent-700); font-weight: 600; min-height: 0; }

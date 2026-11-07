@@ -1,0 +1,156 @@
+/* Skill library, router card, progress card and the saved moment. Tokens only (style.css :root).
+   Toolbar, chips and cards follow Etch Explore: round search, black-selected chips, white 22px cards. */
+
+/* ---------------------------------------------------------------- toolbar */
+.lib-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; }
+.lib-bar input[type="search"] { flex: 0 1 300px; min-width: 0; height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: var(--card); box-shadow: 0 0 0 1px var(--line) inset; font: 500 15px var(--ui); color: var(--ink); outline: none; transition: box-shadow .25s; }
+.lib-bar input[type="search"]:focus { box-shadow: 0 0 0 1.5px var(--accent) inset, 0 4px 14px var(--accent-glow); }
+.lib-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.lib-filter button { display: inline-flex; align-items: center; height: 38px; padding: 0 15px; border: 0; border-radius: 19px; background: transparent; box-shadow: 0 0 0 1px var(--line) inset; font-weight: 600; font-size: 14px; color: var(--ink2); white-space: nowrap; transition: color .25s, background-color .25s, box-shadow .25s, transform .45s var(--liquid); }
+.lib-filter button:hover:not(.on) { color: var(--ink); box-shadow: 0 0 0 1px #c3d2df inset; }
+.lib-filter button:active { transform: scale(.92, .88); transition-duration: .1s; }
+.lib-filter button.on { background: var(--ink); color: #fff; box-shadow: none; }
+.lib-bar select { height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: #e9eef3; font: 600 14px var(--ui); color: var(--ink2); }
+#lib-new { margin-left: auto; height: 44px; padding: 0 20px; border-radius: 999px; border: 0; font-size: 15px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 16px rgba(8, 102, 255, .28); transition: transform .45s var(--liquid), box-shadow .25s, background-color .2s; }
+#lib-new:hover { background: var(--accent-400); transform: translateY(-2px); }
+#lib-new svg { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.lib-count { font-size: 14px; color: var(--ink2); margin: 0 0 18px; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 1fr)); gap: 20px; }
+.tile { position: relative; background: #fff; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--ring); transition: box-shadow .35s var(--soft); }
+.tile:hover { box-shadow: var(--ring-up); }
+.tile-thumb { position: relative; aspect-ratio: 4 / 3; margin: 10px 10px 0; border-radius: 14px; background: var(--stage); overflow: hidden; }
+.tile-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.no-thumb { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; font-size: 12px; color: var(--text-dim); background: repeating-linear-gradient(135deg, transparent 0 8px, var(--bg-hover) 8px 9px); }
+.tile-tier, .tile-robot { position: absolute; top: 8px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #fff; color: var(--ink2); box-shadow: 0 1px 2px rgba(16, 24, 32, .08); }
+.tile-tier { left: 8px; }
+.tile-robot { right: 8px; letter-spacing: 0.3px; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-robot.custom { color: var(--accent-700); background: var(--accent-bg); }
+.tile.tap { cursor: pointer; }
+.tile.tap:hover { box-shadow: var(--ring), 0 10px 28px rgba(16, 24, 32, .1); }
+.tile.tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tile-testing { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; padding: 4px 8px; border-radius: 8px; background: var(--bg); color: var(--live); border: 1px solid var(--border); }
+.tile-body { padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.tile-name { font-weight: 600; font-size: 17px; line-height: 1.35; color: #141414; cursor: text; }
+.tile-rename { font: inherit; font-weight: 500; font-size: 13.5px; border: 1px solid var(--border-strong); border-radius: 7px; padding: 2px 6px; outline: none; }
+.tile-ins { font-size: 14px; color: #6b6b70; margin-top: -4px; }
+.tile-arms { list-style: none; padding-left: 0; display: grid; gap: 6px; }
+.tile-arms li b { color: var(--ink2); font-weight: 600; }
+.tile-arms .arm-facts { display: block; color: var(--text-muted); font-size: 11px; }
+.tile-chain { font-size: 12px; color: var(--text-muted); margin: 0; padding-left: 18px; }
+.tile-rate { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-dim); }
+.tile-rate b { font-size: 13px; color: var(--text); font-weight: 500; min-width: 34px; }
+.rate-bar { flex: 1; height: 4px; border-radius: 4px; background: var(--bg-elevated); overflow: hidden; }
+.rate-bar i { display: block; height: 100%; background: var(--ok); border-radius: 4px; }
+.tile-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: #6b6b70; }
+.tile-meta span + span::before { content: "·"; margin-right: 10px; color: var(--text-dim); }
+.tile-tests { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tile-tests .lbl { margin-right: 4px; }
+.tdot { font: 600 11px/1 var(--ui); padding: 3px 5px; border-radius: 5px; }
+.tdot.ok { background: var(--ok-soft); color: var(--ok); }
+.tdot.bad { background: var(--bad-soft); color: var(--bad); }
+.tile-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 4px; }
+.tile-acts button { height: 32px; padding: 0 13px; border-radius: 999px; border: 0; background: #f1f1f1; color: #141414; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .15s, color .15s, transform .45s var(--liquid); }
+.tile-acts button:hover:not(:disabled) { background: var(--ink); color: #fff; }
+.tile-acts button:active:not(:disabled) { transform: scale(.94); }
+.tile-acts button:disabled { color: var(--live); cursor: default; }
+.tile-acts button.ghost { background: transparent; color: var(--ink3); margin-left: auto; }
+.tile-reply { font-size: 11.5px; color: var(--text-muted); }
+.tile-reply:empty { display: none; }
+
+/* skeletons: the page loading, and the skill being made right now */
+.tile.is-loading .tile-thumb { border-bottom-color: transparent; }
+.shimmer, .sk-line { background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-hover) 40%, var(--bg-elevated) 80%); background-size: 240% 100%; animation: lib-shimmer 1.3s ease-in-out infinite; }
+.shimmer { position: absolute; inset: 0; }
+.sk-line { height: 10px; border-radius: 5px; }
+.sk-line.w70 { width: 70%; } .sk-line.w55 { width: 55%; } .sk-line.w40 { width: 40%; }
+@keyframes lib-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.tile.is-loading.run { box-shadow: 0 0 0 1.5px var(--accent-200), var(--ring); }
+.tile.is-loading.run .tile-name { color: var(--text-muted); }
+.sk-phase { font-size: 12px; color: var(--live); }
+
+/* the saved moment */
+.tile.is-saved { box-shadow: 0 0 0 2px var(--ok), 0 0 0 6px var(--ok-soft); animation: lib-pop .5s var(--bounce); }
+@keyframes lib-pop { 0% { transform: scale(0.96); opacity: 0.4; } 100% { transform: none; opacity: 1; } }
+
+/* ---------------------------------------------------------------- shared progress bar */
+.pc-bar { height: 4px; border-radius: 4px; background: var(--bg-elevated); overflow: hidden; }
+.pc-bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--live); transition: width 0.3s ease; }
+.is-loading .pc-bar i { background-image: linear-gradient(90deg, transparent 0 30%, rgb(255 255 255 / 0.45) 50%, transparent 70%); background-size: 200% 100%; animation: lib-sweep 1.1s linear infinite; background-color: var(--live); }
+@keyframes lib-sweep { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* ---------------------------------------------------------------- progress card in the chat */
+.progress-card { margin-top: 8px; padding: 11px 12px; border-radius: 14px; background: #fff; box-shadow: var(--ring); display: flex; flex-direction: column; gap: 7px; }
+.pc-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 3px; }
+.pc-steps li { flex: 1; font: 500 9.5px/1 var(--mono); letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-dim); padding-top: 6px; border-top: 2px solid var(--bg-elevated); }
+.pc-steps li.done { color: var(--text-muted); border-top-color: var(--ok); }
+.pc-steps li.live { color: var(--live); border-top-color: var(--live); }
+.pc-steps li.fail { color: var(--bad); border-top-color: var(--bad); }
+.pc-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.pc-label { color: var(--text); font-weight: 500; }
+.pc-detail { color: var(--text-dim); font-size: 11px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress-card.is-saved { border-color: var(--ok); background: var(--ok-soft); }
+.progress-card.is-saved .pc-bar i { background: var(--ok); }
+.progress-card.is-saved .pc-label { color: var(--ok); }
+.progress-card.is-saved .pc-label::before { content: "✓ "; }
+.progress-card.is-failed { border-color: var(--bad-soft); }
+.progress-card.is-failed .pc-bar i { background: var(--bad); }
+.progress-card.is-failed .pc-label { color: var(--bad); }
+
+/* ---------------------------------------------------------------- router card */
+.route-card { margin-top: 8px; padding: 11px 12px; border-radius: 14px; background: #fff; box-shadow: var(--ring); font-size: 12.5px; color: var(--prose); }
+.rc-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rc-h b { font-weight: 500; color: var(--text); font-size: 12.5px; }
+.rc-est { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+.route-card.d-train .rc-h b, .route-card.d-chain .rc-h b { color: var(--live); }
+.route-card.d-reuse .rc-h b { color: var(--ok); }
+.route-card.is-refused { border-color: var(--bad-soft); background: linear-gradient(var(--bad-soft), var(--bad-soft)) top / 100% 3px no-repeat, var(--bg); }
+.route-card.is-refused .rc-h b { color: var(--bad); }
+.rc-why { color: var(--text); }
+.rc-checks { list-style: none; margin: 7px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--text-muted); }
+.rc-checks li { display: flex; gap: 6px; align-items: baseline; }
+.rc-checks b { font: 500 10px/1 var(--mono); letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); flex: none; }
+.rc-checks .ck { flex: none; width: 12px; color: var(--ok); }
+.rc-checks li.bad .ck, .rc-checks li.bad { color: var(--bad); }
+.rc-note { margin-top: 6px; font-size: 11.5px; color: var(--text-muted); }
+.rc-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.rc-acts button { height: 28px; padding: 0 11px; border-radius: 999px; border: 0; background: #f1f1f1; cursor: pointer; font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-acts button:hover { background: var(--ink); color: #fff; }
+
+/* ---------------------------------------------------------------- composer mode chip */
+.composer-row .chip-mode { white-space: nowrap; flex: none; }
+.lib-mode { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; margin-right: 6px; font-size: 11.5px; padding: 2px 3px 2px 8px; border-radius: 8px; background: var(--bg-elevated); color: var(--text); max-width: 140px; min-width: 0; }
+.lib-mode span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-mode button { border: 0; background: transparent; width: 18px; height: 18px; border-radius: 5px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+.lib-mode button:hover { background: var(--bg-hover); color: var(--text); }
+
+/* ---------------------------------------------------------------- toast */
+.lib-toast { position: absolute; left: 50%; bottom: 24px; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--ink); color: #fff; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .25s, transform .3s var(--bounce); max-width: calc(100% - 32px); }
+.lib-toast.is-saved { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.lib-toast .tk { width: 22px; height: 22px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; flex: none; }
+.lib-toast .tk svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 2.2; }
+.lib-toast.is-saved .tk svg path { stroke-dasharray: 20; stroke-dashoffset: 20; animation: lib-check 0.45s 0.1s ease-out forwards; }
+@keyframes lib-check { to { stroke-dashoffset: 0; } }
+.lib-toast .tt { display: flex; flex-direction: column; min-width: 0; }
+.lib-toast .tt b { font-weight: 500; font-size: 13px; }
+.lib-toast .tt span { font-size: 11.5px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-toast button { height: 26px; padding: 0 10px; border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.25); background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
+
+@media (max-width: 640px) {
+  #lib-new { width: 100%; justify-content: center; margin-left: 0; }
+  .lib-bar input[type="search"] { flex: 1 1 100%; }
+  .tiles { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer, .sk-line, .is-loading .pc-bar i, .tile.is-saved { animation: none; }
+}
+
+/* Trained models | 3D models switch */
+.lib-face { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 999px; background: #e9eef3; }
+.lib-face button { flex: none; white-space: nowrap; width: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; font: 600 14px var(--ui); color: var(--ink2); transition: background-color .25s, color .25s; }
+.lib-face button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 32, .12); }
+#lib-3d[hidden], #lib-trained[hidden] { display: none; }
+
+/* the RSI-improved card leads the list */
+.tile-rsi { position: absolute; left: 8px; bottom: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 9px; border-radius: 999px; background: var(--accent-600, #0866ff); color: #fff; box-shadow: 0 1px 2px rgba(16, 24, 32, .18); }

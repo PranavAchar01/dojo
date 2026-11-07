@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>thumb</title>
+<style>html,body{margin:0;background:#e7e8ea}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": { "three": "/web/vendor/three/three.module.js", "three/addons/": "/web/vendor/three/addons/" } }
+</script>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+// Library thumbnails come out of the same stage as the Sim tab and the factory view (web/stage.js).
+import { createStage, loadModel, standOnFloor, frameBox } from "/web/stage.js";
+const W = 480, H = 360;
+const st = createStage(document.getElementById("c"), { width: W, height: H, preserve: true, fog: null, target: [0.2, 0, 0] });
+let current = null;
+window.shoot = async (url) => {
+  if (current) st.scene.remove(current);
+  const { holder, size } = standOnFloor(await loadModel(url));
+  current = holder; st.scene.add(holder);
+  frameBox(st, new st.THREE.Box3().setFromObject(holder), [0.62, -0.62, 0.5], 1.05);
+  st.render();
+  return { size: [size[0], size[2], size[1]] }; // y up in the file, as the card shows it
+};
+window.ready = true;
+</script>

@@ -1,0 +1,110 @@
+{
+ "budget": "standard 3 minute pipeline (DEADLINE 172 s), no longer budget used",
+ "skills": [
+  {
+   "skill_id": "185611-f8b0",
+   "skill": "kit",
+   "instruction": "put the red block in the front-left slot of the tray",
+   "tier": 2,
+   "rounds": [
+    "11/20",
+    "13/20"
+   ],
+   "held_out_success": "13/20",
+   "seconds": 177.5,
+   "budget_seconds": 172,
+   "init": "closest skill 'put the red block in the red bin' is a different motion: starting from the base policy",
+   "expert_success_dart_noise": "47-48/50 (94-96%)"
+  },
+  {
+   "skill_id": "185909-ce72",
+   "skill": "insert",
+   "instruction": "insert the red block into the socket",
+   "tier": 3,
+   "rounds": [
+    "7/20",
+    "13/20"
+   ],
+   "held_out_success": "13/20",
+   "seconds": 176.2,
+   "budget_seconds": 172,
+   "init": "closest skill 'put the red block in the front-left slot of the tray' is a different motion: starting from the base policy",
+   "expert_success_dart_noise": "46/50 (92%)"
+  },
+  {
+   "skill_id": "190206-1c08",
+   "skill": "rotate",
+   "instruction": "pick up the red block, rotate it and set it in the diamond socket",
+   "tier": 3,
+   "rounds": [
+    "13/20",
+    "13/20"
+   ],
+   "held_out_success": "13/20",
+   "seconds": 184.0,
+   "budget_seconds": 172,
+   "init": "closest skill 'insert the red block into the socket' is a different motion: starting from the base policy",
+   "expert_success_dart_noise": "47/50 (94%)"
+  },
+  {
+   "skill_id": "190511-3a8e",
+   "skill": "kit",
+   "instruction": "put the red block in the back-right slot of the tray",
+   "tier": 2,
+   "rounds": [
+    "14/20",
+    "17/20"
+   ],
+   "held_out_success": "17/20",
+   "seconds": 165.8,
+   "budget_seconds": 172,
+   "init": "fine-tuning from 'put the red block in the front-left slot of the tray' (similarity 1.14)",
+   "expert_success_dart_noise": "47-48/50 (94-96%)"
+  },
+  {
+   "skill_id": "190758-40c7",
+   "skill": "kit",
+   "instruction": "put the blue block in the front-right slot of the tray",
+   "tier": 2,
+   "rounds": [
+    "11/20",
+    "14/20"
+   ],
+   "held_out_success": "14/20",
+   "seconds": 172.8,
+   "budget_seconds": 172,
+   "init": "fine-tuning from 'put the red block in the front-left slot of the tray' (similarity 1.08)",
+   "expert_success_dart_noise": "47-48/50 (94-96%)"
+  },
+  {
+   "skill_id": "191052-f611",
+   "skill": "insert",
+   "instruction": "insert the green block into the socket",
+   "tier": 3,
+   "rounds": [
+    "10/20",
+    "12/20"
+   ],
+   "held_out_success": "12/20",
+   "seconds": 175.1,
+   "budget_seconds": 172,
+   "init": "fine-tuning from 'insert the red block into the socket' (similarity 1.08)",
+   "expert_success_dart_noise": "46/50 (92%)"
+  },
+  {
+   "skill_id": "191348-6791",
+   "skill": "rotate",
+   "instruction": "pick up the blue block, rotate it and set it in the diamond socket",
+   "tier": 3,
+   "rounds": [
+    "10/20",
+    "14/20"
+   ],
+   "held_out_success": "14/20",
+   "seconds": 180.7,
+   "budget_seconds": 172,
+   "init": "fine-tuning from 'pick up the red block, rotate it and set it in the diamond socket' (similarity 1.09)",
+   "expert_success_dart_noise": "47/50 (94%)"
+  }
+ ]
+}

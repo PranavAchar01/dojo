@@ -1,0 +1,87 @@
+{
+ "name": "Factory cell",
+ "floor": {
+  "specular": 0.3,
+  "shininess": 0.5,
+  "reflectance": 0.12
+ },
+ "lights": [],
+ "frame": {
+  "cells": 2,
+  "belt_items": [
+   {
+    "y": -0.5,
+    "yaw": 0,
+    "done": false
+   },
+   {
+    "y": -0.3,
+    "yaw": 0,
+    "done": false
+   },
+   {
+    "y": 0.3,
+    "yaw": 0,
+    "done": true
+   },
+   {
+    "y": 0.5,
+    "yaw": 0,
+    "done": true
+   },
+   {
+    "y": 0.7,
+    "yaw": 0,
+    "done": true
+   }
+  ],
+  "guard": {
+   "height": 0.28,
+   "panel": 0.3
+  }
+ },
+ "scenery": [
+  {
+   "id": "plastic_crate_b",
+   "pos": [
+    0.5,
+    0.32,
+    0.0
+   ],
+   "yaw": 20,
+   "scale": 0.3
+  },
+  {
+   "id": "euro_pallet",
+   "pos": [
+    1.6,
+    -0.9,
+    -0.75
+   ],
+   "yaw": 10
+  },
+  {
+   "id": "grey_tote",
+   "pos": [
+    1.6,
+    -0.9,
+    -0.61
+   ],
+   "yaw": 80
+  }
+ ],
+ "product": {
+  "scale": 0.38,
+  "yaw": 90,
+  "cassette_lift": [
+   0,
+   0,
+   0.12
+  ],
+  "lid_lift": [
+   0,
+   -0.06,
+   0
+  ]
+ }
+}

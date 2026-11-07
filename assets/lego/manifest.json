@@ -1,0 +1,66 @@
+{
+  "build": "Rule-generated brick bridge (src/vla_forge/hero_bricks.py). Every placement follows from the three rules (gap, pillar height, deck length); nothing is placed by eye. Parts are plain LDraw bricks.",
+  "library": "LDraw Parts Library, official complete.zip",
+  "library_url": "https://library.ldraw.org/library/updates/complete.zip",
+  "library_licence": "CC BY 4.0 (parts); the zip's CAlicense.txt text is Creative Commons Attribution 2.0",
+  "attribution": "LDraw is a trademark of the Estate of James Jessiman. Parts are from the LDraw Parts Library.",
+  "conversion": "src/vla_forge/hero_ldraw.py: sub-file recursion with BFC winding, LDU 0.4 mm, Y-down to Z-up, origin at the footprint bottom centre. Studs and underside tubes are kept in the visual mesh; physics uses boxes.",
+  "parts": {
+    "3003": {
+      "title": "Brick 2 x 2",
+      "source_url": "https://library.ldraw.org/library/official/parts/3003.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        2,
+        2
+      ],
+      "mesh": "meshes/3003.npz",
+      "vertices": 212,
+      "triangles": 316
+    },
+    "3001": {
+      "title": "Brick 2 x 4",
+      "source_url": "https://library.ldraw.org/library/official/parts/3001.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        4,
+        2
+      ],
+      "mesh": "meshes/3001.npz",
+      "vertices": 472,
+      "triangles": 700
+    },
+    "2456": {
+      "title": "Brick 2 x 6",
+      "source_url": "https://library.ldraw.org/library/official/parts/2456.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        6,
+        2
+      ],
+      "mesh": "meshes/2456.npz",
+      "vertices": 732,
+      "triangles": 1084
+    },
+    "3007": {
+      "title": "Brick 2 x 8",
+      "source_url": "https://library.ldraw.org/library/official/parts/3007.dat",
+      "author": "James Jessiman",
+      "licence": "CC BY 4.0 (Licensed under CC BY 4.0 : see CAreadme.txt)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "footprint_studs": [
+        8,
+        2
+      ],
+      "mesh": "meshes/3007.npz",
+      "vertices": 1070,
+      "triangles": 1540
+    }
+  }
+}

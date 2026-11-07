@@ -1,0 +1,41 @@
+[project]
+name = "vla-forge"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Pranav Achar", email = "achar.pranav@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "mujoco>=3.17.0",
+    "numpy>=2.5.4",
+    "openevolve>=0.4.1",
+    "openai>=3.46.0",
+    "pillow>=13.0.0",
+    "torch>=2.15.0",
+    "transformers>=5.22.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+vla-forge = "vla_forge:main"
+
+[build-system]
+requires = ["uv_build>=0.13.4,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+assets = [
+    "coacd>=1.0.14",
+    "fast-simplification>=0.2.0",
+    "httpx>=0.28.1",
+    "pycollada>=0.9.3",
+    "pygltflib>=1.16.5",
+    "python-multipart>=0.0.33",
+    "scipy>=1.18.1",
+    "trimesh>=5.2.0",
+]
+dev = [
+    "pytest>=9.2.0",
+]

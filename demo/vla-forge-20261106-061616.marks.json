@@ -1,0 +1,28 @@
+{
+ "speed": [
+  [
+   7.3195,
+   70.52989999997615
+  ],
+  [
+   96.99409999996423,
+   178.60809999996422
+  ]
+ ],
+ "prompts": [
+  {
+   "prompt": "touch the red block",
+   "start": 4.2225,
+   "published": 76.15,
+   "seconds": 71.928
+  },
+  {
+   "prompt": "sort the blue and green blocks into the bowls of the same color",
+   "start": 94.42939999997616,
+   "published": 217.69019999998807,
+   "seconds": 123.261
+  }
+ ],
+ "ladder": 241.72889999997616,
+ "end": 247.7315
+}

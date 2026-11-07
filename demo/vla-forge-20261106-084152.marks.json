@@ -1,0 +1,56 @@
+{
+ "speed": [
+  [
+   8.9555,
+   74.13019999998808
+  ],
+  [
+   158.50639999997617,
+   160.03230000001193
+  ]
+ ],
+ "prompts": [
+  {
+   "prompt": "touch the yellow block",
+   "start": 5.4805,
+   "published": 78.11280000001192,
+   "seconds": 72.633
+  },
+  {
+   "prompt": "put the blue block in the blue bowl and then put the green block in the green bowl",
+   "start": 91.75419999998807,
+   "published": 94.57410000002385,
+   "seconds": 2.821
+  },
+  {
+   "prompt": "lift the red block 60 cm up",
+   "start": 102.2585,
+   "published": 108.11969999998809,
+   "seconds": 5.862
+  },
+  {
+   "prompt": "pick up the red block",
+   "start": 146.36769999998808,
+   "published": 148.99089999997616,
+   "seconds": 2.624
+  }
+ ],
+ "at": {
+  "intro": 0.009399999976158141,
+  "simple": 4.0126999999880795,
+  "simple_done": 78.11319999998808,
+  "chain": 87.14539999997616,
+  "chain_done": 94.57439999997615,
+  "far": 100.57719999998808,
+  "library": 113.62310000002384,
+  "remix": 119.13480000001192,
+  "robot": 122.6585,
+  "wrist": 129.9751999999881,
+  "widowx": 134.79410000002383,
+  "refuse_robot": 144.9478000000119,
+  "custom": 155.99960000002383,
+  "custom_done": 160.0325,
+  "ladder": 167.04130000001192
+ },
+ "end": 173.04360000002384
+}
