@@ -1,0 +1,22 @@
+{
+ "floor": {
+  "id": "concrete_floor_02",
+  "kind": "pbr texture",
+  "name": "Concrete Floor 02",
+  "author": "Rob Tuytel",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "source_name": "Poly Haven",
+  "source_url": "https://polyhaven.com/a/concrete_floor_02"
+ },
+ "sky": {
+  "id": "machine_shop_02",
+  "kind": "hdri",
+  "name": "Machine Shop 02",
+  "author": "Sergej Majboroda",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "source_name": "Poly Haven",
+  "source_url": "https://polyhaven.com/a/machine_shop_02"
+ }
+}

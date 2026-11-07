@@ -1,0 +1,17 @@
+{
+ "size_m": [
+  0.4035,
+  0.3974,
+  0.0783
+ ],
+ "faces": 14430,
+ "hulls": 8,
+ "collision": "coacd",
+ "mass_kg": 14.634,
+ "settings": {
+  "kind": "dynamic",
+  "density": 1800,
+  "max_hulls": 8,
+  "friction": 0.8
+ }
+}

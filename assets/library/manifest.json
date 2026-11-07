@@ -1,0 +1,2517 @@
+{
+ "version": 1,
+ "models": [
+  {
+   "id": "cardboard_box",
+   "name": "Cardboard Box 01",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Cardboard shipping box",
+   "tags": [
+    "bin",
+    "box",
+    "cardboard",
+    "container",
+    "crate",
+    "dynamic",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/cardboard_box_01",
+    "upstream": "cardboard_box_01",
+    "author": "Rahul Chaudhary",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.387,
+    0.5159,
+    0.3418
+   ],
+   "mass_kg": 3.74,
+   "faces": 16952,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "grey_tote",
+   "name": "Grey tote",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Grey stackable plastic tote",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "grey",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Grey%20tote",
+    "upstream": "OpenRobotics/Grey tote",
+    "author": "Nate Koenig (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.6794,
+    0.4128,
+    0.3112
+   ],
+   "mass_kg": 9.749,
+   "faces": 4972,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "industrial_container",
+   "name": "Industrial Plastic Container",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Industrial plastic storage container",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "industrial",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/industrial_pastic_container",
+    "upstream": "industrial_pastic_container",
+    "author": "Galo Benivegna",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4572,
+    0.6315,
+    0.4188
+   ],
+   "mass_kg": 5.74,
+   "faces": 7118,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "large_crate",
+   "name": "Large Crate",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Large shipping crate",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "large",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Large%20Crate",
+    "upstream": "OpenRobotics/Large Crate",
+    "author": "OpenRobotics",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    1.0807,
+    0.5545,
+    0.4897
+   ],
+   "mass_kg": 39.138,
+   "faces": 4014,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "metal_trash_can",
+   "name": "Metal Trash Can",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Steel waste bin",
+   "tags": [
+    "bin",
+    "box",
+    "can",
+    "container",
+    "crate",
+    "dynamic",
+    "metal",
+    "tote",
+    "trash"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/metal_trash_can",
+    "upstream": "metal_trash_can",
+    "author": "GurJas Studios",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.778,
+    0.5563,
+    0.9062
+   ],
+   "mass_kg": 32.536,
+   "faces": 13960,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "military_crate",
+   "name": "Old Military Crate",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Steel-banded crate",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "military",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/old_military_crate",
+    "upstream": "old_military_crate",
+    "author": "Jack Mava",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.8154,
+    0.9757,
+    0.3009
+   ],
+   "mass_kg": 43.382,
+   "faces": 20952,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "picking_bin",
+   "name": "Picking_Bin",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Warehouse picking bin",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "picking",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Picking_Bin",
+    "upstream": "OpenRobotics/Picking_Bin",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.2667,
+    0.3,
+    0.6
+   ],
+   "mass_kg": 2.302,
+   "faces": 36,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "plastic_crate_a",
+   "name": "Plastic Crate 01",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Plastic stacking crate",
+   "tags": [
+    "a",
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "plastic",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/plastic_crate_01",
+    "upstream": "plastic_crate_01",
+    "author": "PierreB3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.298,
+    0.408,
+    0.2642
+   ],
+   "mass_kg": 1.016,
+   "faces": 18320,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "plastic_crate_b",
+   "name": "Plastic Crate 02",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Plastic crate with handles",
+   "tags": [
+    "b",
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "plastic",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/plastic_crate_02",
+    "upstream": "plastic_crate_02",
+    "author": "Fabi_G",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.5055,
+    0.4055,
+    0.2541
+   ],
+   "mass_kg": 1.972,
+   "faces": 5840,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "plastic_crate_c",
+   "name": "Plastic Crate 03",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Industrial plastic crate",
+   "tags": [
+    "bin",
+    "box",
+    "c",
+    "container",
+    "crate",
+    "dynamic",
+    "plastic",
+    "tote"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/plastic_crate_03",
+    "upstream": "plastic_crate_03",
+    "author": "Pacific Penguin",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4811,
+    0.265,
+    0.2659
+   ],
+   "mass_kg": 1.711,
+   "faces": 21740,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "wooden_crate",
+   "name": "Wooden Crate 01",
+   "category": "container",
+   "kind": "dynamic",
+   "description": "Wooden shipping crate",
+   "tags": [
+    "bin",
+    "box",
+    "container",
+    "crate",
+    "dynamic",
+    "tote",
+    "wooden"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/wooden_crate_01",
+    "upstream": "wooden_crate_01",
+    "author": "James Ray Cock",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.8253,
+    0.409,
+    0.3496
+   ],
+   "mass_kg": 22.895,
+   "faces": 6576,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "conveyor_module",
+   "name": "conveyor_block",
+   "category": "conveyor",
+   "kind": "static",
+   "description": "Roller-belt conveyor module, steel frame and black belt",
+   "tags": [
+    "belt",
+    "conveyor",
+    "line",
+    "module",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/Open-RMF/fuel/models/conveyor_block",
+    "upstream": "Open-RMF/conveyor_block",
+    "author": "Cole Biesemeyer (Open-RMF on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.5,
+    0.502,
+    0.504
+   ],
+   "mass_kg": null,
+   "faces": 2292,
+   "hulls": 14,
+   "collision": "hull-fallback"
+  },
+  {
+   "id": "forklift",
+   "name": "Forklift",
+   "category": "handling",
+   "kind": "static",
+   "description": "Warehouse forklift",
+   "tags": [
+    "forklift",
+    "handling",
+    "logistics",
+    "static",
+    "vehicle"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Forklift",
+    "upstream": "OpenRobotics/Forklift",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    1.1353,
+    2.1459,
+    3.1686
+   ],
+   "mass_kg": null,
+   "faces": 15492,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "hand_truck",
+   "name": "Hand Truck",
+   "category": "handling",
+   "kind": "dynamic",
+   "description": "Two-wheel hand truck",
+   "tags": [
+    "dynamic",
+    "hand",
+    "handling",
+    "logistics",
+    "truck",
+    "vehicle"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/hand_truck",
+    "upstream": "hand_truck",
+    "author": "Mutanzom3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.5933,
+    0.6925,
+    1.4025
+   ],
+   "mass_kg": 5.589,
+   "faces": 13220,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "pallet_jack",
+   "name": "Pallet_Jack",
+   "category": "handling",
+   "kind": "static",
+   "description": "Manual pallet jack",
+   "tags": [
+    "handling",
+    "jack",
+    "logistics",
+    "pallet",
+    "static",
+    "vehicle"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Pallet_Jack",
+    "upstream": "OpenRobotics/Pallet_Jack",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.5371,
+    1.1878,
+    1.3037
+   ],
+   "mass_kg": null,
+   "faces": 3839,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "caged_hanging_light",
+   "name": "Caged Hanging Light",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Caged hanging work light",
+   "tags": [
+    "caged",
+    "fixture",
+    "hanging",
+    "lamp",
+    "light",
+    "lighting",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/caged_hanging_light",
+    "upstream": "caged_hanging_light",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.1618,
+    0.3149,
+    0.7501
+   ],
+   "mass_kg": null,
+   "faces": 22893,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "caged_sconce",
+   "name": "Industrial Caged Sconce",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Caged wall light",
+   "tags": [
+    "caged",
+    "fixture",
+    "lamp",
+    "light",
+    "lighting",
+    "sconce",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/industrial_caged_sconce",
+    "upstream": "industrial_caged_sconce",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.2102,
+    0.3894,
+    0.9128
+   ],
+   "mass_kg": null,
+   "faces": 26576,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "fluorescent_light",
+   "name": "Mounted Fluorescent Lights",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Mounted fluorescent tube fixture",
+   "tags": [
+    "fixture",
+    "fluorescent",
+    "lamp",
+    "light",
+    "lighting",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/mounted_fluorescent_lights",
+    "upstream": "mounted_fluorescent_lights",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.9122,
+    0.6454,
+    0.0354
+   ],
+   "mass_kg": null,
+   "faces": 17820,
+   "hulls": 7,
+   "collision": "coacd"
+  },
+  {
+   "id": "hanging_industrial_lamp",
+   "name": "Hanging Industrial Lamp",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Hanging industrial lamp",
+   "tags": [
+    "fixture",
+    "hanging",
+    "industrial",
+    "lamp",
+    "light",
+    "lighting",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/hanging_industrial_lamp",
+    "upstream": "hanging_industrial_lamp",
+    "author": "Kuutti Siitonen",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.5496,
+    0.5496,
+    1.3554
+   ],
+   "mass_kg": null,
+   "faces": 9530,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "security_light",
+   "name": "Security Light",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Wall security floodlight",
+   "tags": [
+    "fixture",
+    "lamp",
+    "light",
+    "lighting",
+    "security",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/security_light",
+    "upstream": "security_light",
+    "author": "Maximilian Schuster",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3231,
+    0.4172,
+    0.531
+   ],
+   "mass_kg": null,
+   "faces": 4668,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "tube_light",
+   "name": "Tube Light",
+   "category": "lighting",
+   "kind": "static",
+   "description": "Tube light fixture",
+   "tags": [
+    "fixture",
+    "lamp",
+    "light",
+    "lighting",
+    "static",
+    "tube"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Tube%20Light",
+    "upstream": "OpenRobotics/Tube Light",
+    "author": "Ian Chen (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.1928,
+    1.8893,
+    0.0735
+   ],
+   "mass_kg": null,
+   "faces": 1896,
+   "hulls": 1,
+   "collision": "coacd"
+  },
+  {
+   "id": "bench_vice",
+   "name": "Bench Vice 01",
+   "category": "machine",
+   "kind": "static",
+   "description": "Bench vice",
+   "tags": [
+    "bench",
+    "machine",
+    "static",
+    "tool",
+    "vice"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/bench_vice_01",
+    "upstream": "bench_vice_01",
+    "author": "Yann Kervran, Antanas Kep",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.2005,
+    0.3957,
+    0.2851
+   ],
+   "mass_kg": null,
+   "faces": 2864,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "drill_press",
+   "name": "Drill Press 01",
+   "category": "machine",
+   "kind": "static",
+   "description": "Bench drill press",
+   "tags": [
+    "drill",
+    "machine",
+    "press",
+    "static",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/drill_press_01",
+    "upstream": "drill_press_01",
+    "author": "Viktor",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3543,
+    0.5988,
+    0.9011
+   ],
+   "mass_kg": null,
+   "faces": 58526,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "generator",
+   "name": "Generator",
+   "category": "machine",
+   "kind": "static",
+   "description": "Portable generator",
+   "tags": [
+    "generator",
+    "machine",
+    "static",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Generator",
+    "upstream": "OpenRobotics/Generator",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.46,
+    0.3059,
+    1.1201
+   ],
+   "mass_kg": null,
+   "faces": 12065,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "overhead_crane",
+   "name": "Overhead Crane",
+   "category": "machine",
+   "kind": "static",
+   "description": "Overhead hoist crane",
+   "tags": [
+    "crane",
+    "machine",
+    "overhead",
+    "static",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/overhead_crane",
+    "upstream": "overhead_crane",
+    "author": "Timothy3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    12.4917,
+    4.0,
+    5.1326
+   ],
+   "mass_kg": null,
+   "faces": 89964,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "pump",
+   "name": "Pump",
+   "category": "machine",
+   "kind": "static",
+   "description": "Industrial pump",
+   "tags": [
+    "machine",
+    "pump",
+    "static",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Pump",
+    "upstream": "OpenRobotics/Pump",
+    "author": "Ian Chen (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.4831,
+    1.4901,
+    0.6817
+   ],
+   "mass_kg": null,
+   "faces": 1868,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "euro_pallet",
+   "name": "Euro pallet",
+   "category": "pallet",
+   "kind": "dynamic",
+   "description": "EUR/EPAL wooden pallet, 1200 x 800 mm",
+   "tags": [
+    "dynamic",
+    "euro",
+    "logistics",
+    "pallet"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Euro%20pallet",
+    "upstream": "OpenRobotics/Euro pallet",
+    "author": "G\u00e9rald Lelong (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.795,
+    1.2,
+    0.144
+   ],
+   "mass_kg": 15.148,
+   "faces": 260,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "pallet_standard",
+   "name": "Pallet_Standard",
+   "category": "pallet",
+   "kind": "dynamic",
+   "description": "Standard wooden shipping pallet",
+   "tags": [
+    "dynamic",
+    "logistics",
+    "pallet",
+    "standard"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Pallet_Standard",
+    "upstream": "OpenRobotics/Pallet_Standard",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    1.2,
+    0.145,
+    1.0
+   ],
+   "mass_kg": 20.833,
+   "faces": 276,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "cable_spool",
+   "name": "Cable_Spool",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Cable drum",
+   "tags": [
+    "cable",
+    "component",
+    "dynamic",
+    "part",
+    "spool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Cable_Spool",
+    "upstream": "OpenRobotics/Cable_Spool",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    1.0,
+    0.6,
+    0.9848
+   ],
+   "mass_kg": 131.557,
+   "faces": 1116,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "circuit_board",
+   "name": "Circuit Board",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Computer circuit board",
+   "tags": [
+    "board",
+    "circuit",
+    "component",
+    "dynamic",
+    "part"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/circuit_board",
+    "upstream": "circuit_board",
+    "author": "Benny Weimer",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4035,
+    0.3974,
+    0.0783
+   ],
+   "mass_kg": 14.634,
+   "faces": 14430,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "gasket_part",
+   "name": "Gasket Part",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Gasket (ARIAC)",
+   "tags": [
+    "component",
+    "dynamic",
+    "gasket",
+    "part"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Gasket%20Part",
+    "upstream": "OpenRobotics/Gasket Part",
+    "author": "Nate Koenig (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3144,
+    0.1568,
+    0.0339
+   ],
+   "mass_kg": 0.928,
+   "faces": 232,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "gear_part",
+   "name": "Gear Part",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Machined gear (ARIAC)",
+   "tags": [
+    "component",
+    "dynamic",
+    "gear",
+    "part"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Gear%20Part",
+    "upstream": "OpenRobotics/Gear Part",
+    "author": "Nate Koenig (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3137,
+    0.3137,
+    0.0471
+   ],
+   "mass_kg": 25.313,
+   "faces": 192,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "piston_rod_part",
+   "name": "Piston Rod Part",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Piston rod (ARIAC)",
+   "tags": [
+    "component",
+    "dynamic",
+    "part",
+    "piston",
+    "rod"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Piston%20Rod%20Part",
+    "upstream": "OpenRobotics/Piston Rod Part",
+    "author": "Nate Koenig (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.2375,
+    0.6458,
+    0.0301
+   ],
+   "mass_kg": 20.532,
+   "faces": 244,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "pulley_part",
+   "name": "Pulley Part",
+   "category": "part",
+   "kind": "dynamic",
+   "description": "Machined pulley (ARIAC)",
+   "tags": [
+    "component",
+    "dynamic",
+    "part",
+    "pulley"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Pulley%20Part",
+    "upstream": "OpenRobotics/Pulley Part",
+    "author": "Nate Koenig (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.2339,
+    0.2339,
+    0.0719
+   ],
+   "mass_kg": 22.77,
+   "faces": 432,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "chainlink_fence",
+   "name": "Modular Chainlink Fence",
+   "category": "safety",
+   "kind": "static",
+   "description": "Chain-link fence section",
+   "tags": [
+    "chainlink",
+    "fence",
+    "guard",
+    "safety",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/modular_chainlink_fence",
+    "upstream": "modular_chainlink_fence",
+    "author": "James Ray Cock, Amal Kumar",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    8.115,
+    2.1492,
+    2.5229
+   ],
+   "mass_kg": null,
+   "faces": 89232,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "construction_cone",
+   "name": "Construction Cone",
+   "category": "safety",
+   "kind": "dynamic",
+   "description": "Traffic cone",
+   "tags": [
+    "cone",
+    "construction",
+    "dynamic",
+    "guard",
+    "safety"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Construction%20Cone",
+    "upstream": "OpenRobotics/Construction Cone",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.198,
+    0.198,
+    0.4287
+   ],
+   "mass_kg": 1.098,
+   "faces": 166,
+   "hulls": 4,
+   "collision": "coacd"
+  },
+  {
+   "id": "fire_alarm",
+   "name": "Fire Alarm",
+   "category": "safety",
+   "kind": "static",
+   "description": "Fire alarm pull station",
+   "tags": [
+    "alarm",
+    "fire",
+    "guard",
+    "safety",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/fire_alarm",
+    "upstream": "fire_alarm",
+    "author": "Slinc",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0994,
+    0.0264,
+    0.1436
+   ],
+   "mass_kg": null,
+   "faces": 2705,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "fire_extinguisher",
+   "name": "FireExtinguisher",
+   "category": "safety",
+   "kind": "dynamic",
+   "description": "Fire extinguisher",
+   "tags": [
+    "dynamic",
+    "extinguisher",
+    "fire",
+    "guard",
+    "safety"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/FireExtinguisher",
+    "upstream": "OpenRobotics/FireExtinguisher",
+    "author": "OpenRobotics",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.2251,
+    0.6071,
+    0.3444
+   ],
+   "mass_kg": 11.525,
+   "faces": 1064,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "jersey_barrier",
+   "name": "Jersey Barrier",
+   "category": "safety",
+   "kind": "static",
+   "description": "Concrete jersey barrier",
+   "tags": [
+    "barrier",
+    "guard",
+    "jersey",
+    "safety",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Jersey%20Barrier",
+    "upstream": "OpenRobotics/Jersey Barrier",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.6006,
+    0.32,
+    0.45
+   ],
+   "mass_kg": null,
+   "faces": 432,
+   "hulls": 2,
+   "collision": "coacd"
+  },
+  {
+   "id": "security_camera",
+   "name": "Security Camera 01",
+   "category": "safety",
+   "kind": "static",
+   "description": "Security camera",
+   "tags": [
+    "camera",
+    "guard",
+    "safety",
+    "security",
+    "static"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/security_camera_01",
+    "upstream": "security_camera_01",
+    "author": "Alexander Otterbeck, Yann Kervran",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.1696,
+    0.5537,
+    0.286
+   ],
+   "mass_kg": null,
+   "faces": 13571,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "wet_floor_sign",
+   "name": "Wet Floor Sign 01",
+   "category": "safety",
+   "kind": "dynamic",
+   "description": "Wet floor sign",
+   "tags": [
+    "dynamic",
+    "floor",
+    "guard",
+    "safety",
+    "sign",
+    "wet"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/WetFloorSign_01",
+    "upstream": "WetFloorSign_01",
+    "author": "Fran Calvente",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3001,
+    0.3585,
+    0.6295
+   ],
+   "mass_kg": 1.269,
+   "faces": 228,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "locker_bank",
+   "name": "LockerBig",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Steel locker bank",
+   "tags": [
+    "bank",
+    "locker",
+    "rack",
+    "shelf",
+    "shelving",
+    "static",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/LockerBig",
+    "upstream": "OpenRobotics/LockerBig",
+    "author": "Roselle Carmen (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.5202,
+    9.1585,
+    1.6
+   ],
+   "mass_kg": null,
+   "faces": 14346,
+   "hulls": 3,
+   "collision": "coacd"
+  },
+  {
+   "id": "metal_cabinet",
+   "name": "MetalCabinet",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Steel storage cabinet",
+   "tags": [
+    "cabinet",
+    "metal",
+    "rack",
+    "shelf",
+    "shelving",
+    "static",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/MetalCabinet",
+    "upstream": "OpenRobotics/MetalCabinet",
+    "author": "Wan Yi Seow (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.8076,
+    0.4487,
+    1.6762
+   ],
+   "mass_kg": null,
+   "faces": 92,
+   "hulls": 5,
+   "collision": "coacd"
+  },
+  {
+   "id": "metal_rack",
+   "name": "Worn Metal Rack",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Worn metal storage rack",
+   "tags": [
+    "metal",
+    "rack",
+    "shelf",
+    "shelving",
+    "static",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/worn_metal_rack",
+    "upstream": "worn_metal_rack",
+    "author": "Luca B",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.9154,
+    0.6,
+    1.9
+   ],
+   "mass_kg": null,
+   "faces": 6372,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "pallet_rack",
+   "name": "Pallet_Rack",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Warehouse pallet racking bay",
+   "tags": [
+    "pallet",
+    "rack",
+    "shelf",
+    "shelving",
+    "static",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Pallet_Rack",
+    "upstream": "OpenRobotics/Pallet_Rack",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    2.6421,
+    3.0595,
+    1.5181
+   ],
+   "mass_kg": null,
+   "faces": 624,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "picking_shelves",
+   "name": "Picking_Shelves",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Warehouse picking shelves",
+   "tags": [
+    "picking",
+    "rack",
+    "shelf",
+    "shelves",
+    "shelving",
+    "static",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Picking_Shelves",
+    "upstream": "OpenRobotics/Picking_Shelves",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.9144,
+    1.905,
+    0.4593
+   ],
+   "mass_kg": null,
+   "faces": 580,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "steel_shelves_a",
+   "name": "Steel Frame Shelves 01",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Steel frame storage shelves",
+   "tags": [
+    "a",
+    "rack",
+    "shelf",
+    "shelves",
+    "shelving",
+    "static",
+    "steel",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/steel_frame_shelves_01",
+    "upstream": "steel_frame_shelves_01",
+    "author": "James Ray Cock",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.0974,
+    0.5021,
+    2.1405
+   ],
+   "mass_kg": null,
+   "faces": 4348,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "steel_shelves_b",
+   "name": "Steel Frame Shelves 02",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Steel frame shelves with boards",
+   "tags": [
+    "b",
+    "rack",
+    "shelf",
+    "shelves",
+    "shelving",
+    "static",
+    "steel",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/steel_frame_shelves_02",
+    "upstream": "steel_frame_shelves_02",
+    "author": "James Ray Cock",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.5933,
+    0.5024,
+    2.1416
+   ],
+   "mass_kg": null,
+   "faces": 4348,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "steel_shelves_c",
+   "name": "Steel Frame Shelves 03",
+   "category": "shelving",
+   "kind": "static",
+   "description": "Steel frame shelf unit",
+   "tags": [
+    "c",
+    "rack",
+    "shelf",
+    "shelves",
+    "shelving",
+    "static",
+    "steel",
+    "storage"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/steel_frame_shelves_03",
+    "upstream": "steel_frame_shelves_03",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    2.3511,
+    0.7212,
+    2.3118
+   ],
+   "mass_kg": null,
+   "faces": 8396,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "ladder",
+   "name": "Ladder_01",
+   "category": "structure",
+   "kind": "static",
+   "description": "Step ladder",
+   "tags": [
+    "ladder",
+    "static",
+    "structure"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Ladder_01",
+    "upstream": "OpenRobotics/Ladder_01",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.529,
+    1.7102,
+    1.4402
+   ],
+   "mass_kg": null,
+   "faces": 1516,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "rollershutter_door",
+   "name": "Rollershutter Door",
+   "category": "structure",
+   "kind": "static",
+   "description": "Roller shutter door",
+   "tags": [
+    "door",
+    "rollershutter",
+    "static",
+    "structure"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/rollershutter_door",
+    "upstream": "rollershutter_door",
+    "author": "MP",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    3.08,
+    0.3001,
+    2.4
+   ],
+   "mass_kg": null,
+   "faces": 1104,
+   "hulls": 4,
+   "collision": "coacd"
+  },
+  {
+   "id": "adjustable_wrench",
+   "name": "Adjustable Wrench",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Adjustable wrench",
+   "tags": [
+    "adjustable",
+    "dynamic",
+    "hand tool",
+    "tool",
+    "wrench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/adjustable_wrench",
+    "upstream": "adjustable_wrench",
+    "author": "Mateusz Sadek",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0683,
+    0.0306,
+    0.2541
+   ],
+   "mass_kg": 1.713,
+   "faces": 5390,
+   "hulls": 3,
+   "collision": "coacd"
+  },
+  {
+   "id": "bolt_cutters",
+   "name": "Bolt Cutters 01",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Bolt cutters",
+   "tags": [
+    "bolt",
+    "cutters",
+    "dynamic",
+    "hand tool",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/bolt_cutters_01",
+    "upstream": "bolt_cutters_01",
+    "author": "Yann Kervran, Antanas Kep",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.151,
+    0.036,
+    0.8026
+   ],
+   "mass_kg": 16.109,
+   "faces": 3410,
+   "hulls": 3,
+   "collision": "coacd"
+  },
+  {
+   "id": "combination_wrench",
+   "name": "Combination Wrench",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Combination wrench",
+   "tags": [
+    "combination",
+    "dynamic",
+    "hand tool",
+    "tool",
+    "wrench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/combination_wrench",
+    "upstream": "combination_wrench",
+    "author": "BKS",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0566,
+    0.337,
+    0.0215
+   ],
+   "mass_kg": 1.346,
+   "faces": 1986,
+   "hulls": 6,
+   "collision": "coacd"
+  },
+  {
+   "id": "measuring_tape",
+   "name": "Measuring Tape 01",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Tape measure",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "measuring",
+    "tape",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/measuring_tape_01",
+    "upstream": "measuring_tape_01",
+    "author": "Kuutti Siitonen",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0406,
+    0.1694,
+    0.0734
+   ],
+   "mass_kg": 0.231,
+   "faces": 2868,
+   "hulls": 5,
+   "collision": "coacd"
+  },
+  {
+   "id": "metal_toolbox",
+   "name": "Metal Toolbox",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Steel toolbox",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "metal",
+    "tool",
+    "toolbox"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/metal_toolbox",
+    "upstream": "metal_toolbox",
+    "author": "Mateusz Sadek",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4,
+    0.2705,
+    0.3047
+   ],
+   "mass_kg": 3.441,
+   "faces": 14228,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "pipe_wrench",
+   "name": "Pipe Wrench",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Pipe wrench",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "pipe",
+    "tool",
+    "wrench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/pipe_wrench",
+    "upstream": "pipe_wrench",
+    "author": "Will Evarts",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.084,
+    0.0343,
+    0.4047
+   ],
+   "mass_kg": 3.446,
+   "faces": 10746,
+   "hulls": 4,
+   "collision": "coacd"
+  },
+  {
+   "id": "pliers",
+   "name": "Pliers",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Pliers",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "pliers",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/pliers",
+    "upstream": "pliers",
+    "author": "PierreB3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0553,
+    0.018,
+    0.1798
+   ],
+   "mass_kg": 0.658,
+   "faces": 4540,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "ratchet_wrench",
+   "name": "Ratchet Wrench",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Ratchet wrench",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "ratchet",
+    "tool",
+    "wrench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/ratchet_wrench",
+    "upstream": "ratchet_wrench",
+    "author": "John Hutcheson",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0441,
+    0.0434,
+    0.2462
+   ],
+   "mass_kg": 1.064,
+   "faces": 8796,
+   "hulls": 3,
+   "collision": "coacd"
+  },
+  {
+   "id": "screwdriver",
+   "name": "Screwdriver",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Screwdriver",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "screwdriver",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/screwdriver",
+    "upstream": "screwdriver",
+    "author": "PierreB3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.0271,
+    0.0267,
+    0.209
+   ],
+   "mass_kg": 0.116,
+   "faces": 3412,
+   "hulls": 2,
+   "collision": "coacd"
+  },
+  {
+   "id": "tool_chest",
+   "name": "Metal Tool Chest",
+   "category": "tool",
+   "kind": "static",
+   "description": "Rolling steel tool chest",
+   "tags": [
+    "chest",
+    "hand tool",
+    "static",
+    "tool"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/metal_tool_chest",
+    "upstream": "metal_tool_chest",
+    "author": "Yann Kervran, John Hutcheson",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.6854,
+    0.4072,
+    0.6518
+   ],
+   "mass_kg": null,
+   "faces": 13360,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "toolbox",
+   "name": "Toolbox",
+   "category": "tool",
+   "kind": "dynamic",
+   "description": "Red toolbox",
+   "tags": [
+    "dynamic",
+    "hand tool",
+    "tool",
+    "toolbox"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Toolbox",
+    "upstream": "OpenRobotics/Toolbox",
+    "author": "OpenRobotics",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.51,
+    0.218,
+    0.2991
+   ],
+   "mass_kg": 8.876,
+   "faces": 552,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "airduct",
+   "name": "Modular Airduct Rectangular 01",
+   "category": "utility",
+   "kind": "static",
+   "description": "Rectangular air duct run",
+   "tags": [
+    "airduct",
+    "industrial",
+    "static",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/modular_airduct_rectangular_01",
+    "upstream": "modular_airduct_rectangular_01",
+    "author": "James Ray Cock",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    7.6635,
+    2.5866,
+    1.2562
+   ],
+   "mass_kg": null,
+   "faces": 45090,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "cement_bag",
+   "name": "Cement Bag",
+   "category": "utility",
+   "kind": "dynamic",
+   "description": "Cement bag",
+   "tags": [
+    "bag",
+    "cement",
+    "dynamic",
+    "industrial",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/cement_bag",
+    "upstream": "cement_bag",
+    "author": "PierreB3D",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4625,
+    0.6996,
+    0.1799
+   ],
+   "mass_kg": 73.411,
+   "faces": 844,
+   "hulls": 5,
+   "collision": "coacd"
+  },
+  {
+   "id": "jerrycan",
+   "name": "Metal Jerrycan Green",
+   "category": "utility",
+   "kind": "dynamic",
+   "description": "Metal jerrycan",
+   "tags": [
+    "dynamic",
+    "industrial",
+    "jerrycan",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/metal_jerrycan_green",
+    "upstream": "metal_jerrycan_green",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3604,
+    0.1709,
+    0.4999
+   ],
+   "mass_kg": 2.152,
+   "faces": 9636,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "oil_barrel",
+   "name": "Barrel 03",
+   "category": "utility",
+   "kind": "dynamic",
+   "description": "Oil barrel",
+   "tags": [
+    "barrel",
+    "dynamic",
+    "industrial",
+    "oil",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/barrel_03",
+    "upstream": "barrel_03",
+    "author": "Serhii Khromov",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.6339,
+    0.6386,
+    0.9305
+   ],
+   "mass_kg": 23.273,
+   "faces": 1473,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "pipes",
+   "name": "Modular Pipes",
+   "category": "utility",
+   "kind": "static",
+   "description": "Modular steel pipework",
+   "tags": [
+    "industrial",
+    "pipes",
+    "static",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/modular_pipes",
+    "upstream": "modular_pipes",
+    "author": "Kuutti Siitonen",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    4.1874,
+    0.4578,
+    2.4349
+   ],
+   "mass_kg": null,
+   "faces": 94856,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "power_box",
+   "name": "Power Box 01",
+   "category": "utility",
+   "kind": "static",
+   "description": "Electrical power box",
+   "tags": [
+    "box",
+    "industrial",
+    "power",
+    "static",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/power_box_01",
+    "upstream": "power_box_01",
+    "author": "Rico Cilliers, Yann Kervran",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.4613,
+    0.399,
+    0.5031
+   ],
+   "mass_kg": null,
+   "faces": 21272,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "propane_tank",
+   "name": "Propane Tank",
+   "category": "utility",
+   "kind": "dynamic",
+   "description": "Propane tank",
+   "tags": [
+    "dynamic",
+    "industrial",
+    "propane",
+    "tank",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/propane_tank",
+    "upstream": "propane_tank",
+    "author": "Slinc",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.3374,
+    0.3374,
+    0.5538
+   ],
+   "mass_kg": 10.663,
+   "faces": 5238,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "steel_drum",
+   "name": "55gal_Drum",
+   "category": "utility",
+   "kind": "dynamic",
+   "description": "55 gallon steel drum",
+   "tags": [
+    "drum",
+    "dynamic",
+    "industrial",
+    "steel",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/55gal_Drum",
+    "upstream": "OpenRobotics/55gal_Drum",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.5946,
+    0.8622,
+    0.5856
+   ],
+   "mass_kg": 18.407,
+   "faces": 468,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "utility_box",
+   "name": "Utility Box 01",
+   "category": "utility",
+   "kind": "static",
+   "description": "Utility cabinet",
+   "tags": [
+    "box",
+    "industrial",
+    "static",
+    "utility"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/utility_box_01",
+    "upstream": "utility_box_01",
+    "author": "James Ray Cock",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.52,
+    0.432,
+    1.1203
+   ],
+   "mass_kg": null,
+   "faces": 4404,
+   "hulls": 6,
+   "collision": "coacd"
+  },
+  {
+   "id": "drawer_cabinet",
+   "name": "Drawer Cabinet",
+   "category": "workbench",
+   "kind": "static",
+   "description": "Drawer cabinet",
+   "tags": [
+    "bench",
+    "cabinet",
+    "cart",
+    "drawer",
+    "static",
+    "table",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/drawer_cabinet",
+    "upstream": "drawer_cabinet",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.1411,
+    0.4881,
+    1.8813
+   ],
+   "mass_kg": null,
+   "faces": 26406,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "metal_office_desk",
+   "name": "Metal Office Desk",
+   "category": "workbench",
+   "kind": "static",
+   "description": "Steel work desk",
+   "tags": [
+    "bench",
+    "cart",
+    "desk",
+    "metal",
+    "office",
+    "static",
+    "table",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/metal_office_desk",
+    "upstream": "metal_office_desk",
+    "author": "Ulan Cabanilla",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    2.0,
+    0.9472,
+    0.7875
+   ],
+   "mass_kg": null,
+   "faces": 6898,
+   "hulls": 12,
+   "collision": "coacd"
+  },
+  {
+   "id": "packing_station",
+   "name": "Packing_Station",
+   "category": "workbench",
+   "kind": "static",
+   "description": "Packing station with table",
+   "tags": [
+    "bench",
+    "cart",
+    "packing",
+    "static",
+    "station",
+    "table",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Gazebo Fuel",
+    "url": "https://app.gazebosim.org/OpenRobotics/fuel/models/Packing_Station",
+    "upstream": "OpenRobotics/Packing_Station",
+    "author": "Cole Biesemeyer (OpenRobotics on Gazebo Fuel)",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+   },
+   "size_m": [
+    0.8872,
+    1.929,
+    2.1082
+   ],
+   "mass_kg": null,
+   "faces": 3474,
+   "hulls": 14,
+   "collision": "coacd"
+  },
+  {
+   "id": "storage_cart",
+   "name": "Industrial Storage Cart",
+   "category": "workbench",
+   "kind": "dynamic",
+   "description": "Industrial storage cart",
+   "tags": [
+    "bench",
+    "cart",
+    "dynamic",
+    "storage",
+    "table",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/industrial_storage_cart",
+    "upstream": "industrial_storage_cart",
+    "author": "Jule Bielitz",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.6033,
+    1.1027,
+    1.3774
+   ],
+   "mass_kg": 248.338,
+   "faces": 18902,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "tool_cart",
+   "name": "Tool Cart",
+   "category": "workbench",
+   "kind": "dynamic",
+   "description": "Wheeled tool cart",
+   "tags": [
+    "bench",
+    "cart",
+    "dynamic",
+    "table",
+    "tool",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/tool_cart",
+    "upstream": "tool_cart",
+    "author": "Savva Zakharov",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    1.2734,
+    0.7536,
+    0.9646
+   ],
+   "mass_kg": 45.591,
+   "faces": 29394,
+   "hulls": 8,
+   "collision": "coacd"
+  },
+  {
+   "id": "welding_cart",
+   "name": "Portable Welding Cart",
+   "category": "workbench",
+   "kind": "static",
+   "description": "Portable welding cart",
+   "tags": [
+    "bench",
+    "cart",
+    "static",
+    "table",
+    "welding",
+    "workbench"
+   ],
+   "origin": "library",
+   "source": {
+    "name": "Poly Haven",
+    "url": "https://polyhaven.com/a/portable_welding_cart",
+    "upstream": "portable_welding_cart",
+    "author": "Georgii Gorbunov",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+   },
+   "size_m": [
+    0.8383,
+    0.6549,
+    1.5632
+   ],
+   "mass_kg": null,
+   "faces": 29418,
+   "hulls": 14,
+   "collision": "coacd"
+  }
+ ]
+}

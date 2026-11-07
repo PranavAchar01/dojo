@@ -1,0 +1,63 @@
+{
+ "id": "cassette_player",
+ "name": "Portable Cassette Player",
+ "size_m": [
+  0.17226,
+  0.03967,
+  0.13031
+ ],
+ "source": {
+  "author": "Mateusz Sadek",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "source_name": "Poly Haven",
+  "source_url": "https://polyhaven.com/a/portable_cassette_player"
+ },
+ "parts": [
+  {
+   "id": "cassette_body",
+   "role": "body",
+   "node": "portable_cassette_player",
+   "offset": [
+    -0.03756,
+    0.0012,
+    0.0
+   ],
+   "size_m": [
+    0.09714,
+    0.03727,
+    0.13031
+   ]
+  },
+  {
+   "id": "cassette_tape",
+   "role": "cassette",
+   "node": "portable_cassette_player_casette",
+   "offset": [
+    0.05529,
+    -0.0104,
+    0.02505
+   ],
+   "size_m": [
+    0.06168,
+    0.01174,
+    0.09863
+   ]
+  },
+  {
+   "id": "cassette_lid",
+   "role": "lid",
+   "node": "portable_cassette_player_lid",
+   "offset": [
+    -0.02312,
+    -0.01449,
+    0.02307
+   ],
+   "size_m": [
+    0.07056,
+    0.01069,
+    0.10382
+   ]
+  }
+ ]
+}

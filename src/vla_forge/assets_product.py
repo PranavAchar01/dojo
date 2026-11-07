@@ -17,7 +17,6 @@ import numpy as np
 import trimesh
 
 from . import assets_build as build
-from . import assets_convert as conv
 from . import assets_sources as src
 
 UPSTREAM = "portable_cassette_player"
@@ -83,7 +82,10 @@ def prepare() -> dict:
         for n in names:
             world, gname = scene.graph[n]
             one.add_geometry(
-                scene.geometry[gname].copy(), node_name=n, geom_name=gname, transform=world
+                scene.geometry[gname].copy(),
+                node_name=n,
+                geom_name=gname,
+                transform=world,
             )
         b = one.bounds
         base = np.array([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, b[0][2]])
@@ -100,7 +102,9 @@ def prepare() -> dict:
         if d.exists():
             shutil.rmtree(d)
         d.mkdir(parents=True)
-        one.apply_transform(np.linalg.inv(rot))  # back to glTF's Y-up for the loader; textures kept
+        one.apply_transform(
+            np.linalg.inv(rot)
+        )  # back to glTF's Y-up for the loader; textures kept
         one.export(d / "model.glb")
         p = dict(prov)
         p["name"] = f"{prov['name']} ({role})"
@@ -128,9 +132,7 @@ def convert() -> None:
         meta = build.build_one(p)
         entries.append(meta)
         print("ok", pid, meta["size_m"], meta["hulls"], meta["collision"], flush=True)
-    PRODUCT_MANIFEST.write_text(
-        json.dumps({"version": 1, "models": entries}, indent=1)
-    )
+    PRODUCT_MANIFEST.write_text(json.dumps({"version": 1, "models": entries}, indent=1))
 
 
 if __name__ == "__main__":

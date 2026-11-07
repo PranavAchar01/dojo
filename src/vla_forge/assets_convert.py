@@ -37,6 +37,7 @@ DECOMP_TIMEOUT_S = 150
 Y_TO_Z = trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0])
 Z_TO_Y = np.linalg.inv(Y_TO_Z)
 
+MIN_HULL_VOLUME_M3 = 2e-7
 DEFAULT_DENSITY = 500.0  # kg/m3 of the hull volume for a model that gives none
 
 
@@ -339,7 +340,9 @@ def decompose(
         proc.join(5)
     if not hulls:
         return _hull_fallback([merged], max_hulls), "hull-fallback"
-    return hulls[:max_hulls], method
+    # Wire and sliver pieces give hulls MuJoCo rejects as having no volume; they add nothing to contact anyway.
+    solid = [h for h in hulls if h.volume > MIN_HULL_VOLUME_M3]
+    return (solid or [merged.convex_hull])[:max_hulls], method
 
 
 # ---------------------------------------------------------------- the package
@@ -349,7 +352,9 @@ def _mjcf(model_id: str, visuals: list[dict], hulls: int, s: Settings) -> str:
     assets, geoms = [], []
     for i, v in enumerate(visuals):
         mesh = f"{model_id}_v{i}"
-        assets.append(f'    <mesh name="{mesh}" file="visual/v{i}.obj"/>')
+        assets.append(
+            f'    <mesh name="{mesh}" file="visual/v{i}.obj" inertia="shell"/>'
+        )
         if v["texture"]:
             assets.append(
                 f'    <texture name="{mesh}_t" type="2d" file="visual/{v["texture"]}"/>'
