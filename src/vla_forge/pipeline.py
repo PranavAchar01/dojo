@@ -36,6 +36,7 @@ from .rollout import (
     summarize,
     summarize_composed,
 )
+from .sim import feasibility
 from .sim.robots import calibrate, is_default
 from .sim.scene import Layout, Scene
 from .sim.tasks import TIER, TaskSpec, sample_layout
@@ -235,6 +236,7 @@ class Forge:
             run.station
         ):  # the line planner already wrote this station's task and success check
             run.spec = TaskSpec.from_json(run.station["spec"])
+            run.spec.feasibility = feasibility.for_spec(run.spec, run.robot)
             run.parse_info = {
                 "model": "line planner",
                 "seconds": 0.0,
@@ -247,6 +249,8 @@ class Forge:
             run.steps = out
         else:
             run.spec = out
+            if out is not None:
+                out.feasibility = feasibility.for_spec(out, run.robot)
         return out
 
     def route(self, run: Run) -> router_mod.Route:
