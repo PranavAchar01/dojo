@@ -183,3 +183,15 @@ def test_api_fix_refused_without_muse(client, monkeypatch):
         },
     )
     assert r.status_code == 503
+
+
+def test_flow_detail_names_failing_rules():
+    from vla_forge import hero_flow as hf
+
+    builds = [
+        {"seated": 3, "total": 6, "rules_passed": 6, "rules_total": 8, "rules": [{"id": "shape", "ok": False}, {"id": "deck_rests", "ok": False}]},
+        {"seated": 6, "total": 6, "rules_passed": 8, "rules_total": 8, "rules": [{"id": "shape", "ok": True}]},
+    ]
+    assert hf.failures(builds) == {"bricks seated": 1, "shape": 1, "deck_rests": 1}
+    txt = hf.detail(builds, 1.0)
+    assert "not a trained policy" in txt and "1/2 builds pass every rule" in txt and "shape (1/2)" in txt

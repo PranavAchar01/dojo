@@ -150,6 +150,7 @@ def tile(skill: Skill) -> dict:
         "thumb": bool(skill.thumb_png),
         "replay": bool(skill.replay),
         "replay_source": skill.replay_source,
+        "detail": skill.record.get("detail", ""),
         "tests": tests,
         "agent_address": skill.agent_address,
     }

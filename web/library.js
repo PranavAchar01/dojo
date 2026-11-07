@@ -33,7 +33,7 @@ const DECISION = {
   too_complex: "Too complex",
   not_feasible: "Not feasible",
 };
-const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task" };
+const ORIGIN = { prompt: "prompt", remix: "remix", scratch: "from scratch", step: "chain step", chain: "chain", station: "arm in a task", scripted: "scripted" };
 
 let tiles = [];
 let loaded = false;
@@ -448,7 +448,7 @@ function tileEl(t, byId) {
   } else {
     th.append(el("div", "no-thumb", "No recording yet. Test records one."));
   }
-  th.append(el("span", "tile-tier mono", t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${t.robot !== "so101" ? " custom" : ""}`, robotLabel(t.robot)));
+  th.append(el("span", "tile-tier mono", t.origin === "scripted" ? "SCRIPTED" : t.tier === 3 ? "CHAIN" : `T${t.tier}`), el("span", `tile-robot mono${t.robot !== "so101" ? " custom" : ""}`, robotLabel(t.robot)));
   // one click on the tile plays its recorded rollout straight away; the buttons below keep their own jobs
   a.classList.add("tap");
   a.tabIndex = 0;
@@ -468,6 +468,7 @@ function tileEl(t, byId) {
   name.ondblclick = () => rename(t, name);
   body.append(name);
   if (t.name !== t.instruction) body.append(el("div", "tile-ins", t.instruction));
+  if (t.detail) body.append(el("div", "tile-ins", t.detail)); // a scripted build says what it measured and which rules failed
   if (t.steps?.length) {
     const ol = el("ol", "tile-chain");
     for (const st of t.steps) ol.append(el("li", "", st.instruction));
@@ -478,10 +479,10 @@ function tileEl(t, byId) {
   const fill = el("i");
   fill.style.width = pct(t.success_rate);
   bar.append(fill);
-  rate.append(el("b", "mono", pct(t.success_rate)), bar, el("span", "", `of ${t.n_eval} held-out`));
+  rate.append(el("b", "mono", pct(t.success_rate)), bar, el("span", "", t.origin === "scripted" ? `of ${t.n_eval} builds` : `of ${t.n_eval} held-out`));
   body.append(rate);
   const meta = el("div", "tile-meta");
-  const parent = t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
+  const parent = t.origin === "scripted" ? "no training" : t.origin === "chain" ? `chain of ${t.steps.length}` : t.parent ? `from “${(byId[t.parent]?.name || "a tile").slice(0, 26)}”` : "from base";
   meta.append(
     el("span", "", t.train_seconds ? `train ${fmt(t.train_seconds)}` : `run ${fmt(t.seconds)}`),
     el("span", "", parent),
@@ -499,6 +500,7 @@ function tileEl(t, byId) {
     }
     body.append(tr);
   }
+  if (t.origin === "scripted") { a.append(th, body); return a; } // no policy: nothing to Test, Remix or Call
   const acts = el("div", "tile-acts");
   const mk = (label, fn, cls) => {
     const b = el("button", cls || "", label);

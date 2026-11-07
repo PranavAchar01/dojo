@@ -27,6 +27,7 @@ from . import (
     assets_scene,
     factory,
     hero_api,
+    hero_replay,
     optimizer_api,
     records,
     robotcache,
@@ -109,13 +110,17 @@ def index():
 @app.get("/api/state")
 def state():
     assert AGENTS is not None
+    runs = [FORGE.runs[r].summary() for r in FORGE.order[-60:]]
+    live = {r["skill_id"] for r in runs}
+    # a scripted build's run lives on its skill record, so the rail still has it after a restart
+    runs += [s.record for s in FORGE.registry.scripted.values() if s.record and s.id not in live]
     return {
         "ready": FORGE.ready,
         "robot": FORGE.robot,
         "active": AGENTS.active,
-        "runs": [FORGE.runs[r].summary() for r in FORGE.order[-60:]],
+        "runs": runs,
         "skills": [
-            {**s.__dict__, "record": records.load(s.id)}
+            {**s.__dict__, "record": s.record if s.scripted else records.load(s.id)}
             for s in FORGE.registry.ordered()
         ],
     }
@@ -141,7 +146,11 @@ async def prompt(p: Prompt):
         if not (assets_scene.model_folder(scenery) / "model.xml").exists():
             raise HTTPException(404, "that 3D model has no simulation file yet")
     run = await AGENTS.submit(
-        text, p.mode, p.from_skill if p.mode == "remix" else "", scenery=scenery
+        text,
+        p.mode,
+        p.from_skill if p.mode == "remix" else "",
+        scenery=scenery,
+        bridge=bool(p.reference and p.reference.kind == "bridge"),
     )
     return {"run": run.id}
 
@@ -160,7 +169,14 @@ def library():
 
 
 def _skill(sid: str):
-    return FORGE.registry.skills.get(sid) or _404()
+    return FORGE.registry.skills.get(sid) or FORGE.registry.scripted.get(sid) or _404()
+
+
+def _policy(sid: str):
+    """A skill that has a checkpoint: Test and Call agent run it, so a scripted build has none to run."""
+    if sid in FORGE.registry.scripted:
+        raise HTTPException(400, "a scripted build has no policy to run")
+    return _skill(sid)
 
 
 @app.get("/api/skills/{sid}/thumb.png")
@@ -235,7 +251,7 @@ def rename(sid: str, r: Rename):
 @app.post("/api/skills/{sid}/test")
 async def test_skill(sid: str, r: TestReq):
     """Run the tile's policy on fresh random scenes (never its training or held-out seeds); progress over SSE."""
-    _skill(sid)
+    _policy(sid)
     n = min(max(r.n, 1), 20)
     tid = uuid4().hex[:8]
     task = asyncio.get_running_loop().run_in_executor(
@@ -269,6 +285,8 @@ def run_summary(rid: str):
 @app.get("/api/runs/{rid}/scene")
 def run_scene(rid: str):
     run = FORGE.runs.get(rid) or _404()
+    if run.bridge:
+        return {**run.bridge["scene"], "frame": run.bridge["frame0"]}
     if not run.layouts:
         return {
             "pending": True
@@ -286,6 +304,8 @@ def _robot_id(robot: str) -> str:
 
 @app.get("/api/meshes")
 def meshes(robot: str = "so101"):
+    if robot == hero_replay.ROBOT_ID:  # the two-arm brick table (hero_replay)
+        return hero_replay.meshes()
     return robot_meshes(_robot_id(robot))
 
 
@@ -397,7 +417,7 @@ def rollout(rid: str, rnd: int, index: int):
 @app.post("/api/skills/{sid}/run")
 async def run_skill(sid: str):
     """Run a saved skill once in a fresh random scene and say what happened."""
-    sk = _skill(sid)
+    sk = _policy(sid)
     res = await asyncio.to_thread(run_once, sk)
     return {"reply": describe_run_reply(sk, res)}
 

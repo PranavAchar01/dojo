@@ -123,9 +123,11 @@ class Expert:
         part = db.brick_map()[name].part
         nx, ny = db.PART_FOOTPRINT[part]
         ax = yaw + (np.pi / 2 if nx >= ny else 0.0)  # direction of the short side
+        turns = 4 if nx == ny else 2  # a square brick can be gripped across any of its four faces
+        step = np.pi / 2 if nx == ny else np.pi
         cands = [
-            np.array([np.cos(ax + k * np.pi), np.sin(ax + k * np.pi), 0.0])
-            for k in range(2)
+            np.array([np.cos(ax + k * step), np.sin(ax + k * step), 0.0])
+            for k in range(turns)
         ]
         p = self.t.pose(name)[0][:2]
         radial = (p - self.base_xy) / max(np.linalg.norm(p - self.base_xy), 1e-9)
@@ -170,7 +172,8 @@ class Expert:
         self.goto(self.site_for([*xy, CARRY_Z], CENTRE_GRASP), TRANSIT, 0.15)
         self.hold(0.3)
         ty = 2 * np.arctan2(tq[3], tq[0])
-        self.turn_to(xy, name, ty, sym=np.pi)
+        nx, ny = db.PART_FOOTPRINT[b.part]
+        self.turn_to(xy, name, ty, sym=np.pi / 2 if nx == ny else np.pi)
         for _ in range(4):  # slip correction
             err = xy - t.pose(name)[0][:2]
             if np.linalg.norm(err) < 0.0007:
