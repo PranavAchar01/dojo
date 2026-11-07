@@ -338,7 +338,7 @@ async function replay(id, i = 0) {
   const t = tiles.find((x) => x.id === id);
   performance.mark("dojo-click");
   const want = F().replayData(id, i, t?.replay_source || ""); // the request goes out before any UI work
-  F().simLoading(`Loading “${t?.name || "the skill"}”`);
+  F().simLoading(`Loading “${t?.name || "the model"}”`);
   F().setView("sim");
   if (t) F().selectSkill(t);
   const p = await want;
@@ -585,7 +585,7 @@ document.querySelectorAll("#lib-filter button").forEach((b) =>
     draw();
   }),
 );
-$("#lib-new").addEventListener("click", () => setMode("scratch", "", ""));
+$("#lib-new").addEventListener("click", () => { setMode("scratch", "", ""); window.forge.openNew(); });
 
 window.forgeLib = { onEvent, refresh, render: () => draw(), takeMode, startTest, replay, openTile };
 draw();

@@ -62,19 +62,8 @@
       <div class="rp-head"><h2>Chat</h2><button class="ib sm" id="new-chat" title="New chat" aria-label="New chat"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></button></div>
       <div class="thread" id="thread">
         <div class="empty" id="empty">
-          <div class="hero-bot">
-            <span class="mascot lg" data-follow></span>
-            <span class="bb-thought on" aria-hidden="true"><i class="bb-puff p1"></i><i class="bb-puff p2"></i><span class="bb-cloud"><i class="bb-thing blk r"></i><i class="bb-thing bowl"></i><i class="bb-thing blk g"></i></span></span>
-          </div>
-          <h1>What should the arm <em>learn</em>?</h1>
-          <p>Type a task, or ask for more than one arm. Agents turn it into a success check, collect demos, fine-tune a vision-language-action policy from the nearest skill, and measure it on 20 scenes it never saw.</p>
-          <div class="examples">
-            <button class="ex"><span class="t">T1</span>touch the red block</button>
-            <button class="ex"><span class="t">T2</span>put the blue block in the blue bowl</button>
-            <button class="ex"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
-            <button class="ex" data-say="add another SO-101"><span class="t">+1</span>add another SO-101</button>
-            <button class="ex" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket"><span class="t">2 arms</span>two arms: one seats the housing in the pallet, the other inserts it into the socket</button>
-          </div>
+          <span class="mascot sm" data-follow></span>
+          <p class="empty-hint">Describe a task below, or press + to train a new model.</p>
         </div>
       </div>
       <form class="composer" id="prompt-form" autocomplete="off">
@@ -100,14 +89,11 @@
         <div id="step-badge" class="step-badge hidden" data-keepclear></div>
 
         <div class="welcome" id="welcome" hidden data-keepclear>
-          <p class="wl-h">Hi, I'm Dojo. Here's what I've learned so far.</p>
-          <p class="wl-now" id="welcome-now"></p>
-          <div class="wl-chips">
-            <button class="wl-chip" data-say="touch the red block">touch the red block</button>
-            <button class="wl-chip" data-say="put the blue block in the blue bowl">blue block in the bowl</button>
-            <button class="wl-chip" data-say="sort the blue and green blocks into the bowls of the same color">sort by colour</button>
-            <button class="wl-chip" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket">two arms, one housing</button>
-          </div>
+          <video id="welcome-video" muted loop playsinline preload="auto" disablepictureinpicture tabindex="-1" aria-hidden="true" poster="/static/landing-rollout.jpg">
+            <source src="/static/landing-rollout.webm" type="video/webm">
+            <source src="/static/landing-rollout.mp4" type="video/mp4">
+          </video>
+          <p class="wl-now" id="welcome-now">touch the yellow block</p>
         </div>
         <div class="sim-load" id="sim-load" hidden><span class="spin"></span><span id="sim-load-t">Loading the rollout</span></div>
 
@@ -190,6 +176,27 @@
           <div id="lib-count" class="lib-count"></div>
           <div id="skills" class="tiles"></div>
         </div>
+      </div>
+
+      <div class="nm" id="new-modal" hidden role="dialog" aria-modal="true" aria-labelledby="nm-title">
+        <div class="nm-back" data-close></div>
+        <form class="nm-card" id="nm-form" autocomplete="off">
+          <button type="button" class="ib sm nm-x" data-close aria-label="Close"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+          <h2 id="nm-title">What should the arm <em>learn</em>?</h2>
+          <p class="nm-sub">Describe a task. Dojo turns it into a success check, collects demos, fine-tunes a vision-language-action policy and measures it on 20 scenes it never saw.</p>
+          <textarea id="nm-prompt" rows="3" maxlength="300" placeholder="Tell Dojo what the arm should do..."></textarea>
+          <div class="nm-row">
+            <button type="button" class="chip-mode" id="nm-arm" title="Change the robot"><span class="sq"></span><span id="nm-robot">SO-101 &middot; sim</span></button>
+            <button class="btn primary nm-go" id="nm-go" type="submit" disabled>Train model</button>
+          </div>
+          <div class="nm-chips">
+            <button type="button" class="mx" data-say="touch the red block"><span class="t">T1</span>touch the red block</button>
+            <button type="button" class="mx" data-say="put the blue block in the blue bowl"><span class="t">T2</span>put the blue block in the blue bowl</button>
+            <button type="button" class="mx" data-say="sort the blue and green blocks into the bowls of the same color"><span class="t">T3</span>sort the blue and green blocks into the bowls of the same color</button>
+            <button type="button" class="mx" data-say="add another SO-101"><span class="t">+1</span>add another SO-101</button>
+            <button type="button" class="mx" data-say="two arms: one seats the housing in the pallet, the other inserts it into the socket"><span class="t">2 arms</span>two arms: one seats the housing in the pallet, the other inserts it into the socket</button>
+          </div>
+        </form>
       </div>
 
       <footer class="tabs">
