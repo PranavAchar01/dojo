@@ -29,6 +29,8 @@
 import { createEyes } from "./eyes.js";
 import { spring, reducedMotion } from "./spring.js";
 import { gooLayer, spawnBlob } from "./goo.js";
+import { createRoamer } from "./roam.js";
+import { tick } from "./spring.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -51,7 +53,7 @@ const ORDER = Object.keys(STAGE);
 
 // ---------------------------------------------------------------- bots on the page
 const bots = new Map(); // host -> { eyes, wob }
-function mount(host) {
+export function mountBot(host) {
   if (bots.has(host)) return bots.get(host);
   if (!host.isConnected) return null;
   host.querySelector(":scope > svg")?.remove();
@@ -64,6 +66,18 @@ function mount(host) {
   host.addEventListener("click", () => { eyes.react("surprise"); bot.wobble(1); setTimeout(() => eyes.emote("hop"), 520); });
   return bot;
 }
+// ---------------------------------------------------------------- the roaming robot (roam.js)
+// where the bot goes while a stage runs: the part of the screen that stage is working on
+export const TARGET = {
+  task: "#thread", router: "#rail", planner: "#plan-sec", scene: "#three", data: "#three", trainer: "#loss-sec",
+  eval: "#rounds-sec", critic: "#critic-sec", optimizer: "#optimizer-root .opt-grid-card, #optimizer-root", executor: "#three", registry: "#rail",
+};
+export const roamer = createRoamer({ mountBot, slot: document.querySelector(".ag-pill-eyes") });
+let visitSeq = 0;
+export function goTo(sel, o = {}) { visitSeq++; return roamer.visit(sel, o); }
+export function say(text, ms = 3200) { showBubble(text, { id: "say", done: true }); dropBubble(ms); }
+export function goHomeSoon(ms = 1800) { const n = ++visitSeq; setTimeout(() => { if (n === visitSeq) roamer.home(); }, ms); }
+
 // a still of the idle face as markup, for places that cannot run script
 export function mascotSVG() {
   const h = document.createElement("div");
@@ -83,7 +97,7 @@ const followers = () => {
   return [...document.querySelectorAll(".mascot[data-follow]"), ...(forge.length ? [forge[forge.length - 1]] : [])]
     .map((h) => bots.get(h)).filter(Boolean);
 };
-const each = (f) => followers().forEach(f);
+export const each = (f) => followers().forEach(f);
 
 function decorate(root) {
   const hosts = [];
@@ -104,7 +118,7 @@ function decorate(root) {
   let i = 0;
   for (const h of hosts) {
     if (bots.has(h)) continue;
-    const bot = mount(h);
+    const bot = mountBot(h);
     if (bot && h.hasAttribute("data-follow")) { arrive(bot, 120 + 160 * i++); bot.eyes.setState(want.state); bot.eyes.setActivity(want.act); }
   }
 }
@@ -139,6 +153,10 @@ function compute() {
   if (typingUntil > now) return { state: "userTalking", act: null, words: "" };
   return { state: "idle", act: null, words: "" };
 }
+addEventListener("forge:mood", (ev) => {
+  const st = ev.detail && ev.detail.state;
+  if (st) holdState(st, ev.detail.ms || 0); else { clearHold(); apply(); }
+});
 function clearHold() { clearTimeout(hold.timer); hold.state = null; }
 function apply() {
   const next = compute();
@@ -160,7 +178,7 @@ let layer = null, bub = null, bubT = 0;
 function anchorBot() {
   const vis = (b) => { const r = b.host.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; };
   const f = followers().filter(vis);
-  return f.find((b) => b.host.matches(".lg, .xl")) || f[0] || null;
+  return f.find((b) => b.host === roamer.host) || f.find((b) => b.host.matches(".lg, .xl")) || f[0] || null;
 }
 function ensureLayer() {
   if (layer) return layer;
@@ -188,7 +206,8 @@ function showBubble(text, { id = null, done = false, failed = false } = {}) {
     L.bubs.append(c);
     bub = { c, id, blob: null, bot: a };
   }
-  bub.id = id; bub.bot = a;
+  bub.id = id; bub.bot = a; bub.base = { x: r.left, y: r.top };
+  L.root.style.translate = "0 0";
   const c = bub.c;
   c.className = "ag-bub" + (done ? " done" : "") + (failed ? " failed" : "");
   c.replaceChildren();
@@ -213,6 +232,15 @@ function dropBubble(delay = 0) {
   }, delay);
 }
 
+// the bubble rides along while the bot flies
+tick(() => {
+  if (bub && layer && bub.base) {
+    const r = bub.bot.host.getBoundingClientRect();
+    layer.root.style.translate = `${(r.left - bub.base.x).toFixed(1)}px ${(r.top - bub.base.y).toFixed(1)}px`;
+  }
+  return true;
+});
+
 // ---------------------------------------------------------------- reading the page for edges
 const prev = {};      // stage key -> "live" | "done" | "fail" | ""
 const metric = {};    // stage key -> last metric text
@@ -229,15 +257,18 @@ function watchRail() {
     if (!STAGE[k]) continue;
     if (st === "live") {
       showBubble(STAGE[k][2], { id: k });
+      if (TARGET[k]) goTo(TARGET[k], { dwell: 0 });
     } else if (st === "done" && was === "live") {
       const line = k === "eval" || k === "critic" || k === "optimizer" ? `${STAGE[k][3]}${m ? ": " + m : ""}` : STAGE[k][3];
       showBubble(line, { id: k, done: true }); dropBubble(650);
       each((b) => b.eyes.react("nod"));
+      goHomeSoon(k === "registry" ? 2600 : 2200);
       if (k === "registry") { each((b) => { b.eyes.emote("delight"); b.wobble(1); }); holdState("success", 2500); }
       if (k === "critic" && /retrain/i.test(m)) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); }
     } else if (st === "fail") {
       failAt = performance.now();
       showBubble(`${li.querySelector("span")?.textContent || k} failed`, { id: k, failed: true }); dropBubble(1400);
+      goHomeSoon(2600);
       each((b) => b.eyes.emote("wince"));
       setTimeout(() => { if (want.state === "working") each((b) => b.eyes.emote("nod")); else if (!hold.state) holdState("confused", 4000); }, 900);
     }
@@ -258,6 +289,7 @@ function watchBadge() {
 // stepping through the rounds in the montage: the selected chip's verdict gets its reaction
 window.addEventListener("forge:optround", (e) => {
   const st = e.detail && e.detail.state;
+  goTo("#optimizer-root .opt-grid-card, #optimizer-root", { dwell: 4200 });
   if (st === "kept") { each((b) => { b.eyes.emote("pleased"); b.eyes.react("nod"); }); showBubble("Round kept", { id: "opt", done: true }); dropBubble(900); }
   else if (st === "reverted") { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); showBubble("Round reverted", { id: "opt", failed: true }); dropBubble(1200); }
 });
@@ -265,6 +297,7 @@ window.addEventListener("forge:optround", (e) => {
 function watchOptimizer() {
   const kept = document.querySelectorAll("#optimizer-root .opt-chip.kept").length;
   const bad = document.querySelectorAll("#optimizer-root .opt-chip.reverted").length;
+  if (kept > optKept || bad > optBad) goTo("#optimizer-root .opt-grid-card, #optimizer-root", { dwell: 4200 });
   if (kept > optKept) { each((b) => { b.eyes.emote("pleased"); b.eyes.react("nod"); }); showBubble("Round kept", { id: "opt", done: true }); dropBubble(900); }
   if (bad > optBad) { each((b) => b.eyes.emote("wince")); setTimeout(() => each((b) => b.eyes.emote("nod")), 900); showBubble("Round reverted", { id: "opt", failed: true }); dropBubble(1200); }
   optKept = kept; optBad = bad;

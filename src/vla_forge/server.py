@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
-from . import factory, optimizer_api, tiles
+from . import agents_api, factory, optimizer_api, tiles
 from .agents import Forge as Agents
 from .agents import register_on_agentverse
 from .pipeline import FORGE
@@ -39,9 +39,11 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     FORGE.loop = loop
     AGENTS = Agents(loop)
+    agents_api.HOLD["agents"] = AGENTS
     task = loop.create_task(AGENTS.start())
     await asyncio.to_thread(FORGE.warm)
     registered = await asyncio.to_thread(register_on_agentverse, AGENTS)
+    AGENTS.registered = registered
     FORGE.emit(
         "",
         "agents",
@@ -54,6 +56,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(
+    agents_api.router
+)  # first: its /api/optimizer/start goes through the agents
 app.include_router(optimizer_api.router)
 
 

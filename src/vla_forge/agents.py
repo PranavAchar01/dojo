@@ -36,6 +36,7 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 from . import tiles
+from .agentbus import BUS, patch_send, thought
 from .pipeline import EVAL_N, FIRST_DEMOS, FIRST_TRAIN, FORGE, Round, Run
 from .registry import ROOT, Skill
 
@@ -135,6 +136,44 @@ class Execute(Model):  # planner -> executor
     run_id: str
 
 
+# the optimizer's typed protocol (docs/fetch-ai-plan.md): one request, one acceptance, one progress message per
+# round, one result. Another agent can hire the optimizer by address and follow the run with these.
+class OptimizeRequest(Model):
+    request_id: str
+    skill_id: str = ""
+    checkpoint_url: str = ""
+    rounds: int = 5
+    train_seconds: float = 40.0
+
+
+class OptimizeAccepted(Model):
+    request_id: str
+    run_id: str = ""
+    error: str = ""
+    code: int = 0
+
+
+class OptimizeProgress(Model):
+    run_id: str
+    round: int
+    change: str
+    kept: bool
+    success: float
+    n: int
+    ci_low: float
+    ci_high: float
+
+
+class OptimizeResult(Model):
+    run_id: str
+    start_success: float
+    final_success: float
+    ci_low: float
+    ci_high: float
+    checkpoint_url: str
+    note: str
+
+
 def _seed(name: str) -> str:
     if not SEED_FILE.exists():
         SEED_FILE.write_text(secrets.token_hex(32))
@@ -167,8 +206,11 @@ class Forge:
         self.agents: dict[str, Agent] = {}
         self.pending: dict[str, asyncio.Future] = {}
         self.pending_skill: dict[str, tuple[str, asyncio.Future]] = {}
+        self.pending_opt: dict[str, asyncio.Future] = {}
+        self.registered: list[str] = []
         self.run_lock = asyncio.Lock()
         self.active = ""
+        patch_send()
         self._build()
 
     def finish(self, run: Run) -> None:
@@ -220,11 +262,13 @@ class Forge:
             description=description,
         )
         self.agents[name] = a
+        BUS.names[a.address] = name
         self.bureau.add(a)
         return a
 
     def log(self, run_id: str, agent: str, text: str, **extra) -> None:
         FORGE.emit(run_id, "log", agent, text=text, **extra)
+        thought(run_id, agent, text)
 
     def _build(self) -> None:
         gateway = self.agent(
@@ -265,6 +309,10 @@ class Forge:
             "router",
             "Decides what a parsed prompt needs: reuse a tile, train, chain, or refuse with a reason.",
         )
+        optimizer = self.agent(
+            "optimizer",
+            "Improves a simulated manipulation policy, one change per round, scored on 100 held-out scenes.",
+        )
         a = self.agents
 
         # gateway: the UI talks to the task agent exactly as ASI:One would, over the chat protocol
@@ -291,6 +339,100 @@ class Forge:
             pass
 
         gateway.include(gw_chat)
+
+        # optimizer agent: hired over the typed forge-optimize protocol (gateway -> optimizer), it runs the optimizer
+        # and sends one OptimizeProgress per round and an OptimizeResult at the end. One run at a time.
+        opt_proto = Protocol(name="forge-optimize", version="1.0")
+
+        @opt_proto.on_message(
+            OptimizeRequest,
+            replies={OptimizeAccepted, OptimizeProgress, OptimizeResult},
+        )
+        async def on_optimize(ctx: Context, sender: str, msg: OptimizeRequest):
+            from fastapi import HTTPException
+
+            from . import optimizer_api
+
+            if not msg.skill_id:
+                await ctx.send(
+                    sender,
+                    OptimizeAccepted(
+                        request_id=msg.request_id,
+                        error="a skill_id is needed (checkpoint_url is not supported yet)",
+                        code=422,
+                    ),
+                )
+                return
+            try:
+                res = await optimizer_api.start(
+                    optimizer_api.Start(
+                        skill=msg.skill_id,
+                        rounds=msg.rounds,
+                        train_seconds=msg.train_seconds,
+                    )
+                )
+            except HTTPException as e:
+                await ctx.send(
+                    sender,
+                    OptimizeAccepted(
+                        request_id=msg.request_id,
+                        error=str(e.detail),
+                        code=e.status_code,
+                    ),
+                )
+                return
+            self.log(
+                res["id"],
+                "optimizer",
+                f"hired by {BUS.names.get(sender, sender[:12])}: {msg.rounds} rounds on {msg.skill_id}, "
+                f"one change per round, scored on the same held-out scenes",
+            )
+            await ctx.send(
+                sender, OptimizeAccepted(request_id=msg.request_id, run_id=res["id"])
+            )
+            asyncio.get_running_loop().create_task(
+                self._watch_optimizer(res["id"], sender)
+            )
+
+        optimizer.include(opt_proto, publish_manifest=bool(self.endpoint))
+        o_chat = Protocol(spec=chat_protocol_spec)
+
+        @o_chat.on_message(ChatMessage)
+        async def on_o_chat(ctx: Context, sender: str, msg: ChatMessage):
+            await ctx.send(
+                sender,
+                ChatAcknowledgement(
+                    timestamp=datetime.now(UTC), acknowledged_msg_id=msg.msg_id
+                ),
+            )
+            await ctx.send(
+                sender,
+                _chat(
+                    "I improve a simulated manipulation policy, one change per round, scored on 100 held-out "
+                    "scenes. Hire me with an OptimizeRequest (skill_id, rounds, train_seconds) and I answer with "
+                    "OptimizeProgress per round and an OptimizeResult. Simulation only; one run at a time."
+                ),
+            )
+
+        @o_chat.on_message(ChatAcknowledgement)
+        async def o_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
+            pass
+
+        optimizer.include(o_chat, publish_manifest=bool(self.endpoint))
+
+        @gateway.on_message(OptimizeAccepted)
+        async def gw_accepted(ctx: Context, sender: str, msg: OptimizeAccepted):
+            fut = self.pending_opt.pop(msg.request_id, None)
+            if fut and not fut.done():
+                fut.set_result(msg)
+
+        @gateway.on_message(OptimizeProgress)
+        async def gw_progress(ctx: Context, sender: str, msg: OptimizeProgress):
+            pass
+
+        @gateway.on_message(OptimizeResult)
+        async def gw_result(ctx: Context, sender: str, msg: OptimizeResult):
+            pass
 
         # task agent: chat protocol in, TaskReady out; answers the asker when the skill is published
         t_chat = Protocol(spec=chat_protocol_spec)
@@ -789,6 +931,184 @@ class Forge:
         return ag
 
     running = False
+
+    async def optimize(self, skill_id: str, rounds: int, train_seconds: float) -> str:
+        """The gateway hires the optimizer agent over the protocol; returns the run id or raises the refusal."""
+        from fastapi import HTTPException
+
+        rid = uuid4().hex[:8]
+        fut = self.loop.create_future()
+        self.pending_opt[rid] = fut
+        await (
+            self.agents["gateway"]
+            ._build_context()
+            .send(
+                self.agents["optimizer"].address,
+                OptimizeRequest(
+                    request_id=rid,
+                    skill_id=skill_id,
+                    rounds=rounds,
+                    train_seconds=train_seconds,
+                ),
+            )
+        )
+        acc = await asyncio.wait_for(fut, 30)
+        if acc.error:
+            raise HTTPException(acc.code or 500, acc.error)
+        return acc.run_id
+
+    async def _watch_optimizer(self, opt_id: str, to: str) -> None:
+        """Turns the optimizer's run record into protocol messages: one OptimizeProgress per round, then the result."""
+        from . import optimizer_api
+
+        ctx = self.agents["optimizer"]._build_context()
+        seen = 0
+        while True:
+            await asyncio.sleep(1.0)
+            opt = optimizer_api.LIVE.get(opt_id)
+            if opt is None:
+                return
+            d = opt.to_json()
+            rounds = d.get("rounds", [])
+            for r in rounds[seen:]:
+                n = int(r.get("n") or 1)
+                ci = r.get("ci") or [0, 0]
+                ch = r.get("change") or {}
+                change = (
+                    f"{ch.get('knob')} = {ch.get('value')}: {ch.get('reason', '')}"
+                    if isinstance(ch, dict) and ch
+                    else "baseline, no change"
+                )
+                ok = r.get("status") in ("start", "kept")
+                await ctx.send(
+                    to,
+                    OptimizeProgress(
+                        run_id=opt_id,
+                        round=int(r.get("round", 0)),
+                        change=change,
+                        kept=ok,
+                        success=round(float(r.get("success", 0)) / n, 3),
+                        n=n,
+                        ci_low=float(ci[0]),
+                        ci_high=float(ci[1]),
+                    ),
+                )
+                verdict = (
+                    "kept"
+                    if r.get("status") == "kept"
+                    else "reverted"
+                    if r.get("status")
+                    else ""
+                )
+                self.log(
+                    opt_id,
+                    "optimizer",
+                    f"round {r.get('round', 0)}: {change}"
+                    + (
+                        f" -> {verdict}, {r.get('success')}/{n} on held-out scenes"
+                        if verdict
+                        else f" ({r.get('success')}/{n})"
+                    ),
+                )
+            seen = len(rounds)
+            if d.get("status") in ("done", "error", "failed", "cancelled"):
+                break
+        rs = d.get("rounds", [])
+        if not rs:
+            return
+        n0, best = (
+            int(rs[0].get("n") or 1),
+            rs[min(d.get("best_round", 0), len(rs) - 1)],
+        )
+        nb = int(best.get("n") or 1)
+        ci = best.get("ci") or [0, 0]
+        kept = d.get("best_round", 0) > 0
+        await ctx.send(
+            to,
+            OptimizeResult(
+                run_id=opt_id,
+                start_success=round(float(rs[0].get("success", 0)) / n0, 3),
+                final_success=round(float(best.get("success", 0)) / nb, 3),
+                ci_low=float(ci[0]),
+                ci_high=float(ci[1]),
+                checkpoint_url=f"run:opt-{opt_id}" if kept else "",
+                note=(
+                    f"kept round {d.get('best_round')}; the checkpoint is in the run record"
+                    if kept
+                    else "nothing was kept; the starting checkpoint is unchanged"
+                )
+                + ". Simulation result on one skill and one robot.",
+            ),
+        )
+        self.log(
+            opt_id,
+            "optimizer",
+            "sent the result to " + BUS.names.get(to, "the requester"),
+        )
+
+    def manifests(self) -> dict:
+        """Each agent's protocol manifests (the same documents published when an endpoint is set)."""
+        out = {}
+        for n, ag in self.agents.items():
+            out[n] = [
+                {
+                    "name": m.get("metadata", {}).get("name"),
+                    "version": m.get("metadata", {}).get("version"),
+                    "digest": d,
+                    "models": [
+                        (x.get("schema") or {}).get("title") or x.get("name")
+                        for x in m.get("models", [])
+                    ],
+                }
+                for d, p in ag.protocols.items()
+                for m in [p.manifest()]
+            ]
+        return out
+
+    def graph(self) -> dict:
+        """The agents and who talks to whom, for the Agents view."""
+        from . import llama
+
+        llm = {"task", "critic", "optimizer"}
+        nodes = [
+            {
+                "id": n,
+                "address": ag.address,
+                "description": getattr(ag, "_description", "") or "",
+                "llm": n in llm,
+                "skill": n.startswith("skill-"),
+            }
+            for n, ag in self.agents.items()
+        ]
+        edges = [
+            ["gateway", "task", "chat"],
+            ["task", "router", "RouteTask"],
+            ["router", "scene", "TaskReady"],
+            ["router", "planner", "ComposeTask"],
+            ["scene", "data", "CollectDemos"],
+            ["data", "trainer", "DemosReady"],
+            ["trainer", "eval", "PolicyTrained"],
+            ["eval", "critic", "EvalReport"],
+            ["critic", "data", "CollectDemos"],
+            ["critic", "registry", "Publish"],
+            ["planner", "executor", "Execute"],
+            ["executor", "registry", "Publish"],
+            ["registry", "task", "SkillPublished"],
+            ["gateway", "optimizer", "OptimizeRequest"],
+        ]
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "model": llama.MODEL,
+            "backends": llama.live_backends(),
+            "agentverse": {
+                "registered": sorted(self.registered),
+                "note": "registered on Agentverse: "
+                + ", ".join(sorted(self.registered))
+                if self.registered
+                else "local Bureau, not registered on Agentverse",
+            },
+        }
 
     async def start(self) -> None:
         for s in FORGE.registry.ordered():
