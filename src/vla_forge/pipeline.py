@@ -21,6 +21,7 @@ import numpy as np
 import torch
 
 from . import llm, tiles
+from . import records
 from . import router as router_mod
 from .compose import Step, step_layout
 from .compose import sample_layout as compose_layout
@@ -57,6 +58,7 @@ EVAL_SECONDS = 15.0  # measured: 20 rollouts in 12-14 s
 class Round:
     index: int
     demos: int = 0
+    demos_asked: int = 0
     train: dict = field(default_factory=dict)
     eval: dict = field(default_factory=dict)
     plan: dict = field(default_factory=dict)
@@ -378,6 +380,7 @@ class Forge:
             ),
         )
         self.registry.add(skill)
+        records.save(sid, records.from_run(run))
         self._save_tile(
             skill, run.rollouts[0], [st.instruction for st in run.steps], run_id=run.id
         )
@@ -650,6 +653,7 @@ class Forge:
             ),
         )
         self.registry.add(skill)
+        records.save(sid, records.from_run(run))
         self._save_tile(skill, run.rollouts[run.best_round], run_id=run.id)
         run.skill_id = sid
         run.seconds = round(run.elapsed(), 1)

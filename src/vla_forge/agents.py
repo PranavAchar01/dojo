@@ -362,7 +362,7 @@ class Forge:
                 + (f" focused near {len(near)} failure spots" if near else ""),
             )
             st = await self._stage("data", FORGE.collect, run, n, near or None, "data")
-            run.rounds.append(Round(index=len(run.rounds), demos=st["ok"]))
+            run.rounds.append(Round(index=len(run.rounds), demos=st["ok"], demos_asked=st["n"]))
             self.log(
                 run.id,
                 "data",

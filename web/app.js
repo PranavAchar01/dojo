@@ -378,7 +378,7 @@ async function startPlayback(payload, auto = false) {
 let playTok = 0;
 
 // ---------------------------------------------------------------- welcome: with nothing picked, the floor is never blank; it loops real recorded rollouts
-let welcomeOn = false, welcomeTimer = 0, welcomeTiles = null;
+let welcomeOn = false, welcomeTimer = 0, welcomeTiles = null, welcomeShown = null;
 // a frame from each published model's own rollout, with its measured score, one after another
 async function welcomeStep(k) {
   if (!welcomeTiles) {
@@ -390,6 +390,14 @@ async function welcomeStep(k) {
   img.src = `/api/skills/${encodeURIComponent(t.id)}/thumb.png?v=${encodeURIComponent(t.replay_source || "")}`;
   img.hidden = false;
   $("#welcome-now").textContent = `${t.instruction}: ${Math.round(t.success_rate * t.n_eval)} / ${t.n_eval} on held-out scenes`;
+  // the rail, the inspector and any open step card follow the model the loop is showing
+  welcomeShown = t;
+  const held = `${Math.round(t.success_rate * t.n_eval)}/${t.n_eval}`;
+  resetStages(t.tier === 3);
+  stage("eval", "done", held);
+  stage("registry", "done", held);
+  showSavedModel(t);
+  if (railCard) { const key = railCardKey; closeRailCard(); openRailCard(key); }
   welcomeTimer = setTimeout(() => welcomeStep(k + 1), 4000);
 }
 function startWelcome() {
@@ -1366,6 +1374,22 @@ function closeRailCard() {
 }
 const ruleText = (r) => `${String(r.op).replace(/_/g, " ")}: ${Object.entries(r).filter(([k]) => k !== "op").map(([k, v]) => `${k} ${v}`).join(", ")}`;
 const when = (t) => new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+// a published model's saved record (engine records.py) shaped like a run, so the cards read one thing
+function recordRun(sk) {
+  const rec = sk?.record;
+  if (!rec || !Object.keys(rec).length) return null;
+  const n = Math.max(rec.eval?.length || 0, rec.demos?.per_round?.length || 0, rec.critic?.length || 0, rec.train?.rounds || 0, 1);
+  const rounds = Array.from({ length: n }, (_, i) => ({
+    index: i,
+    demos: rec.demos?.per_round?.[i]?.ok || 0,
+    train: i === 0 && rec.train ? { steps: rec.train.steps, seconds: rec.train.seconds } : {},
+    eval: rec.eval?.find((e) => e.round === i) || {},
+    successes: rec.eval?.find((e) => e.round === i)?.successes || [],
+    plan: rec.critic?.find((c) => c.round === i) || {},
+    loss: (rec.train?.loss_curve || []).filter((p) => p[0] === i).map((p) => [p[1], p[2]]),
+  }));
+  return { route: rec.route, rounds, best_round: rec.best_round ?? n - 1, layout_seed: rec.layout_seed, n_scenes: rec.n_scenes, spec: null, saved: true, demos: rec.demos };
+}
 function stepRows(k, sk, run) {
   const rows = []; // [label, text] or [label, null] for "not recorded"
   const add = (l, v) => rows.push([l, v === undefined || v === null || v === "" ? null : String(v)]);
@@ -1380,11 +1404,13 @@ function stepRows(k, sk, run) {
       (spec.success || []).forEach((r, i) => add(i ? "" : "Success rule", ruleText(r)));
     }
     if (run?.parse?.model) add("Parsed by", modelTag(run.parse.model));
-    const fe = spec?.feasibility ?? sk?.feasibility;
-    if (fe != null) {
-      const flat = (v) => (typeof v === "object" && v ? (Array.isArray(v) ? v.map(flat).join("; ") : Object.entries(v).map(([a, b]) => `${a.replace(/_/g, " ")} ${flat(b)}`).join(", ")) : String(v));
-      if (typeof fe === "object" && !Array.isArray(fe)) Object.entries(fe).forEach(([a, b], i) => add(i ? a.replace(/_/g, " ") : `Feasibility: ${a.replace(/_/g, " ")}`, flat(b)));
-      else add("Feasibility", flat(fe));
+    const flat = (v) => (typeof v === "object" && v ? (Array.isArray(v) ? v.map(flat).join("; ") : Object.entries(v).map(([a, b]) => `${a.replace(/_/g, " ")} ${flat(b)}`).join(", ")) : String(v));
+    for (const key of ["feasibility", "routing"]) {
+      const fe = spec?.[key] ?? sk?.[key];
+      if (fe == null) continue;
+      const cap = key[0].toUpperCase() + key.slice(1);
+      if (typeof fe === "object" && !Array.isArray(fe)) Object.entries(fe).forEach(([a, b], i) => add(i ? a.replace(/_/g, " ") : `${cap}: ${a.replace(/_/g, " ")}`, flat(b)));
+      else add(cap, flat(fe));
     }
   } else if (k === "router") {
     const r = run?.route;
@@ -1403,14 +1429,15 @@ function stepRows(k, sk, run) {
     if (spec) { add("Block", spec.obj); add("Target", spec.target); add("Distractors", spec.distractors); }
     add("Held-out scenes", sk?.n_eval || (best?.eval?.n));
     add("Replays from", sk?.replay_source);
-    add("Layout seed", null);
+    add("Layout seed", run?.layout_seed);
     btn.push(["Set orbit camera", () => setCam("orbit")]);
   } else if (k === "data") {
     const n = rounds.reduce((a, r) => a + (r.demos || 0), 0);
     add("Demonstrations", n || null);
     if (rounds.length) add("Collected", "scripted expert in randomized scenes");
     if (rounds.length > 1) add("Rounds", `${rounds.length} (${rounds.map((r) => r.demos).join(" + ")})`);
-    add("Expert success", null);
+    const d = run?.demos;
+    add("Expert success", d?.asked ? `${d.ok}/${d.asked} demos succeeded` : null);
   } else if (k === "trainer") {
     const secs = rounds.reduce((a, r) => a + (r.train?.seconds || 0), 0) || sk?.train_seconds;
     add("Train time", secs ? `${(+secs).toFixed(1)}s` : null);
@@ -1450,14 +1477,16 @@ async function openRailCard(k) {
   let st = { skills: [], runs: [] };
   try { st = await (await fetch("/api/state")).json(); } catch { /* the card still opens with what the page holds */ }
   if (railCardKey !== k) return; // closed or switched while loading
-  const sid = selSkill || lastSkill;
-  const run = st.runs.find((r) => r.id === current && !runDone) || st.runs.find((r) => sid && r.skill_id === sid) || st.runs.find((r) => r.id === current);
-  const sk = st.skills.find((x) => x.id === (sid || run?.skill_id));
-  const { rows, btn } = stepRows(k, sk, run);
+  const sid = selSkill || lastSkill || (welcomeOn && welcomeShown?.id) || "";
+  const live = st.runs.find((r) => r.id === current && !runDone) || st.runs.find((r) => sid && r.skill_id === sid) || st.runs.find((r) => r.id === current);
+  const sk = st.skills.find((x) => x.id === (sid || live?.skill_id));
+  const run = live || recordRun(sk);
+  const { rows, btn } = sk || run ? stepRows(k, sk, run) : { rows: [], btn: [] };
   const c = el("div", "rail-card");
   c.setAttribute("role", "dialog"); c.setAttribute("aria-label", NAMES[k]);
   const x = el("button", "wf-x", "\u00D7"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.onclick = closeRailCard;
   c.append(x, el("div", "rc-t", NAMES[k]));
+  if (!sk && !run) c.append(el("p", "rc-empty", "Pick a model from the Library or describe a task."));
   const body = el("dl", "rc-rows");
   for (const [l, v] of rows) { body.append(el("dt", "", l)); body.append(el("dd", v === null ? "none" : "", v === null ? NOT_REC : v)); }
   c.append(body);
@@ -1473,7 +1502,10 @@ document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && railCa
 async function showSavedModel(sk) {
   savedModel = { sk };
   let run = null;
-  try { run = (await (await fetch("/api/state")).json()).runs.find((r) => r.skill_id === sk.id) || null; } catch { /* the saved skill record still fills the cards */ }
+  try {
+    const st = await (await fetch("/api/state")).json();
+    run = st.runs.find((r) => r.skill_id === sk.id) || recordRun(st.skills.find((x) => x.id === sk.id)) || null;
+  } catch { /* the saved skill record still fills the cards */ }
   if (!savedModel || savedModel.sk !== sk) return;
   savedModel.run = run;
   losses = (run?.rounds || []).map((r) => r.loss || []).filter((l) => l.length);
