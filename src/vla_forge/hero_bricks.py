@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache, lru_cache
 from pathlib import Path
 
@@ -288,3 +288,26 @@ def from_json(rows) -> tuple[Brick, ...]:
         )
         for r in rows
     )
+
+
+def replace_name(b: Brick, name: str) -> Brick:
+    return replace(b, name=name)
+
+
+ACTIVE = ROOT / "runs" / "hero_build.json"
+
+
+def save_active(rules: Rules, bricks) -> None:
+    """The build the Build plan view hands to the MuJoCo table ("Use this build")."""
+    ACTIVE.parent.mkdir(parents=True, exist_ok=True)
+    ACTIVE.write_text(
+        json.dumps({"rules": rules.as_dict(), "bricks": to_json(bricks)}, indent=1)
+    )
+
+
+def load_active() -> tuple[Rules, tuple[Brick, ...]] | None:
+    try:
+        d = json.loads(ACTIVE.read_text())
+        return Rules(**d["rules"]), from_json(d["bricks"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None

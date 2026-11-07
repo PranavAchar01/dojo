@@ -44,7 +44,10 @@ def loose() -> dict[str, tuple[float, float, float]]:
     return {b.name: SLOTS[i % len(SLOTS)] for i, b in enumerate(db.DUCK)}
 
 
-PAD_X = (-0.006, 0.004)  # pad span along the jaw about the gripper site: low on the jaw tip, sized for 9.6 mm bricks
+PAD_X = (
+    -0.006,
+    0.004,
+)  # pad span along the jaw about the gripper site: low on the jaw tip, sized for 9.6 mm bricks
 
 
 def pad_frames() -> dict:
@@ -140,8 +143,13 @@ def build_model(size: int = 960) -> mujoco.MjModel:
         material="table_mat",
         friction=[0.8, 0.005, 0.0001],
     )
-    for g in spec.geoms:  # the vendor arm prints yellow like the bricks: tint it slate so the bricks read
-        if g.type == mujoco.mjtGeom.mjGEOM_MESH and g.parent.name.split("_", 1)[0] in ("a", "b"):
+    for g in (
+        spec.geoms
+    ):  # the vendor arm prints yellow like the bricks: tint it slate so the bricks read
+        if g.type == mujoco.mjtGeom.mjGEOM_MESH and g.parent.name.split("_", 1)[0] in (
+            "a",
+            "b",
+        ):
             g.material = ""
             g.rgba = [0.30, 0.34, 0.42, 1.0]
     # collision bits as in sim/scene.py: jaw meshes do not touch bricks, the pads do, everything else does
@@ -296,3 +304,25 @@ class Table:
             return r.render().copy()
         finally:
             r.close()
+
+
+if (
+    __name__ == "__main__"
+):  # python -m vla_forge.hero_sim OUT.png|-  renders the table with the build in use
+    import io
+    import sys
+
+    from PIL import Image
+
+    active = db.load_active()
+    if active:
+        db.set_assembly(active[1])
+    t = Table.new()
+    t.reset()
+    img = Image.fromarray(t.render("overview", 1600, 1000))
+    if sys.argv[1] == "-":
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        sys.stdout.buffer.write(buf.getvalue())
+    else:
+        img.save(sys.argv[1])

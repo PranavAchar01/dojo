@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/static/arms.css">
 <link rel="stylesheet" href="/static/roam.css">
 <link rel="stylesheet" href="/static/agents.css">
+<link rel="stylesheet" href="/static/plan.css">
 <script type="importmap">
 { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
 </script>
@@ -46,6 +47,7 @@
           <button data-view="sim">Sim</button>
           <button data-view="robot">Robot</button>
           <button data-view="ladder">Ladder</button>
+          <button data-view="plan">Build plan</button>
           <button data-view="agents">How it works</button>
         </div>
       </div>
@@ -157,6 +159,8 @@
 
       <div class="view hidden" id="view-agents"></div>
 
+      <div class="view hidden" id="view-plan"></div>
+
       <div class="view hidden" id="view-skills">
         <div class="doc">
           <div class="doc-h">
@@ -244,6 +248,7 @@
 <script type="module" src="/static/library.js"></script>
 <script type="module" src="/static/arms.js"></script>
 <script type="module" src="/static/agents.js"></script>
+<script type="module" src="/static/plan.js"></script>
 <script type="module" src="/static/forge-agent.js"></script>
 <script type="module" src="/static/workflow.js"></script>
 </body>

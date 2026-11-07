@@ -828,7 +828,7 @@ function setView(v) {
   // the library keeps the chat beside it, so a new task can be typed straight from it
   app.classList.toggle("immersive", v !== "sim" && v !== "skills");
   app.classList.toggle("lib", v === "skills");
-  for (const k of ["sim", "robot", "ladder", "agents", "skills"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
+  for (const k of ["sim", "robot", "ladder", "agents", "skills", "plan"]) $(`#view-${k}`).classList.toggle("hidden", k !== v);
   showBuilder(v === "robot");
   $(".tabs").classList.toggle("hidden", v !== "sim");
   if (v === "ladder") renderLadder();
