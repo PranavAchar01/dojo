@@ -21,7 +21,7 @@ dock.setStatus("");
 const st = { run: "", thoughts: [], n: 0, open: null, graph: null, last: 0 };
 let loading = false, t0 = 0, loadIv = 0;
 
-function agentLabel(agent, llm) { return llm ? `${agent} · Llama 4 Maverick` : `${agent} · code`; }
+function agentLabel(agent, llm) { return llm ? `${agent} · Muse Spark` : `${agent} · code`; }
 
 function railNow() {
   const live = $("#rail li.live"), done = [...document.querySelectorAll("#rail li.done")];
@@ -60,7 +60,7 @@ addEventListener("keydown", (e) => {
 function row(t) {
   const d = document.createElement("div");
   d.className = "th-row" + (t.llm ? " llm" : "");
-  d.innerHTML = `<span class="th-ag" data-agent="${esc(t.agent)}">${esc(t.agent)}</span><span class="th-tx">${esc(t.text)}</span><span class="th-lb">${t.llm ? "Llama 4 Maverick" : "code"}</span>`;
+  d.innerHTML = `<span class="th-ag" data-agent="${esc(t.agent)}">${esc(t.agent)}</span><span class="th-tx">${esc(t.text)}</span><span class="th-lb">${t.llm ? "Muse Spark" : "code"}</span>`;
   $(".th-ag", d).onclick = () => fly(t.agent);
   return d;
 }
@@ -73,7 +73,7 @@ function renderAll() {
 function modelLine(g) {
   const m = g && g.models;
   if (!m) return "";
-  return [["Llama", m.llama], ["SubQ", m.subq]].filter(([, v]) => v).map(([k, v]) => `${k} ${v.backend || "stub"}`).join(", ");
+  return [["Muse Spark", m.meta], ["SubQ", m.subq]].filter(([, v]) => v).map(([k, v]) => (v.available === false ? `${k} unavailable: ${v.why || "no reason given"}` : `${k} ${v.backend || "stub"}`)).join("; ");
 }
 function paintFoot() {
   const b = st.graph ? (st.graph.backends || []).join(", ") || "stub" : "";
@@ -139,13 +139,13 @@ async function compose(q) {
     const n = g.nodes.find((x) => x.id === named);
     fly(named);
     const said = [...st.thoughts].reverse().find((t) => t.agent === named);
-    return `**${named}** is a stage of the pipeline. ${n.description}${n.llm ? " It asks Llama 4 Maverick." : " It runs plain code, no model call."}${said ? ` Last thing it said: "${said.text}"` : " It has not said anything in this session yet."}`;
+    return `**${named}** is a stage of the pipeline. ${n.description}${n.llm ? " It asks Muse Spark." : " It runs plain code, no model call."}${said ? ` Last thing it said: "${said.text}"` : " It has not said anything in this session yet."}`;
   }
-  if (/model|llama|backend|who.*(answer|power)/.test(s) && g) {
-    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Llama 4 Maverick**. SubQ reads the whole run history, every past round and the skill library. In each optimizer round both propose a change at the same time and both are scored in simulation. Backends answering in this process: **${modelLine(g) || (g.backends || []).join(", ") || "a stub"}**.`;
+  if (/model|muse|spark|subq|llama|backend|who.*(answer|power)/.test(s) && g) {
+    return `The agents that call the model (${g.nodes.filter((n) => n.llm).map((n) => n.id).join(", ")}) ask **Muse Spark** (Meta). SubQ reads the whole run history, every past round and the skill library, and picks among the options. Every change is scored in simulation. Backends answering in this process: **${modelLine(g) || (g.backends || []).join(", ") || "a stub"}**.`;
   }
   if (/agent|stage|who/.test(s) && g) {
-    return `${g.nodes.filter((n) => !n.skill).length} stages run in one pipeline: ${g.nodes.filter((n) => !n.skill).map((n) => n.id).join(", ")}. Open the **Llama + SubQ** tab to watch the model calls.`;
+    return `${g.nodes.filter((n) => !n.skill).length} stages run in one pipeline: ${g.nodes.filter((n) => !n.skill).map((n) => n.id).join(", ")}. Open the **Muse Spark + SubQ** tab to watch the model calls.`;
   }
   if (/think|why|reason/.test(s)) {
     setThinking(true);

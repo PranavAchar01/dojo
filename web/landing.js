@@ -37,11 +37,11 @@ if (!reduced && innerWidth >= 760) {
   import("/static/mascot.js").then(({ roamer, goTo, goHomeSoon, say }) => {
     const LINES = {
       how: "One sentence, eight steps.",
-      agents: "Llama and SubQ, in parallel.",
+      agents: "Muse Spark and SubQ, in parallel.",
       arms: "Another arm gets its own sub-task.",
       skills: "Each saved skill is an agent too.",
       robots: "Every part has a real source.",
-      models: "What runs today. Llama plans.",
+      models: "What runs today. Muse Spark plans.",
     };
     setTimeout(() => { say("Hi, I will point things out.", 3600); }, 1400);
     let last = "", t = 0;

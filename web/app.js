@@ -466,7 +466,8 @@ function heldOut(run, round, rate) {
 // which model answered, as the server reported it
 function modelTag(m) {
   if (!m) return "";
-  if (/llama/i.test(m)) return "Llama 4 Maverick";
+  if (/muse|meta:/i.test(m)) return "Muse Spark";
+  if (/llama/i.test(m)) return "Llama";
   return m === "rules" ? "keyword rules, no model" : m;
 }
 function fmt(s) {
