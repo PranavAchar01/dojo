@@ -37,7 +37,7 @@ if (!reduced && innerWidth >= 760) {
   import("/static/mascot.js").then(({ roamer, goTo, goHomeSoon, say }) => {
     const LINES = {
       how: "One sentence, eight steps.",
-      agents: "Fetch.ai agents, Llama behind three.",
+      agents: "Llama and SubQ, in parallel.",
       arms: "Another arm gets its own sub-task.",
       skills: "Each saved skill is an agent too.",
       robots: "Every part has a real source.",
