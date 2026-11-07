@@ -9,6 +9,7 @@ nothing assembles in the browser until an arm is picked. `python -m vla_forge.th
 from __future__ import annotations
 
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -39,6 +40,41 @@ def wanted() -> list[tuple[str, str, str | None]]:
     return out
 
 
+# the robots are drawn black and white: the same roles and colours as web/studio.js robotMaterial, so a card
+# picture matches the library and the live preview
+SHELL, SERVO, STEEL = (
+    (0.945, 0.949, 0.953, 1),
+    (0.078, 0.082, 0.094, 1),
+    (0.44, 0.455, 0.48, 1),
+)
+_SERVO_NAME = re.compile(
+    r"motor|sts3215|horn|prop|gripper_bar|finger|_7_gripper|_6_wrist|_2_shoulder|hand_|robotiq.*(base|driver|coupler|follower|spring)",
+    re.IGNORECASE,
+)
+_NOT_SERVO = re.compile(r"moving_jaw|Moving_Jaw|gripper_moving_finger|static_finger$")
+
+
+def _recolour(m: mujoco.MjModel) -> None:
+    for g in range(m.ngeom):
+        if (
+            m.geom_group[g] != VISUAL_GROUP
+            or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
+        ):
+            continue
+        name = (
+            mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, int(m.geom_dataid[g])) or ""
+        )
+        mat = m.geom_matid[g]
+        rgba = m.mat_rgba[mat] if mat >= 0 else m.geom_rgba[g]
+        lum = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+        if _SERVO_NAME.search(name) and not _NOT_SERVO.search(name):
+            colour = SERVO
+        else:
+            colour = SHELL if lum > 0.62 else SERVO if lum < 0.3 else STEEL
+        m.geom_rgba[g] = colour
+        m.geom_matid[g] = -1
+
+
 def _on_arm(slot: str, part: str, arm: str) -> str:
     return R.make_id(arm, part if slot == "wrist" else "native")
 
@@ -46,6 +82,7 @@ def _on_arm(slot: str, part: str, arm: str) -> str:
 def _render(
     m: mujoco.MjModel, d: mujoco.MjData, box, direction, pad: float
 ) -> Image.Image:
+    _recolour(m)
     lo, hi = np.asarray(box[0]), np.asarray(box[1])
     centre = (lo + hi) / 2
     size = max(float(np.linalg.norm(hi - lo)), 0.05)
@@ -116,8 +153,7 @@ def missing() -> list[tuple[str, str, str | None]]:
 
 def warm_needed() -> bool:
     return bool(missing()) or any(
-        not (robotcache.ROOT / f"{robotcache.config_key(c)}.report.json.gz").exists()
-        for c in robotcache.configs()
+        not robotcache.warmed(c) for c in robotcache.configs()
     )
 
 
@@ -126,8 +162,7 @@ def main(argv: list[str] | None = None) -> None:
     for item in wanted() if force else missing():
         save(*item)
     for rid in robotcache.configs():
-        robotcache.view_blob(rid)
-        robotcache.report_blob(rid)
+        robotcache.warm(rid)
 
 
 if __name__ == "__main__":

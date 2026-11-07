@@ -116,5 +116,32 @@ def part_blob(slot: str, part: str) -> tuple[bytes, str]:
 
 
 def configs() -> list[str]:
-    """Every robot id the arm cards and the wrist cards can ask for: each arm with its own wrist and a locked one."""
-    return [R.make_id(a, w) for a in R.ARMS for w in R.WRISTS]
+    """Every robot id a pick can ask for: each arm with each wrist choice, and with each sourced gripper."""
+    ids = [R.make_id(a, w) for a in R.ARMS for w in R.WRISTS]
+    grippers = [
+        R.make_id(a, "native", e)
+        for a in R.ARMS
+        for e, v in R.EFFECTORS.items()
+        if v is not None
+    ]
+    return sorted(  # the stock arm first: it is the likeliest first pick
+        ids + grippers,
+        key=lambda i: not i.startswith("so101"),
+    )
+
+
+def warmed(robot_id: str) -> bool:
+    key = config_key(robot_id)
+    return any(
+        (ROOT / f"{key}.{tail}").exists() for tail in ("report.json.gz", "failed")
+    )
+
+
+def warm(robot_id: str) -> None:
+    """Build and store both payloads; a combination that cannot be assembled is marked so it is not retried."""
+    try:
+        view_blob(robot_id)
+        report_blob(robot_id)
+    except Exception:  # noqa: BLE001 - the server answers such a pick with its own error; here it is only skipped
+        ROOT.mkdir(parents=True, exist_ok=True)
+        (ROOT / f"{config_key(robot_id)}.failed").touch()
