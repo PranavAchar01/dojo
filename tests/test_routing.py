@@ -7,13 +7,13 @@ TOOLS = ["ratchet_wrench", "pliers", "screwdriver"]
 ALL = list(toolbox.ALL_TOOLS)
 
 
-def test_toolbox_pack_routes_to_so101():
+def test_toolbox_pack_routes_to_a_heavier_arm():
     r = routing.route(TOOLS, toolbox.TOOLBOX, XY)
-    assert r["chosen"] == ["so101"]
+    assert r["chosen"] == ["vx300s.native.robotiq_2f85"]
     assert r["assignments"][0]["objects"] == TOOLS
     assert r["excluded"] == [] and r["pinned"] is None
     top = r["ranked"][0]
-    assert top["robot"] == "so101" and top["score"] == 1.0 and top["fails"] == []
+    assert top["robot"] == "vx300s.native.robotiq_2f85" and top["score"] == 1.0 and top["fails"] == []
 
 
 def test_every_arm_is_ranked_with_numbers():

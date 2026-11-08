@@ -16,8 +16,14 @@ from . import feasibility, robots
 
 
 def available() -> list[str]:
-    """Every arm the Build tab accepts (`robots.usable`), with its native wrist and jaw, as robot ids; default first."""
-    ids = [r for r in (robots.make_id(a) for a in robots.ARMS) if robots.usable(r)[0]]
+    """Every arm the Build tab accepts (`robots.usable`), with its own jaw or any catalogue gripper swapped in, as robot ids; default first."""
+    cands = [
+        robots.make_id(a, effector=e)
+        for a in robots.ARMS
+        for e, d in robots.EFFECTORS.items()
+        if e == "native" or (d is not None and a != "so101")
+    ]
+    ids = [r for r in cands if robots.usable(r)[0]]
     return sorted(ids, key=lambda r: (not robots.is_default(r), cost(r)))
 
 

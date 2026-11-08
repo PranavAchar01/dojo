@@ -29,6 +29,7 @@ from .scene import (
 from .tasks import TaskSpec
 
 DT = STEPS_PER_CONTROL * TIMESTEP
+FRAME_STEPS = 10  # 300 Hz physics / 10 = the 30 fps the tile replays use (rollout.py records the same)
 DOWN = np.array([0.0, 0.0, -1.0])
 
 GRIP_OPEN = 0.7
@@ -81,6 +82,7 @@ class IK:
         self.use_heading = self.n >= 5
         self.w_ori, self.w_post, self.damping = w_ori, w_post, damping
         self.heading: np.ndarray | None = None
+        self.down = DOWN  # the approach axis the wrist aims at (the toolbox carry leans it away from the lid)
         self.tilt = 1.0  # weight of the top-down term against the heading term (the toolbox carry lowers it)
 
     def fk(self, q):
@@ -98,7 +100,7 @@ class IK:
         for _ in range(iters):
             pos, mat = self.fk(q)
             ep = target - pos
-            eo = self.tilt * np.cross(mat[:, 0], DOWN)
+            eo = self.tilt * np.cross(mat[:, 0], self.down)
             if self.heading is not None and self.use_heading:
                 eo = eo + np.cross(mat[:, 2], self.heading)
             if np.linalg.norm(ep) < tol and np.linalg.norm(eo) < 0.02:
@@ -149,10 +151,12 @@ class Expert:
         max_seconds: float = 20.0,
         noise: float = 0.0,
         rng: np.random.Generator | None = None,
+        on_frame: Callable[[Scene], None] | None = None,
     ):
-        """noise > 0 is DART: the executed joint command carries a slowly varying perturbation (std `noise`
+        """on_frame(scene) runs every FRAME_STEPS physics steps (30 Hz, the replay rate the tiles play).
+        noise > 0 is DART: the executed joint command carries a slowly varying perturbation (std `noise`
         rad) while `scene.cmd` keeps the clean command, so recorded labels show how to get back on track."""
-        self.sc, self.spec, self.on_tick = scene, spec, on_tick
+        self.sc, self.spec, self.on_tick, self.on_frame = scene, spec, on_tick, on_frame
         r = self.r = (
             scene.robot
         )  # the embodiment's gripper commands, jaw-centre offsets and home pose
@@ -202,6 +206,8 @@ class Expert:
         for _ in range(STEPS_PER_CONTROL):
             mujoco.mj_step(self.sc.model, d)
             self.step += 1
+            if self.on_frame and self.step % FRAME_STEPS == 0:
+                self.on_frame(self.sc)
             if self.step % STEPS_PER_POLICY == 0:
                 if (
                     self.calm
