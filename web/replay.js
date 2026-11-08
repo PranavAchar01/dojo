@@ -74,7 +74,7 @@ const MOMENTS = 8, COLS = 10, TW = 96, TH = 72;
 let rsiUI = null;
 // the panel is the next chapter: built at open, hidden, and shown only while the replay sits at its end
 function rsiSync() {
-  const U = rsiUI; if (!U || !R) return;
+  const U = rsiUI; if (!U || U.solo || !R) return;
   const end = R.pos >= R.total;
   if (!end) U.dismissed = false;
   const want = end && !U.dismissed;
@@ -84,9 +84,9 @@ function rsiSync() {
   if (want) { U.place(); U.draw(); }
 }
 function rsiClose() { document.body.classList.remove("rsi-open"); if (rsiUI) { clearInterval(rsiUI.timer); removeEventListener("resize", rsiUI.place); rsiUI.box.remove(); rsiUI = null; } }
-async function rsiPanel(rsi) {
+async function rsiPanel(rsi, solo = false) {
   const r = await fetch(`/api/optimizer/runs/${rsi.run}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-  if (!r || !R || !bar || r.status === "running") return;
+  if (!r || (!solo && (!R || !bar)) || r.status === "running") return;
   rsiClose();
   const rows = r.rounds.filter((x) => x.success != null && x.outcomes);
   if (rows.length < 2) return;
@@ -94,7 +94,8 @@ async function rsiPanel(rsi) {
   const best = r.rounds[r.best_round] || rows[rows.length - 1];
   const c = r.test && r.test.compare, h = r.hero;
   const box = mkEl("section", "rp-rsi");
-  box.hidden = true;
+  box.hidden = !solo;
+  if (solo) box.classList.add("rsi-solo");
   box.dataset.keepclear = "8";
   box.setAttribute("data-keepclear", "");
   box.setAttribute("aria-label", "Recursive self-improvement example");
@@ -102,7 +103,7 @@ async function rsiPanel(rsi) {
   top.append(mkEl("span", "rsi-tag", "RSI"), mkEl("h3", "", `The optimizer lifted this skill from ${rows[0].success} to ${best.success} of ${best.n} scenes`));
   const x = mkEl("button", "rsi-x", "×");
   x.setAttribute("aria-label", "Hide the RSI example");
-  x.onclick = () => { rsiUI.dismissed = true; rsiSync(); };
+  x.onclick = () => { if (solo) return rsiClose(); rsiUI.dismissed = true; rsiSync(); };
   top.append(x);
   const main = mkEl("div", "rsi-main");
   const left = mkEl("div", "rsi-left");
@@ -152,12 +153,14 @@ async function rsiPanel(rsi) {
   if (c) foot.append(mkEl("p", "", `${pctN(c.after.k / c.n)} vs ${pctN(c.before.k / c.n)} on ${c.n} fresh scenes, in simulation. A small gain, not statistically significant (McNemar p ${c.mcnemar.p}).`));
   const open = mkEl("button", "rsi-open", "Open the full Optimize view");
   open.onclick = () => window.forgeOptimizer?.show(rsi.run);
-  foot.append(open);
+  if (!solo) foot.append(open);
   right.append(foot);
   main.append(left, right);
   box.append(top, main);
   document.body.append(box);
-  const place = () => { // under the replay bar, centred in the stage column (never over the side rail)
+  const place = () => {
+    if (solo) { box.style.top = "84px"; box.style.left = "50%"; box.style.width = `${Math.min(900, window.innerWidth - 32)}px`; box.style.maxHeight = `${Math.max(240, window.innerHeight - 112)}px`; return; }
+    // under the replay bar, centred in the stage column (never over the side rail)
     const b = bar.getBoundingClientRect(), v = $("#view-sim").getBoundingClientRect();
     const gap = v.width >= 1000 ? 372 : 16; // the stage's floating arm card keeps the left edge
     const w = Math.min(900, v.width - gap - 16);
@@ -168,13 +171,13 @@ async function rsiPanel(rsi) {
   };
   place();
   addEventListener("resize", place);
-  R.rsi = rsi;
+  if (R) R.rsi = rsi;
 
   const imgs = new Map();
   const sheet = (rd, k) => { const key = `${rd}/${k}`; if (!imgs.has(key)) { const im = new Image(); im.src = `${API}/img/r${rd}/m${k}.jpg`; imgs.set(key, im); } return imgs.get(key); };
   for (let k = 0; k < MOMENTS; k++) sheet(0, k);
   const g = cv.getContext("2d");
-  const U = { box, tick: 0, round: 0, frac: 0, pinned: null, count: rows[0].success, pin(i) { U.pinned = U.pinned === i ? null : i; draw(); } };
+  const U = { box, tick: 0, round: 0, frac: 0, solo, pinned: null, count: rows[0].success, pin(i) { U.pinned = U.pinned === i ? null : i; draw(); } };
   U.place = place;
   rsiUI = U;
   const roundOf = () => (U.pinned != null ? U.pinned : Math.min(rows.length - 1, Math.floor(U.frac * (rows.length + 1))));
@@ -209,10 +212,13 @@ async function rsiPanel(rsi) {
     box.classList.toggle("final", i === rows.length - 1);
   }
   U.draw = draw;
-  U.timer = setInterval(() => { if (box.hidden) return; U.tick++; draw(); place(); }, 320);
+  U.timer = setInterval(() => { if (box.hidden) return; U.tick++; if (solo) U.frac = Math.min(1, U.tick / 28); draw(); place(); }, 320);
   draw();
+  if (solo) { document.body.append(box); return; }
   rsiSync();
 }
+window.forgeRSIShow = (rsi) => rsiPanel(rsi, true);
+window.forgeRSIHide = () => { if (rsiUI?.solo) rsiClose(); };
 
 async function open(tile) {
   if (R) close();

@@ -86,3 +86,4 @@ body.rp-on .rail li .m { transition: opacity .3s; }
 body.rp-on #view-sim .caption { transition: opacity .3s; }
 body.rp-on #view-sim canvas { animation: rp-fade .35s ease both; }
 @media (prefers-reduced-motion: reduce) { body.rp-on * { animation-duration: .01s !important; } }
+.rp-rsi.rsi-solo { z-index: 260; top: 84px; }
