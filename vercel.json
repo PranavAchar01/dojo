@@ -1,0 +1,25 @@
+{
+ "cleanUrls": false,
+ "rewrites": [
+  {
+   "source": "/app",
+   "destination": "/app.html"
+  },
+  {
+   "source": "/",
+   "destination": "/landing.html"
+  },
+  {
+   "source": "/api/:p*.png",
+   "destination": "/_s/api/:p*.png"
+  },
+  {
+   "source": "/api/:p*.jpg",
+   "destination": "/_s/api/:p*.jpg"
+  },
+  {
+   "source": "/api/:p*.glb",
+   "destination": "/_s/api/:p*.glb"
+  }
+ ]
+}
