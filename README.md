@@ -21,6 +21,16 @@ The first start needs the base policy (`models/base.pt`, see "Pretraining" below
 encoders in the local cache (`facebook/dinov2-small`, `google/siglip2-base-patch16-224`). The OpenAI key is
 read from the environment or the macOS Keychain (`OPENAI_API_KEY`); it is never written to disk.
 
+## Live Demo
+
+Try the interactive demo at [dojo-psi-two.vercel.app/app](https://dojo-psi-two.vercel.app/app)
+
+🎯 **Prompt** — Enter a task in natural language  
+📊 **Pipeline** — Watch real-time loss, model calls, and success metrics  
+🤖 **Scenes** — MuJoCo simulation with SO-101 robot  
+📈 **Optimizer** — Muse vs SubQ rounds, duel outcomes  
+📚 **Library** — Browse trained skills, remix and reuse
+
 ## What happens to one prompt
 
 ```
