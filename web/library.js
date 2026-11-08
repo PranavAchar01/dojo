@@ -498,9 +498,7 @@ function tileEl(t, byId) {
   const a = el("article", `tile${t.id === fresh ? " is-saved" : ""}${testing[t.id] ? " is-testing" : ""}`);
   a.dataset.id = t.id;
   const th = el("div", "tile-thumb");
-  if (t.id === window.forgeRSI?.tile && window.forgeRSI.data) {
-    th.append(rsiThumb(window.forgeRSI)); // the optimizer's 100 simulations playing together, not a single frame
-  } else if (t.thumb) {
+  if (t.thumb) {
     const img = el("img");
     img.alt = t.name;
     img.loading = "lazy";
