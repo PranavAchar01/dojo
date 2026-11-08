@@ -747,7 +747,8 @@ def seeds_for(
 
 
 def solve_topdown(
-    m, d, site, joints, home, target, heading=None, seeds=None, iters=160, w_ori=0.1
+    m, d, site, joints, home, target, heading=None, seeds=None, iters=160, w_ori=0.1,
+    down=(0.0, 0.0, -1.0),
 ):
     """Damped least squares to a top-down tool pose, started from home and from the nearest down-pointing
     seeds. Returns (q, position error m, orientation error) of the best start."""
@@ -770,7 +771,7 @@ def solve_topdown(
             mujoco.mj_comPos(m, d)
             mat = d.site_xmat[site].reshape(3, 3)
             ep = target - d.site_xpos[site]
-            eo = np.cross(mat[:, 0], [0, 0, -1.0])
+            eo = np.cross(mat[:, 0], down)
             if heading is not None and n >= 5:
                 eo = eo + np.cross(mat[:, 2], heading)
             mujoco.mj_jacSite(m, d, jp, jr, site)
@@ -785,7 +786,7 @@ def solve_topdown(
         mujoco.mj_kinematics(m, d)
         mat = d.site_xmat[site].reshape(3, 3)
         ep_n = float(np.linalg.norm(target - d.site_xpos[site]))
-        eo_n = float(np.linalg.norm(np.cross(mat[:, 0], [0, 0, -1.0])))
+        eo_n = float(np.linalg.norm(np.cross(mat[:, 0], down)))
         if ep_n + 0.05 * eo_n < best[1] + 0.05 * best[2]:
             best = (q.copy(), ep_n, eo_n)
     d.qpos[qadr] = best[0]

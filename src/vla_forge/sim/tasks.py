@@ -379,7 +379,7 @@ def sample_layout(
     if spec.skill == "pack":
         from .toolbox import sample
 
-        box, tools = sample(rng)
+        box, tools = sample(rng, robot_id=robot or "so101")
         return Layout(props=box, tools=tools)
     if spec.skill in HARD_SKILLS:
         return _sample_hard(spec, rng, near, tries, bd)
